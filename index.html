@@ -16,7 +16,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 500px;
             margin: 0 auto;
         }
 
@@ -153,9 +153,137 @@
         .sort-option.active { color: #58a6ff; }
         .sort-option.active::before { content: '✓ '; }
 
-        .loading {
+        .loading { color: #484f58; }
+
+        /* Модалка настройки */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 350px;
+            width: 100%;
+        }
+
+        .modal h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 12px;
+            color: #8b949e;
+            margin-bottom: 5px;
+        }
+
+        .modal input {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #238636;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #30363d;
+            color: #c9d1d9;
+        }
+
+        .btn-link {
+            background: #1f6feb;
+            color: white;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #6e7681;
+            line-height: 1.5;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #30363d;
+        }
+
+        .share-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #30363d;
+        }
+
+        .share-section p {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 10px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #238636;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 200;
+            animation: fadeInOut 2s ease;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+
+        .setup-prompt {
             padding: 15px;
-            color: #484f58;
+            color: #8b949e;
+            text-align: center;
         }
     </style>
 </head>
@@ -204,9 +332,41 @@
         </div>
     </div>
 
+    <!-- Модалка первоначальной настройки -->
+    <div class="modal-overlay hidden" id="setupModal">
+        <div class="modal">
+            <h2>⚙️ Настройка</h2>
+            
+            <label>Gist ID:</label>
+            <input type="text" id="inputGistId" placeholder="abc123def456...">
+            
+            <label>GitHub Token:</label>
+            <input type="password" id="inputToken" placeholder="ghp_...">
+            
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="saveSettings()">Сохранить</button>
+            </div>
+            
+            <div class="share-section hidden" id="shareSection">
+                <p>📤 Поделитесь этой ссылкой — другим не придётся ничего вводить:</p>
+                <button class="btn-link" onclick="copyShareLink()" style="width:100%">
+                    📋 Скопировать ссылку
+                </button>
+            </div>
+            
+            <div class="hint">
+                <b>Как получить:</b><br>
+                1. Token: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)<br>
+                2. Права: только <b>gist</b><br>
+                3. Gist: создайте на gist.github.com файл contents.json с текстом {"users":{}}
+            </div>
+        </div>
+    </div>
+
     <script>
-        const GIST_ID = '27e1539c9077caea8cef99bbf1139067';
-        const TOKEN = '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';
+        // ===== КОНФИГУРАЦИЯ =====
+        let GIST_ID = localStorage.getItem('gist_id') || '';
+        let TOKEN = localStorage.getItem('github_token') || '';
 
         let currentUser = localStorage.getItem('current_user') || 'noname';
         let currentSort = localStorage.getItem('sort_mode') || 'manual';
@@ -215,11 +375,134 @@
 
         const userInput = document.getElementById('userName');
 
+        // ===== ПРОВЕРКА URL ПАРАМЕТРОВ =====
+        function checkUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const setup = params.get('s');
+            
+            if (setup) {
+                try {
+                    // Декодируем base64
+                    const decoded = atob(setup);
+                    const [gist, token] = decoded.split(':');
+                    
+                    if (gist && token) {
+                        localStorage.setItem('gist_id', gist);
+                        localStorage.setItem('github_token', token);
+                        GIST_ID = gist;
+                        TOKEN = token;
+                        
+                        // Убираем параметры из URL
+                        window.history.replaceState({}, '', window.location.pathname);
+                        
+                        showToast('✓ Настройки применены');
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Invalid setup param');
+                }
+            }
+            return false;
+        }
+
         // ===== INIT =====
         async function init() {
+            checkUrlParams();
+            
             userInput.value = currentUser === 'noname' ? '' : currentUser;
+            
+            if (!GIST_ID || !TOKEN) {
+                showSetupModal();
+                return;
+            }
+            
             await loadData();
             render();
+        }
+
+        // ===== SETUP MODAL =====
+        function showSetupModal() {
+            document.getElementById('viewMode').innerHTML = `
+                <div class="setup-prompt">Требуется настройка...</div>
+            `;
+            document.getElementById('counter').textContent = '';
+            document.getElementById('inputGistId').value = GIST_ID;
+            document.getElementById('inputToken').value = TOKEN;
+            updateShareSection();
+            document.getElementById('setupModal').classList.remove('hidden');
+        }
+
+        function hideSetupModal() {
+            document.getElementById('setupModal').classList.add('hidden');
+        }
+
+        function updateShareSection() {
+            const section = document.getElementById('shareSection');
+            if (GIST_ID && TOKEN) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+
+        function saveSettings() {
+            const gistId = document.getElementById('inputGistId').value.trim();
+            const token = document.getElementById('inputToken').value.trim();
+            
+            if (!gistId || !token) {
+                alert('Заполните оба поля');
+                return;
+            }
+            
+            localStorage.setItem('gist_id', gistId);
+            localStorage.setItem('github_token', token);
+            
+            GIST_ID = gistId;
+            TOKEN = token;
+            
+            updateShareSection();
+            hideSetupModal();
+            init();
+        }
+
+        // ===== SHARE LINK =====
+        function generateShareLink() {
+            if (!GIST_ID || !TOKEN) return '';
+            
+            const data = btoa(`${GIST_ID}:${TOKEN}`);
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}?s=${data}`;
+        }
+
+        function copyShareLink() {
+            const link = generateShareLink();
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(link).then(() => {
+                    showToast('✓ Ссылка скопирована');
+                });
+            } else {
+                // Fallback для старых браузеров
+                const textarea = document.createElement('textarea');
+                textarea.value = link;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('✓ Ссылка скопирована');
+            }
+        }
+
+        function showToast(message) {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 2000);
         }
 
         // ===== USER INPUT =====
@@ -231,9 +514,7 @@
 
         userInput.addEventListener('blur', switchUser);
         userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                userInput.blur();
-            }
+            if (e.key === 'Enter') userInput.blur();
         });
 
         async function switchUser() {
@@ -259,17 +540,39 @@
                 const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     headers: { 'Authorization': `token ${TOKEN}` }
                 });
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
                 const gist = await res.json();
-                data = JSON.parse(gist.files['contents.json'].content);
+                
+                if (!gist.files || !gist.files['contents.json']) {
+                    data = { users: {} };
+                    await saveData();
+                } else {
+                    data = JSON.parse(gist.files['contents.json'].content);
+                }
             } catch (e) {
                 console.error(e);
+                document.getElementById('viewMode').innerHTML = `
+                    <div class="setup-prompt" style="color:#f85149">
+                        Ошибка подключения<br><br>
+                        <button onclick="showSetupModal()" style="background:#30363d;color:#c9d1d9;border:none;padding:10px 20px;border-radius:6px;cursor:pointer">
+                            Проверить настройки
+                        </button>
+                    </div>
+                `;
                 data = { users: {} };
             }
         }
 
         async function saveData() {
+            if (!TOKEN || !GIST_ID) {
+                showSetupModal();
+                return;
+            }
+            
             try {
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     method: 'PATCH',
                     headers: {
                         'Authorization': `token ${TOKEN}`,
@@ -283,13 +586,20 @@
                         }
                     })
                 });
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
             } catch (e) {
+                console.error(e);
                 alert('Ошибка сохранения');
             }
         }
 
         // ===== EDIT =====
         function toggleEdit() {
+            if (!TOKEN || !GIST_ID) {
+                showSetupModal();
+                return;
+            }
             isEditing ? cancelEdit() : startEdit();
         }
 
@@ -322,6 +632,7 @@
             await saveData();
             cancelEdit();
             render();
+            showToast('✓ Сохранено');
         }
 
         // ===== SORT =====
