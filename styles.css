@@ -158,20 +158,21 @@ header{
 .search-toggle-btn:hover{ color:var(--text); border-color:var(--blue); }
 .search-toggle-btn.on{ color:var(--blue); }
 
+/* Mobile search row (in document flow) */
+.mobile-search-row{
+  margin-top:10px;
+}
+.mobile-search-row .filter-wrap{
+  width:100%;
+}
+.mobile-search-row.hidden{
+  display:none;
+}
+
 @media (max-width: 600px) {
   .section-btn{ min-width:auto; max-width:140px; }
-  .filter-wrap{ display:none; }
+  .filter-wrap:not(.mobile-filter){ display:none; }
   .search-toggle-btn{ display:grid; }
-  
-  .filter-wrap.mobile-open{
-    display:flex;
-    position:absolute;
-    top:100%;
-    left:0;
-    right:0;
-    margin-top:8px;
-    z-index:110;
-  }
 }
 
 .header-buttons{
@@ -447,7 +448,6 @@ header{
 
 .dropdown-menu.section-menu{ padding:8px 0; min-width:260px; }
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
-.dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
 .dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
 .dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; }
 
@@ -515,13 +515,20 @@ header{
 
 .sort-dir{ margin-left:auto; color:#8b949e; font-size:12px; }
 
-.settings-menu label{
+/* Settings panel inside section menu */
+.settings-panel{
+  padding:10px 14px;
+}
+.settings-panel.hidden{
+  display:none;
+}
+.settings-panel label{
   display:block;
   font-size:11px;
   color:#8b949e;
   margin-bottom:4px;
 }
-.settings-menu input{
+.settings-panel input{
   width:100%;
   background:var(--bg);
   border:1px solid var(--border);
@@ -531,7 +538,7 @@ header{
   font-size:13px;
   margin-bottom:12px;
 }
-.settings-menu input:focus{ outline:none; border-color:var(--blue); }
+.settings-panel input:focus{ outline:none; border-color:var(--blue); }
 
 .settings-buttons{ display:flex; gap:8px; }
 .settings-btn{

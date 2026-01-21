@@ -50,14 +50,13 @@ let mobileSearchOpen = false;
 // ===== INIT =====
 async function init() {
   applyUrlSetupSilently();
-  updateSettingsIcon();
-  updateShareButton();
   setupFilterUI();
   updateViewedToggleUI();
   updateTagFilterBtnUI();
+  updateShareButton();
 
   if (!GIST_ID || !TOKEN) {
-    document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">Откройте настройки</div>`;
+    document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">Откройте меню → Подключение</div>`;
     document.getElementById("counter").textContent = "";
     return;
   }
@@ -186,42 +185,74 @@ function labelHTMLForSection(sectionKey) {
 // ===== Mobile search toggle =====
 function toggleMobileSearch() {
   mobileSearchOpen = !mobileSearchOpen;
-  const wrap = document.getElementById("filterWrap");
+  const row = document.getElementById("mobileSearchRow");
   const btn = document.getElementById("searchToggleBtn");
-  
-  wrap.classList.toggle("mobile-open", mobileSearchOpen);
+
+  row.classList.toggle("hidden", !mobileSearchOpen);
   btn.classList.toggle("on", mobileSearchOpen);
-  
+
   if (mobileSearchOpen) {
-    document.getElementById("filterInput").focus();
+    const input = document.getElementById("mobileFilterInput");
+    input.value = filterQuery;
+    input.focus();
   }
 }
 
 // ===== Filter (text) =====
 function setupFilterUI() {
+  // Desktop filter
   const input = document.getElementById("filterInput");
   const clear = document.getElementById("filterClear");
 
   input.value = filterQuery;
   clear.classList.toggle("hidden", !filterQuery);
 
-  input.oninput = () => {
-    if (isEditing) return;
-    filterQuery = input.value || "";
-    localStorage.setItem("filter_query", filterQuery);
-    clear.classList.toggle("hidden", !filterQuery);
-    selectedKey = null;
-    disarmItemDelete();
-    closeTagEditor();
-    render();
-  };
-
+  input.oninput = () => handleFilterInput(input.value);
   input.onkeydown = (e) => {
     if (e.key === "Escape") {
       clearFilter();
       input.blur();
     }
   };
+
+  // Mobile filter
+  const mobileInput = document.getElementById("mobileFilterInput");
+  const mobileClear = document.getElementById("mobileFilterClear");
+
+  if (mobileInput) {
+    mobileInput.value = filterQuery;
+    mobileClear.classList.toggle("hidden", !filterQuery);
+
+    mobileInput.oninput = () => handleFilterInput(mobileInput.value);
+    mobileInput.onkeydown = (e) => {
+      if (e.key === "Escape") {
+        clearFilter();
+        mobileInput.blur();
+      }
+    };
+  }
+}
+
+function handleFilterInput(value) {
+  if (isEditing) return;
+  filterQuery = value || "";
+  localStorage.setItem("filter_query", filterQuery);
+
+  // Sync both inputs
+  document.getElementById("filterInput").value = filterQuery;
+  document.getElementById("filterClear").classList.toggle("hidden", !filterQuery);
+
+  const mobileInput = document.getElementById("mobileFilterInput");
+  const mobileClear = document.getElementById("mobileFilterClear");
+  if (mobileInput) {
+    mobileInput.value = filterQuery;
+    mobileClear.classList.toggle("hidden", !filterQuery);
+  }
+
+  selectedKey = null;
+  disarmItemDelete();
+  closeTagEditor();
+  render();
 }
 
 function setFilterLock(locked) {
@@ -230,20 +261,35 @@ function setFilterLock(locked) {
   input.disabled = locked;
   if (locked) clear.classList.add("hidden");
   else clear.classList.toggle("hidden", !filterQuery);
+
+  const mobileInput = document.getElementById("mobileFilterInput");
+  const mobileClear = document.getElementById("mobileFilterClear");
+  if (mobileInput) {
+    mobileInput.disabled = locked;
+    if (locked) mobileClear.classList.add("hidden");
+    else mobileClear.classList.toggle("hidden", !filterQuery);
+  }
 }
 
 function clearFilter() {
   if (isEditing) return;
   filterQuery = "";
   localStorage.setItem("filter_query", "");
-  const input = document.getElementById("filterInput");
-  input.value = "";
+
+  document.getElementById("filterInput").value = "";
   document.getElementById("filterClear").classList.add("hidden");
+
+  const mobileInput = document.getElementById("mobileFilterInput");
+  const mobileClear = document.getElementById("mobileFilterClear");
+  if (mobileInput) {
+    mobileInput.value = "";
+    mobileClear.classList.add("hidden");
+  }
+
   selectedKey = null;
   disarmItemDelete();
   closeTagEditor();
   render();
-  input.focus();
 }
 
 // ===== Tag filter =====
@@ -283,7 +329,7 @@ function toggleTagFilterMenu() {
   }
 
   renderTagFilterMenu();
-  openMenu("tagFilterMenu", btn, "right");
+  openMenu("tagFilterMenu", btn, "left");
 }
 
 function getScopeItems() {
@@ -352,7 +398,7 @@ function renderTagFilterMenu() {
     })
     .join("");
 
-  // attach click handlers (no inline onclick to avoid menu closing)
+  // Attach click handlers via event delegation (menu stays open)
   list.querySelectorAll(".tag-option").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -378,6 +424,7 @@ function toggleTagFilterInternal(tag) {
   disarmItemDelete();
   closeTagEditor();
 
+  // Re-render menu without closing
   renderTagFilterMenu();
   render();
 }
@@ -468,7 +515,7 @@ function renderTagEditorList() {
     })
     .join("");
 
-  // attach handlers
+  // Attach handlers
   list.querySelectorAll(".tag-pill-text").forEach((input) => {
     input.addEventListener("blur", () => handleTagRename(input));
     input.addEventListener("keydown", (e) => {
@@ -507,7 +554,7 @@ function handleTagRename(input) {
   const idx = tags.indexOf(oldTag);
   if (idx === -1) return;
 
-  // check duplicate
+  // Check duplicate
   if (tags.includes(newTag)) {
     tags.splice(idx, 1);
   } else {
@@ -582,7 +629,6 @@ function removeTagFromCurrentItemWithUndo(tag) {
   renderTagEditorList();
   renderTagFilterMenu();
 
-  // undo
   startUndo(
     {
       type: "tag",
@@ -677,22 +723,19 @@ function openMenu(menuId, anchorEl, align = "left") {
   menu.style.visibility = "visible";
 }
 
-// ===== SETTINGS =====
-function toggleSettings() {
-  if (isEditing) return;
+// ===== SETTINGS (inside section menu) =====
+function toggleSettingsPanel() {
+  const panel = document.getElementById("settingsPanel");
+  if (!panel) return;
 
-  const menu = document.getElementById("settingsMenu");
-  const btn = document.getElementById("settingsBtn");
+  const isHidden = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !isHidden);
 
-  if (!menu.classList.contains("hidden")) {
-    menu.classList.add("hidden");
-    return;
+  if (isHidden) {
+    document.getElementById("inputGistId").value = GIST_ID;
+    document.getElementById("inputToken").value = TOKEN;
+    updateShareButton();
   }
-
-  document.getElementById("inputGistId").value = GIST_ID;
-  document.getElementById("inputToken").value = TOKEN;
-  updateShareButton();
-  openMenu("settingsMenu", btn, "right");
 }
 
 function saveSettings() {
@@ -705,18 +748,15 @@ function saveSettings() {
   GIST_ID = gistId;
   TOKEN = token;
 
-  document.getElementById("settingsMenu").classList.add("hidden");
-  updateSettingsIcon();
+  document.getElementById("sectionMenu").classList.add("hidden");
+  document.getElementById("settingsPanel").classList.add("hidden");
   updateShareButton();
   init();
 }
 
-function updateSettingsIcon() {
-  document.getElementById("settingsBtn").classList.toggle("error", !GIST_ID || !TOKEN);
-}
-
 function updateShareButton() {
-  document.getElementById("shareBtn").style.display = GIST_ID && TOKEN ? "grid" : "none";
+  const btn = document.getElementById("shareBtn");
+  if (btn) btn.style.display = GIST_ID && TOKEN ? "grid" : "none";
 }
 
 function copyShareLink() {
@@ -743,12 +783,14 @@ function toggleSectionMenu() {
   if (!menu.classList.contains("hidden")) {
     menu.classList.add("hidden");
     document.getElementById("newSectionInput").classList.add("hidden");
+    document.getElementById("settingsPanel").classList.add("hidden");
     disarmSectionDelete();
     return;
   }
 
   renderSectionList();
   document.getElementById("newSectionInput").classList.add("hidden");
+  document.getElementById("settingsPanel").classList.add("hidden");
   openMenu("sectionMenu", btn, "left");
 }
 
@@ -789,6 +831,7 @@ function selectSection(sectionKey) {
   updateSectionButton();
   updateViewedToggleUI();
   document.getElementById("sectionMenu").classList.add("hidden");
+  document.getElementById("settingsPanel").classList.add("hidden");
   render();
 }
 
@@ -1301,7 +1344,7 @@ function deleteItemNow(sectionKey, index) {
 // ===== EDIT =====
 function toggleEdit() {
   if (!TOKEN || !GIST_ID) {
-    toggleSettings();
+    toggleSectionMenu();
     return;
   }
   isEditing ? cancelEdit() : startEdit();
@@ -1709,7 +1752,7 @@ viewModeEl.addEventListener("click", (e) => {
 
 // ===== Close menus =====
 function closeAllMenus(except) {
-  ["sortMenu", "settingsMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu"].forEach((id) => {
+  ["sortMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu"].forEach((id) => {
     if (id === except) return;
     const el = document.getElementById(id);
     if (el) el.classList.add("hidden");
@@ -1773,7 +1816,7 @@ Object.assign(window, {
   toggleEdit,
   cancelEdit,
   saveEdit,
-  toggleSettings,
+  toggleSettingsPanel,
   saveSettings,
   copyShareLink,
   selectSection,

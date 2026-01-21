@@ -21,10 +21,6 @@
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
         </button>
 
-        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
-          <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
-        </button>
-
         <!-- toggle only for "Все": include/exclude viewed sections -->
         <button class="all-toggle hidden" id="viewedToggleBtn" onclick="toggleShowViewed()" title="Показывать/скрывать просмотренное">
           <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="icons.svg#i-eye-off"></use></svg>
@@ -51,8 +47,18 @@
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-sort"></use></svg>
           </button>
 
-          <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Настройки">
-            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-gear"></use></svg>
+          <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
+            <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile: expanded search field (in document flow, pushes content down) -->
+      <div class="mobile-search-row hidden" id="mobileSearchRow">
+        <div class="filter-wrap mobile-filter">
+          <input class="filter-input" id="mobileFilterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
+          <button class="filter-clear hidden" id="mobileFilterClear" title="Очистить фильтр" onclick="clearFilter()">
+            <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
           </button>
         </div>
       </div>
@@ -77,12 +83,12 @@
       <div class="counter" id="counter"></div>
     </div>
 
-    <!-- Sections -->
+    <!-- Sections (with settings inside) -->
     <div class="dropdown-menu section-menu hidden" id="sectionMenu">
       <div class="menu-option all-sections" onclick="selectSection('__all__')">Все</div>
       <div id="sectionList"></div>
       <div class="menu-divider"></div>
-      <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый</div>
+      <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый раздел</div>
       <input
         type="text"
         class="new-section-input hidden"
@@ -90,6 +96,30 @@
         placeholder="Название..."
         onkeydown="handleNewSection(event)"
       />
+
+      <div class="menu-divider"></div>
+      <div class="menu-option" onclick="toggleSettingsPanel()">
+        <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-gear"></use></svg>
+        <span>Подключение</span>
+      </div>
+
+      <!-- Settings panel (hidden by default) -->
+      <div class="settings-panel hidden" id="settingsPanel">
+        <label>Gist ID</label>
+        <input type="text" id="inputGistId" placeholder="abc123..." />
+
+        <label>Token</label>
+        <input type="password" id="inputToken" placeholder="ghp_..." />
+
+        <div class="settings-buttons">
+          <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
+          </button>
+          <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-copy"></use></svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Sort -->
@@ -140,24 +170,6 @@
 
       <div class="menu-divider"></div>
       <div class="menu-option" onclick="clearTagsForCurrentItem()">Очистить теги</div>
-    </div>
-
-    <!-- Settings -->
-    <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
-      <label>Gist ID</label>
-      <input type="text" id="inputGistId" placeholder="abc123..." />
-
-      <label>Token</label>
-      <input type="password" id="inputToken" placeholder="ghp_..." />
-
-      <div class="settings-buttons">
-        <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">
-          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
-        </button>
-        <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">
-          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-copy"></use></svg>
-        </button>
-      </div>
     </div>
   </div>
 
