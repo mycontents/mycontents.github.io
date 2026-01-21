@@ -1,13 +1,13 @@
 // Contents app (GitHub Pages + Gist)
-// Split from original single-file version: CSS -> styles.css, icons -> icons.svg
+// CSS -> styles.css, icons -> icons.svg
 
 // ===== CONFIG =====
 const ICONS = "icons.svg";
-const VIEWED_KEY_PREFIX = "__viewed__:"; // внутренний префикс (не показываем текстом)
-const OLD_VIEWED_PREFIX = "✓ "; // миграция со старых данных
+const VIEWED_KEY_PREFIX = "__viewed__:"; // внутренний префикс
 
 const SECTION_UNDO_MS = 10000;
-const ITEM_UNDO_MS = 10000; // требование: 10 сек на отмену удаления позиции
+const ITEM_UNDO_MS = 10000; // 10 сек на отмену удаления позиции
+const MOVE_UNDO_MS = 10000; // 10 сек на отмену переноса в/из просмотренного
 
 const TAG_FILTER_LS_KEY = "tag_filter";
 
@@ -45,7 +45,7 @@ let undoTimer = null;
 let undoPayload = null; // {type, ...}
 
 // edit context for filtered editing
-let editCtx = null; // {mode, filterLower, showViewedInAll, masksBySection? / mask? / sectionKey?}
+let editCtx = null; // {mode, filterLower, showViewedInAll, tagFilterArr, masksBySection? / mask? / sectionKey?}
 
 // tags
 let tagFilter = loadTagFilter(); // Set<string>
@@ -69,7 +69,6 @@ async function init() {
   await loadData();
   normalizeDataModel();
   ensureDefaultSections();
-  migrateViewedPrefixesIfNeeded();
   normalizeDataModel();
 
   renderSectionList();
@@ -102,7 +101,6 @@ function isItemObject(it) {
 }
 
 function getItemText(it) {
-  if (typeof it === "string") return it;
   if (isItemObject(it)) return it.text;
   return String(it ?? "");
 }
@@ -142,7 +140,10 @@ function ensureItemObject(it, createdIso) {
     if (!it.created) it.created = createdIso || new Date().toISOString();
     return it;
   }
-  return createItem(getItemText(it), createdIso);
+
+  // если в данных попалась строка/что-то ещё — приводим к корректному формату
+  const item = createItem(getItemText(it), createdIso);
+  return item;
 }
 
 function normalizeDataModel() {
@@ -152,21 +153,12 @@ function normalizeDataModel() {
   for (const sectionKey of Object.keys(data.sections)) {
     let sec = data.sections[sectionKey];
 
-    // extremely old: section value is an array
-    if (Array.isArray(sec)) {
-      sec = { items: sec, modified: new Date().toISOString() };
-    }
-
     if (!sec || typeof sec !== "object") sec = { items: [], modified: new Date().toISOString() };
     if (!Array.isArray(sec.items)) sec.items = [];
     if (!sec.modified) sec.modified = new Date().toISOString();
 
     const baseMs = Date.parse(sec.modified) || Date.now();
-
-    sec.items = sec.items.map((it, i) => {
-      const createdIso = new Date(baseMs + i).toISOString();
-      return ensureItemObject(it, createdIso);
-    });
+    sec.items = sec.items.map((it, i) => ensureItemObject(it, new Date(baseMs + i).toISOString()));
 
     data.sections[sectionKey] = sec;
   }
@@ -174,13 +166,12 @@ function normalizeDataModel() {
 
 // ===== Viewed helpers =====
 function isViewedSection(name) {
-  return typeof name === "string" && (name.startsWith(VIEWED_KEY_PREFIX) || name.startsWith(OLD_VIEWED_PREFIX));
+  return typeof name === "string" && name.startsWith(VIEWED_KEY_PREFIX);
 }
 
 function baseSectionName(name) {
   if (typeof name !== "string") return "";
   if (name.startsWith(VIEWED_KEY_PREFIX)) return name.slice(VIEWED_KEY_PREFIX.length);
-  if (name.startsWith(OLD_VIEWED_PREFIX)) return name.slice(OLD_VIEWED_PREFIX.length);
   return name;
 }
 
@@ -194,50 +185,17 @@ function editorLabelForSectionKey(sectionKey) {
 }
 
 function sectionKeyFromEditorLabel(label) {
-  // поддержка: ~Раздел => просмотренный, иначе обычный
+  // ~Раздел => просмотренный
   const t = String(label || "").trim();
-
-  if (t.startsWith(VIEWED_KEY_PREFIX)) return t; // если кто-то вставил "как есть"
+  if (t.startsWith(VIEWED_KEY_PREFIX)) return t;
   if (t.startsWith("~")) return VIEWED_KEY_PREFIX + t.slice(1).trim();
-  if (t.startsWith(OLD_VIEWED_PREFIX)) return VIEWED_KEY_PREFIX + t.slice(OLD_VIEWED_PREFIX.length).trim();
   return t;
 }
 
 function labelHTMLForSection(sectionKey) {
   const base = escapeHtml(baseSectionName(sectionKey));
-  if (!isViewedSection(sectionKey)) {
-    return `<span class="sec-label">${base}</span>`;
-  }
+  if (!isViewedSection(sectionKey)) return `<span class="sec-label">${base}</span>`;
   return `<span class="sec-label"><svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>${base}</span>`;
-}
-
-function migrateViewedPrefixesIfNeeded() {
-  // rename keys "✓ X" -> "__viewed__:X"
-  const keys = Object.keys(data.sections || {});
-  const toRename = keys.filter((k) => k.startsWith(OLD_VIEWED_PREFIX));
-  if (!toRename.length) return;
-
-  for (const oldKey of toRename) {
-    const base = oldKey.slice(OLD_VIEWED_PREFIX.length);
-    const newKey = VIEWED_KEY_PREFIX + base;
-
-    if (!data.sections[newKey]) {
-      data.sections[newKey] = data.sections[oldKey];
-      delete data.sections[oldKey];
-    } else {
-      const a = data.sections[newKey]?.items || [];
-      const b = data.sections[oldKey]?.items || [];
-      data.sections[newKey].items = [...a, ...b];
-      delete data.sections[oldKey];
-    }
-
-    if (currentSection === oldKey) {
-      currentSection = newKey;
-      localStorage.setItem("current_section", newKey);
-    }
-  }
-
-  saveData();
 }
 
 // ===== Filter (text) =====
@@ -336,16 +294,20 @@ function getScopeItems() {
   if (currentSection === "__all__") {
     for (const sectionKey of Object.keys(data.sections)) {
       if (!shouldIncludeSectionInAll(sectionKey)) continue;
-      const arr = data.sections[sectionKey]?.items || [];
+      const sec = data.sections[sectionKey];
+      const arr = sec?.items || [];
       for (let i = 0; i < arr.length; i++) {
         const item = ensureItemObject(arr[i]);
+        sec.items[i] = item;
         out.push({ item, sectionKey, index: i });
       }
     }
   } else {
-    const arr = data.sections[currentSection]?.items || [];
+    const sec = data.sections[currentSection];
+    const arr = sec?.items || [];
     for (let i = 0; i < arr.length; i++) {
       const item = ensureItemObject(arr[i]);
+      sec.items[i] = item;
       out.push({ item, sectionKey: currentSection, index: i });
     }
   }
@@ -409,7 +371,7 @@ function toggleTagFilter(tag) {
   disarmItemDelete();
   closeTagEditor();
 
-  // keep menu open and update checkmarks/counts
+  // меню не закрываем — обновляем состояние галочек
   renderTagFilterMenu();
   render();
 }
@@ -603,8 +565,7 @@ function openMenu(menuId, anchorEl, align = "left") {
   const mRect = menu.getBoundingClientRect();
 
   const top = aRect.bottom - cRect.top + 8;
-  let left =
-    align === "right" ? aRect.right - cRect.left - mRect.width : aRect.left - cRect.left;
+  let left = align === "right" ? aRect.right - cRect.left - mRect.width : aRect.left - cRect.left;
 
   left = Math.max(0, Math.min(left, cRect.width - mRect.width));
 
@@ -702,16 +663,12 @@ function renderSectionList() {
       const armed = deleteArmSection === sectionKey;
 
       return `
-        <div class="menu-option ${currentSection === sectionKey ? "active" : ""} ${
-          armed ? "armed" : ""
-        }"
+        <div class="menu-option ${currentSection === sectionKey ? "active" : ""} ${armed ? "armed" : ""}"
              onclick="selectSection('${escapeQuotes(sectionKey)}')">
           <span>${labelHTMLForSection(sectionKey)}</span>
 
           <span class="menu-actions" onclick="event.stopPropagation()">
-            <button class="mini-btn danger" title="Удалить" onclick="handleSectionDelete('${escapeQuotes(
-              sectionKey
-            )}')">×</button>
+            <button class="mini-btn danger" title="Удалить" onclick="handleSectionDelete('${escapeQuotes(sectionKey)}')">×</button>
           </span>
         </div>
       `;
@@ -770,7 +727,6 @@ function handleSectionDelete(sectionKey) {
   if (!data.sections[sectionKey]) return;
 
   if (deleteArmSection === sectionKey) {
-    // delete now
     const payload = {
       type: "section",
       sectionKey,
@@ -800,7 +756,6 @@ function handleSectionDelete(sectionKey) {
     return;
   }
 
-  // arm
   deleteArmSection = sectionKey;
   renderSectionList();
 
@@ -887,7 +842,7 @@ function getSortedItems(items) {
   if (!items || sortState.key === "manual") return items;
 
   const sorted = [...items];
-  const getText = (x) => x.text ?? getItemText(x.item) ?? x;
+  const getText = (x) => x.text ?? x.item?.text ?? "";
 
   switch (sortState.key) {
     case "alpha":
@@ -926,16 +881,7 @@ async function loadData() {
     const gist = await res.json();
     if (gist.files?.["contents.json"]) {
       const loaded = JSON.parse(gist.files["contents.json"].content);
-
-      if (loaded?.users && !loaded?.sections) {
-        // very old schema: { users: { section: ["..."] } }
-        data = { sections: {} };
-        for (const [k, v] of Object.entries(loaded.users || {})) {
-          data.sections[k] = Array.isArray(v) ? { items: v, modified: new Date().toISOString() } : v;
-        }
-      } else {
-        data = loaded?.sections ? loaded : { sections: {} };
-      }
+      data = loaded?.sections ? loaded : { sections: {} };
     } else {
       data = { sections: {} };
       await saveData();
@@ -985,6 +931,11 @@ function hideUndo() {
   document.getElementById("undoBar").classList.add("hidden");
 }
 
+function findItemIndexByCreated(arr, created) {
+  if (!Array.isArray(arr) || !created) return -1;
+  return arr.findIndex((x) => isItemObject(x) && x.created === created);
+}
+
 document.getElementById("undoBtn").addEventListener("click", () => {
   if (!undoPayload) return;
 
@@ -1030,6 +981,55 @@ document.getElementById("undoBtn").addEventListener("click", () => {
     render();
   }
 
+  if (undoPayload.type === "move") {
+    const { fromSectionKey, fromIndex, toSectionKey, toIndex, item } = undoPayload;
+
+    if (!data.sections[toSectionKey]) data.sections[toSectionKey] = { items: [], modified: new Date().toISOString() };
+    if (!data.sections[fromSectionKey]) data.sections[fromSectionKey] = { items: [], modified: new Date().toISOString() };
+
+    normalizeDataModel();
+
+    const toArr = data.sections[toSectionKey].items;
+    let removedIdx = -1;
+
+    if (Number.isFinite(toIndex) && toIndex >= 0 && toIndex < toArr.length) {
+      const candidate = toArr[toIndex];
+      if (isItemObject(candidate) && isItemObject(item) && candidate.created === item.created) {
+        removedIdx = toIndex;
+      }
+    }
+
+    if (removedIdx === -1) {
+      removedIdx = findItemIndexByCreated(toArr, item?.created);
+    }
+
+    if (removedIdx === -1) {
+      // fallback: by text
+      const t = String(item?.text ?? "");
+      removedIdx = toArr.findIndex((x) => isItemObject(x) && x.text === t);
+    }
+
+    let movedItem = ensureItemObject(item);
+    if (removedIdx !== -1) {
+      movedItem = ensureItemObject(toArr.splice(removedIdx, 1)[0]);
+    }
+
+    data.sections[toSectionKey].modified = new Date().toISOString();
+
+    const fromArr = data.sections[fromSectionKey].items;
+    const idx = Math.max(0, Math.min(Number(fromIndex), fromArr.length));
+    fromArr.splice(idx, 0, movedItem);
+    data.sections[fromSectionKey].modified = new Date().toISOString();
+
+    selectedKey = null;
+    disarmItemDelete();
+    closeTagEditor();
+
+    saveData();
+    renderSectionList();
+    render();
+  }
+
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = null;
   undoPayload = null;
@@ -1048,6 +1048,8 @@ function moveItemToViewed(sectionKey, index) {
   if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
 
   const item = ensureItemObject(srcItems[idx]);
+  const payloadItem = JSON.parse(JSON.stringify(item));
+
   srcItems.splice(idx, 1);
   data.sections[sectionKey].modified = new Date().toISOString();
 
@@ -1055,15 +1057,30 @@ function moveItemToViewed(sectionKey, index) {
   if (!data.sections[destKey]) data.sections[destKey] = { items: [], modified: new Date().toISOString() };
   normalizeDataModel();
 
+  const toIndex = data.sections[destKey].items.length;
   data.sections[destKey].items.push(item);
   data.sections[destKey].modified = new Date().toISOString();
 
   selectedKey = null;
   disarmItemDelete();
   closeTagEditor();
+
   saveData();
   renderSectionList();
   render();
+
+  startUndo(
+    {
+      type: "move",
+      fromSectionKey: sectionKey,
+      fromIndex: idx,
+      toSectionKey: destKey,
+      toIndex,
+      item: payloadItem,
+    },
+    MOVE_UNDO_MS,
+    "Перемещено в просмотренное"
+  );
 }
 
 function returnItemFromViewed(viewedSectionKey, index) {
@@ -1077,6 +1094,8 @@ function returnItemFromViewed(viewedSectionKey, index) {
   if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
 
   const item = ensureItemObject(srcItems[idx]);
+  const payloadItem = JSON.parse(JSON.stringify(item));
+
   srcItems.splice(idx, 1);
   data.sections[viewedSectionKey].modified = new Date().toISOString();
 
@@ -1084,15 +1103,30 @@ function returnItemFromViewed(viewedSectionKey, index) {
   if (!data.sections[baseKey]) data.sections[baseKey] = { items: [], modified: new Date().toISOString() };
   normalizeDataModel();
 
+  const toIndex = data.sections[baseKey].items.length;
   data.sections[baseKey].items.push(item);
   data.sections[baseKey].modified = new Date().toISOString();
 
   selectedKey = null;
   disarmItemDelete();
   closeTagEditor();
+
   saveData();
   renderSectionList();
   render();
+
+  startUndo(
+    {
+      type: "move",
+      fromSectionKey: viewedSectionKey,
+      fromIndex: idx,
+      toSectionKey: baseKey,
+      toIndex,
+      item: payloadItem,
+    },
+    MOVE_UNDO_MS,
+    "Возвращено из просмотренного"
+  );
 }
 
 function armItemDelete(key) {
@@ -1150,6 +1184,17 @@ function toggleEdit() {
   isEditing ? cancelEdit() : startEdit();
 }
 
+function matchesTextFilter(item, filterLower) {
+  if (!filterLower) return true;
+  return String(item?.text || "").toLowerCase().includes(filterLower);
+}
+
+function matchesTagFilter(item, tagSet) {
+  if (!tagSet || tagSet.size === 0) return true;
+  const tags = uniqueNormalizedTags(item?.tags);
+  return tags.some((t) => tagSet.has(t));
+}
+
 function startEdit() {
   isEditing = true;
   selectedKey = null;
@@ -1163,6 +1208,7 @@ function startEdit() {
   document.getElementById("editUse").setAttribute("href", `${ICONS}#i-x`);
 
   const filterLower = (filterQuery || "").trim().toLowerCase();
+  const tagSet = new Set(tagFilter);
 
   normalizeDataModel();
 
@@ -1173,28 +1219,41 @@ function startEdit() {
     for (const sectionKey of Object.keys(data.sections)) {
       if (!showViewedInAll && isViewedSection(sectionKey)) continue;
 
-      const items = data.sections[sectionKey]?.items || [];
-      const mask = items.map((it) => !filterLower || getItemText(it).toLowerCase().includes(filterLower));
+      const sec = data.sections[sectionKey];
+      const items = sec?.items || [];
+
+      const mask = items.map((it, i) => {
+        const item = ensureItemObject(it);
+        sec.items[i] = item;
+        return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet);
+      });
 
       if (mask.some(Boolean)) masksBySection[sectionKey] = mask;
 
       for (let i = 0; i < items.length; i++) {
-        if (mask[i]) lines.push(`[${editorLabelForSectionKey(sectionKey)}] ${getItemText(items[i])}`);
+        if (mask[i]) lines.push(`[${editorLabelForSectionKey(sectionKey)}] ${getItemText(sec.items[i])}`);
       }
     }
 
     editor.value = lines.join("\n");
     hint.classList.remove("hidden");
-    editCtx = { mode: "all", filterLower, showViewedInAll, masksBySection };
+    editCtx = { mode: "all", filterLower, showViewedInAll, tagFilterArr: [...tagSet], masksBySection };
   } else {
     const sectionKey = currentSection;
-    const orig = data.sections[sectionKey]?.items || [];
-    const mask = orig.map((it) => !filterLower || getItemText(it).toLowerCase().includes(filterLower));
-    const lines = orig.filter((_, i) => mask[i]).map(getItemText);
+    const sec = data.sections[sectionKey];
+    const orig = sec?.items || [];
+
+    const mask = orig.map((it, i) => {
+      const item = ensureItemObject(it);
+      sec.items[i] = item;
+      return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet);
+    });
+
+    const lines = sec.items.filter((_, i) => mask[i]).map((x) => x.text);
 
     editor.value = lines.join("\n");
     hint.classList.add("hidden");
-    editCtx = { mode: "section", sectionKey, filterLower, mask };
+    editCtx = { mode: "section", sectionKey, filterLower, tagFilterArr: [...tagSet], mask };
   }
 
   document.getElementById("viewMode").classList.add("hidden");
@@ -1336,16 +1395,20 @@ function buildItemsForView() {
   if (currentSection === "__all__") {
     for (const sectionKey of Object.keys(data.sections)) {
       if (!shouldIncludeSectionInAll(sectionKey)) continue;
-      const arr = data.sections[sectionKey]?.items || [];
+      const sec = data.sections[sectionKey];
+      const arr = sec?.items || [];
       for (let i = 0; i < arr.length; i++) {
         const item = ensureItemObject(arr[i]);
+        sec.items[i] = item;
         items.push({ item, text: item.text, sectionKey, index: i });
       }
     }
   } else {
-    const arr = data.sections[currentSection]?.items || [];
+    const sec = data.sections[currentSection];
+    const arr = sec?.items || [];
     for (let i = 0; i < arr.length; i++) {
       const item = ensureItemObject(arr[i]);
+      sec.items[i] = item;
       items.push({ item, text: item.text, sectionKey: currentSection, index: i });
     }
   }
@@ -1385,11 +1448,7 @@ function render() {
 
       const secTag = showSecTag
         ? `<span class="item-section-tag">
-             ${
-               viewed
-                 ? `<svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>`
-                 : ``
-             }
+             ${viewed ? `<svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>` : ``}
              ${escapeHtml(baseSectionName(it.sectionKey))}
            </span>`
         : "";
@@ -1408,9 +1467,7 @@ function render() {
            </button>`;
 
       return `
-        <div class="item-line ${selected ? "selected" : ""} ${
-        deleteArmItemKey === key ? "del-armed" : ""
-      }"
+        <div class="item-line ${selected ? "selected" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}"
              data-key="${escapeAttr(key)}"
              data-section="${escapeAttr(it.sectionKey)}"
              data-index="${String(it.index)}">
@@ -1483,7 +1540,6 @@ viewModeEl.addEventListener("click", (e) => {
       return;
     }
     if (action === "tags") {
-      // если строка не выбрана — сначала выбираем
       if (selectedKey !== key) {
         selectedKey = key;
         disarmItemDelete();
@@ -1493,34 +1549,28 @@ viewModeEl.addEventListener("click", (e) => {
       return;
     }
     if (action === "item-del") {
-      // если строка не выбрана — сначала выбираем (чтобы появился сдвиг)
       if (selectedKey !== key) {
         selectedKey = key;
         disarmItemDelete();
         closeTagEditor();
         render();
-        // после render — взводим удаление
         armItemDelete(key);
         return;
       }
 
-      // если уже взведено — удаляем
       if (deleteArmItemKey === key) {
         deleteItemNow(sectionKey, index);
         return;
       }
 
-      // иначе взводим
       armItemDelete(key);
       return;
     }
   }
 
-  // если выделяли текст — не трогаем выделение строки
   const sel = window.getSelection ? window.getSelection() : null;
   if (sel && !sel.isCollapsed) return;
 
-  // ignore long press & drag/scroll gestures
   const longPress = pointer.startedAt && Date.now() - pointer.startedAt > 350;
   if (longPress) return;
   if (pointer.moved) return;
@@ -1552,7 +1602,8 @@ document.addEventListener("click", (e) => {
     !e.target.closest(".dropdown-menu") &&
     !e.target.closest(".icon-btn") &&
     !e.target.closest(".section-btn") &&
-    !e.target.closest(".all-toggle")
+    !e.target.closest(".all-toggle") &&
+    !e.target.closest(".filter-tag-btn")
   ) {
     closeAllMenus();
     disarmSectionDelete();
@@ -1591,7 +1642,7 @@ function truncate(str, max) {
   return s.slice(0, Math.max(0, max - 1)) + "…";
 }
 
-// Expose functions used by inline HTML handlers (explicitly)
+// Expose functions used by inline HTML handlers
 Object.assign(window, {
   toggleSectionMenu,
   toggleShowViewed,
