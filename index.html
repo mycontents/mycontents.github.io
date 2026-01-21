@@ -30,29 +30,23 @@
             border-bottom: 1px solid #21262d;
         }
 
-        .section-selector {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         .section-btn {
             background: #21262d;
             border: 1px solid #30363d;
             color: #c9d1d9;
-            font-size: 16px;
+            font-size: 15px;
             padding: 8px 14px;
             border-radius: 6px;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             min-width: 140px;
             justify-content: space-between;
         }
 
         .section-btn:hover { border-color: #58a6ff; }
-        .section-btn .arrow { font-size: 12px; color: #6e7681; }
+        .section-btn .arrow { font-size: 10px; color: #6e7681; }
 
         .header-buttons {
             display: flex;
@@ -71,6 +65,7 @@
 
         .icon-btn:hover { color: #c9d1d9; }
         .icon-btn.error { color: #f85149; }
+        .icon-btn.disabled { opacity: 0.3; cursor: default; }
 
         .content-area {
             background: #161b22;
@@ -88,12 +83,16 @@
         }
 
         .content-list:empty::before {
-            content: '∅';
+            content: '—';
             color: #484f58;
-            font-size: 48px;
+            font-size: 32px;
             display: flex;
             justify-content: center;
             padding-top: 150px;
+        }
+
+        .content-list.all-mode {
+            line-height: 1.5;
         }
 
         .content-edit {
@@ -135,8 +134,8 @@
         .edit-panel button {
             color: white;
             border: none;
-            width: 44px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 18px;
@@ -152,21 +151,20 @@
             background: #161b22;
             border: 1px solid #30363d;
             border-radius: 8px;
-            padding: 8px 0;
             z-index: 50;
-            min-width: 200px;
+            min-width: 180px;
         }
 
-        .section-menu { left: 0; }
-        .sort-menu { right: 80px; }
+        .section-menu { left: 0; padding: 8px 0; }
+        .sort-menu { right: 80px; padding: 8px 0; }
         .settings-menu { 
             right: 0; 
             padding: 15px;
-            width: 280px;
+            width: 260px;
         }
 
         .menu-option {
-            padding: 10px 16px;
+            padding: 8px 16px;
             cursor: pointer;
             font-size: 14px;
             display: flex;
@@ -176,12 +174,11 @@
 
         .menu-option:hover { background: #21262d; }
         .menu-option.active { color: #58a6ff; }
-        .menu-option.active::before { content: '✓ '; margin-left: -20px; width: 20px; }
         
         .menu-option.all-sections { 
             border-bottom: 1px solid #30363d; 
             margin-bottom: 5px;
-            padding-bottom: 12px;
+            padding-bottom: 10px;
         }
 
         .menu-divider {
@@ -189,26 +186,23 @@
             margin: 5px 0;
         }
 
-        .menu-option.add-new {
-            color: #58a6ff;
-        }
+        .menu-option.add-new { color: #58a6ff; }
 
         .menu-option .delete-section {
             margin-left: auto;
             color: #6e7681;
-            font-size: 16px;
+            font-size: 14px;
+            padding: 2px 6px;
         }
 
-        .menu-option .delete-section:hover {
-            color: #f85149;
-        }
+        .menu-option .delete-section:hover { color: #f85149; }
 
         /* Настройки */
         .settings-menu label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             color: #8b949e;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .settings-menu input {
@@ -227,50 +221,46 @@
             border-color: #58a6ff;
         }
 
+        .settings-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
         .settings-btn {
-            width: 100%;
-            height: 36px;
+            flex: 1;
+            height: 40px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 18px;
-            margin-bottom: 8px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-primary { background: #238636; color: white; }
         .btn-share { background: #1f6feb; color: white; }
 
-        .settings-menu .hint {
-            font-size: 10px;
-            color: #6e7681;
-            line-height: 1.4;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #30363d;
-        }
-
         /* Item с меткой раздела */
         .item-line {
             display: flex;
-            gap: 10px;
-            padding: 4px 0;
+            gap: 8px;
+            padding: 2px 0;
+            align-items: baseline;
         }
 
         .item-section-tag {
             background: #30363d;
             color: #8b949e;
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
             white-space: nowrap;
             flex-shrink: 0;
         }
 
-        .item-text {
-            flex: 1;
-        }
+        .item-text { flex: 1; }
 
-        /* Инпут для нового раздела */
         .new-section-input {
             width: calc(100% - 32px);
             margin: 8px 16px;
@@ -292,17 +282,22 @@
             color: #8b949e;
             text-align: center;
         }
+
+        .edit-hint {
+            font-size: 11px;
+            color: #6e7681;
+            padding: 8px 15px;
+            border-bottom: 1px solid #30363d;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <div class="section-selector">
-                <button class="section-btn" onclick="toggleSectionMenu()">
-                    <span id="currentSectionName">📁 Все</span>
-                    <span class="arrow">▼</span>
-                </button>
-            </div>
+            <button class="section-btn" onclick="toggleSectionMenu()">
+                <span id="currentSectionName">Все</span>
+                <span class="arrow">▼</span>
+            </button>
             <div class="header-buttons">
                 <button class="icon-btn" onclick="toggleSort()" title="Sort">⇅</button>
                 <button class="icon-btn" onclick="toggleEdit()" id="editBtn" title="Edit">✎</button>
@@ -314,6 +309,7 @@
             <div class="content-list" id="viewMode"></div>
             
             <div class="hidden" id="editMode">
+                <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
                 <textarea 
                     class="content-edit" 
                     id="editor" 
@@ -331,13 +327,11 @@
         <!-- Меню разделов -->
         <div class="dropdown-menu section-menu hidden" id="sectionMenu">
             <div class="menu-option all-sections" data-section="__all__" onclick="selectSection('__all__')">
-                📁 Все
+                Все
             </div>
             <div id="sectionList"></div>
             <div class="menu-divider"></div>
-            <div class="menu-option add-new" onclick="showNewSectionInput()">
-                ＋ Новый раздел
-            </div>
+            <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый</div>
             <input type="text" class="new-section-input hidden" id="newSectionInput" 
                    placeholder="Название..." 
                    onkeydown="handleNewSection(event)">
@@ -345,25 +339,27 @@
 
         <!-- Меню сортировки -->
         <div class="dropdown-menu sort-menu hidden" id="sortMenu">
-            <div class="menu-option" data-sort="manual" onclick="setSort('manual')">↕ Manual</div>
-            <div class="menu-option" data-sort="newest" onclick="setSort('newest')">🕐 ↓</div>
-            <div class="menu-option" data-sort="oldest" onclick="setSort('oldest')">🕐 ↑</div>
+            <div class="menu-option" data-sort="manual" onclick="setSort('manual')">Manual</div>
+            <div class="menu-option" data-sort="newest" onclick="setSort('newest')">New ↓</div>
+            <div class="menu-option" data-sort="oldest" onclick="setSort('oldest')">Old ↑</div>
             <div class="menu-option" data-sort="az" onclick="setSort('az')">A → Z</div>
             <div class="menu-option" data-sort="za" onclick="setSort('za')">Z → A</div>
-            <div class="menu-option" data-sort="year-desc" onclick="setSort('year-desc')">📅 ↓</div>
-            <div class="menu-option" data-sort="year-asc" onclick="setSort('year-asc')">📅 ↑</div>
+            <div class="menu-option" data-sort="year-desc" onclick="setSort('year-desc')">Year ↓</div>
+            <div class="menu-option" data-sort="year-asc" onclick="setSort('year-asc')">Year ↑</div>
         </div>
 
         <!-- Меню настроек -->
         <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
-            <label>Gist ID:</label>
-            <input type="text" id="inputGistId" placeholder="abc123def456...">
+            <label>Gist ID</label>
+            <input type="text" id="inputGistId" placeholder="abc123...">
             
-            <label>Token:</label>
+            <label>Token</label>
             <input type="password" id="inputToken" placeholder="ghp_...">
             
-            <button class="settings-btn btn-primary" onclick="saveSettings()">✓</button>
-            <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn">🔗</button>
+            <div class="settings-buttons">
+                <button class="settings-btn btn-primary" onclick="saveSettings()">✓</button>
+                <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn">⎘</button>
+            </div>
         </div>
     </div>
 
@@ -458,7 +454,7 @@
         }
 
         function updateShareButton() {
-            document.getElementById('shareBtn').style.display = (GIST_ID && TOKEN) ? 'block' : 'none';
+            document.getElementById('shareBtn').style.display = (GIST_ID && TOKEN) ? 'flex' : 'none';
         }
 
         function copyShareLink() {
@@ -488,7 +484,6 @@
             const list = document.getElementById('sectionList');
             const sections = Object.keys(data.sections);
             
-            // Добавляем дефолтные если нет
             if (sections.length === 0) {
                 defaultSections.forEach(s => {
                     data.sections[s] = { items: [], modified: new Date().toISOString() };
@@ -498,7 +493,7 @@
             list.innerHTML = Object.keys(data.sections).map(name => `
                 <div class="menu-option ${currentSection === name ? 'active' : ''}" onclick="selectSection('${name}')">
                     <span>${name}</span>
-                    <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${name}')">🗑</span>
+                    <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${name}')">✕</span>
                 </div>
             `).join('');
         }
@@ -512,8 +507,8 @@
         }
 
         function updateSectionButton() {
-            const btn = document.getElementById('currentSectionName');
-            btn.textContent = currentSection === '__all__' ? '📁 Все' : currentSection;
+            document.getElementById('currentSectionName').textContent = 
+                currentSection === '__all__' ? 'Все' : currentSection;
         }
 
         function showNewSectionInput() {
@@ -567,7 +562,6 @@
                 
                 if (gist.files?.['contents.json']) {
                     const loaded = JSON.parse(gist.files['contents.json'].content);
-                    // Миграция со старой структуры
                     if (loaded.users && !loaded.sections) {
                         data.sections = loaded.users;
                     } else {
@@ -608,23 +602,34 @@
                 toggleSettings();
                 return;
             }
-            
-            // В режиме "Все" нельзя редактировать
-            if (currentSection === '__all__') {
-                return;
-            }
-            
             isEditing ? cancelEdit() : startEdit();
         }
 
         function startEdit() {
             isEditing = true;
-            const items = data.sections[currentSection]?.items || [];
-            document.getElementById('editor').value = items.join('\n');
+            const editor = document.getElementById('editor');
+            const hint = document.getElementById('editHint');
+            
+            if (currentSection === '__all__') {
+                // Режим "Все" - показываем с метками [Раздел]
+                let lines = [];
+                Object.entries(data.sections).forEach(([section, sectionData]) => {
+                    (sectionData.items || []).forEach(item => {
+                        lines.push(`[${section}] ${item}`);
+                    });
+                });
+                editor.value = lines.join('\n');
+                hint.classList.remove('hidden');
+            } else {
+                const items = data.sections[currentSection]?.items || [];
+                editor.value = items.join('\n');
+                hint.classList.add('hidden');
+            }
+            
             document.getElementById('viewMode').classList.add('hidden');
             document.getElementById('editMode').classList.remove('hidden');
             document.getElementById('editBtn').textContent = '✕';
-            document.getElementById('editor').focus();
+            editor.focus();
         }
 
         function cancelEdit() {
@@ -632,18 +637,66 @@
             document.getElementById('viewMode').classList.remove('hidden');
             document.getElementById('editMode').classList.add('hidden');
             document.getElementById('editBtn').textContent = '✎';
+            document.getElementById('editHint').classList.add('hidden');
         }
 
         async function saveEdit() {
             const text = document.getElementById('editor').value;
-            const items = text.split('\n').map(s => s.trim()).filter(s => s);
+            const lines = text.split('\n').map(s => s.trim()).filter(s => s);
             
-            data.sections[currentSection] = {
-                items: items,
-                modified: new Date().toISOString()
-            };
+            if (currentSection === '__all__') {
+                // Парсим формат [Раздел] Текст
+                const newData = {};
+                
+                // Инициализируем пустые массивы для всех существующих разделов
+                Object.keys(data.sections).forEach(s => {
+                    newData[s] = [];
+                });
+                
+                let lastSection = Object.keys(data.sections)[0] || 'Default';
+                
+                lines.forEach(line => {
+                    const match = line.match(/^\[([^\]]+)\]\s*(.+)$/);
+                    if (match) {
+                        const section = match[1];
+                        const item = match[2];
+                        
+                        // Создаём раздел если не существует
+                        if (!newData[section]) {
+                            newData[section] = [];
+                        }
+                        newData[section].push(item);
+                        lastSection = section;
+                    } else {
+                        // Строка без метки - добавляем в последний использованный раздел
+                        if (!newData[lastSection]) {
+                            newData[lastSection] = [];
+                        }
+                        newData[lastSection].push(line);
+                    }
+                });
+                
+                // Обновляем data.sections
+                Object.keys(newData).forEach(section => {
+                    if (!data.sections[section]) {
+                        data.sections[section] = { items: [], modified: new Date().toISOString() };
+                    }
+                    data.sections[section].items = newData[section];
+                    data.sections[section].modified = new Date().toISOString();
+                });
+                
+                // Удаляем пустые разделы которые были созданы автоматически
+                // (но оставляем те, что пользователь создал явно)
+                
+            } else {
+                data.sections[currentSection] = {
+                    items: lines,
+                    modified: new Date().toISOString()
+                };
+            }
             
             await saveData();
+            renderSectionList();
             cancelEdit();
             render();
         }
@@ -696,29 +749,19 @@
         // ===== RENDER =====
         function render() {
             const view = document.getElementById('viewMode');
-            const editBtn = document.getElementById('editBtn');
             
             let items = [];
-            let totalCount = 0;
             
             if (currentSection === '__all__') {
-                // Собираем из всех разделов с метками
                 Object.entries(data.sections).forEach(([section, sectionData]) => {
                     (sectionData.items || []).forEach(item => {
                         items.push({ text: item, section: section });
                     });
                 });
-                totalCount = items.length;
-                
-                // Скрываем кнопку редактирования
-                editBtn.style.opacity = '0.3';
-                editBtn.style.cursor = 'default';
+                view.classList.add('all-mode');
             } else {
                 items = (data.sections[currentSection]?.items || []).map(item => ({ text: item, section: null }));
-                totalCount = items.length;
-                
-                editBtn.style.opacity = '1';
-                editBtn.style.cursor = 'pointer';
+                view.classList.remove('all-mode');
             }
             
             const sorted = getSortedItems(items);
@@ -726,7 +769,6 @@
             if (sorted.length === 0) {
                 view.innerHTML = '';
             } else if (currentSection === '__all__') {
-                // С метками разделов
                 view.innerHTML = sorted.map(item => `
                     <div class="item-line">
                         <span class="item-section-tag">${item.section}</span>
@@ -734,11 +776,10 @@
                     </div>
                 `).join('');
             } else {
-                // Без меток
                 view.textContent = sorted.map(i => i.text).join('\n');
             }
             
-            document.getElementById('counter').textContent = totalCount;
+            document.getElementById('counter').textContent = sorted.length;
         }
 
         // ===== CLOSE MENUS =====
