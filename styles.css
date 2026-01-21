@@ -164,6 +164,7 @@ header{
 .icon-btn:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .icon-btn:active{ transform:translateY(.5px); }
 .icon-btn.error{ color:var(--red); background:var(--panel); border-color:#3d1f22; }
+.icon-btn.on{ color:var(--blue); background:var(--panel); border-color:var(--border); }
 
 .icon{ width:18px; height:18px; fill:currentColor; display:block; }
 .icon.small{ width:14px; height:14px; }
@@ -278,8 +279,18 @@ header{
   -webkit-user-select:none;
 }
 
-.item-text{
+/* name + tags wrapper */
+.item-main{
   flex:1;
+  min-width:0;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+
+.item-text{
+  min-width:0;
   white-space:pre-wrap;
   word-break:break-word;
   cursor:text;
@@ -287,8 +298,28 @@ header{
   -webkit-user-select:text;
 }
 
-/* Right action (mark viewed / return) */
-.right-action{
+.item-tags{
+  display:inline-flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+.tag-chip{
+  font-size:10px;
+  line-height:1.2;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--muted);
+  user-select:none;
+  -webkit-user-select:none;
+  white-space:nowrap;
+}
+
+/* Right actions */
+.right-action,
+.tag-action{
   width:30px;
   height:30px;
   border-radius:10px;
@@ -305,11 +336,13 @@ header{
   pointer-events:none;
   transition:opacity .12s, background .12s, border-color .12s, color .12s;
 }
-.item-line.selected .right-action{
+.item-line.selected .right-action,
+.item-line.selected .tag-action{
   opacity:1;
   pointer-events:auto;
 }
-.right-action:hover{
+.right-action:hover,
+.tag-action:hover{
   color:var(--text);
   background:#0b0f15;
   border-color:var(--border);
@@ -386,6 +419,8 @@ header{
 .dropdown-menu.section-menu{ padding:8px 0; min-width:260px; }
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
 .dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
+.dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
+.dropdown-menu.tag-editor-menu{ padding:10px; width:260px; min-width:260px; }
 
 .menu-option{
   padding:8px 14px;
@@ -485,6 +520,116 @@ header{
 .btn-share{ background:#1f6feb; }
 
 .setup-prompt{ padding:16px; color:#8b949e; text-align:center; }
+
+/* ===== Tag menus ===== */
+.tag-menu-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.tag-menu-title{
+  font-size:11px;
+  color:#8b949e;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.tag-menu-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-height:260px;
+  overflow:auto;
+  padding-right:2px;
+}
+.tag-menu-hint{
+  margin-top:10px;
+  color:var(--muted2);
+  font-size:11px;
+}
+
+.tag-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  user-select:none;
+  -webkit-tap-highlight-color:var(--tap);
+}
+.tag-option:hover{ background:var(--border2); }
+
+.tag-check{
+  width:16px;
+  height:16px;
+  border-radius:4px;
+  border:1px solid var(--border);
+  display:grid;
+  place-items:center;
+  color:transparent;
+  flex:0 0 auto;
+}
+.tag-option.on .tag-check{
+  border-color:rgba(88,166,255,.6);
+  background:rgba(88,166,255,.12);
+  color:var(--blue);
+}
+
+.tag-name{
+  font-size:13px;
+  color:var(--text);
+}
+.tag-count{
+  margin-left:auto;
+  font-size:12px;
+  color:var(--muted2);
+}
+
+.tag-add-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.tag-add-input{
+  flex:1;
+  min-width:0;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--r10);
+  color:var(--text);
+  padding:8px 10px;
+  font-size:13px;
+}
+.tag-add-input:focus{ outline:none; border-color:var(--blue); }
+
+.tag-pill{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+
+  border:1px solid var(--border);
+  background:var(--panel2);
+  border-radius:999px;
+  padding:4px 6px 4px 10px;
+}
+.tag-pill-text{
+  font-size:13px;
+  color:var(--text);
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.tag-empty{
+  padding:10px;
+  color:var(--muted2);
+  font-size:13px;
+}
 
 /* ===== Undo bar ===== */
 .undo-bar{

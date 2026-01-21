@@ -34,6 +34,10 @@
         </div>
 
         <div class="header-buttons">
+          <button class="icon-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu()" title="Фильтр по тегам">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-filter"></use></svg>
+          </button>
+
           <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-sort"></use></svg>
           </button>
@@ -97,6 +101,40 @@
       <div class="menu-option" data-key="year" onclick="setSortKey('year')">
         Год <span class="sort-dir"></span>
       </div>
+    </div>
+
+    <!-- Tag filter -->
+    <div class="dropdown-menu tag-filter-menu hidden" id="tagFilterMenu">
+      <div class="tag-menu-head">
+        <div class="tag-menu-title">Теги</div>
+        <button class="mini-btn" onclick="clearTagFilter()" title="Сбросить">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="tag-menu-list" id="tagFilterList"></div>
+      <div class="tag-menu-hint" id="tagFilterHint"></div>
+    </div>
+
+    <!-- Tag editor (for item) -->
+    <div class="dropdown-menu tag-editor-menu hidden" id="tagEditorMenu">
+      <div class="tag-menu-head">
+        <div class="tag-menu-title" id="tagEditorTitle">Теги</div>
+        <button class="mini-btn" onclick="closeTagEditor()" title="Закрыть">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+        </button>
+      </div>
+
+      <div class="tag-add-row">
+        <input class="tag-add-input" id="tagAddInput" placeholder="Добавить тег..." autocomplete="off" spellcheck="false" onkeydown="handleTagAdd(event)" />
+        <button class="mini-btn" onclick="addTagFromInput()" title="Добавить">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
+        </button>
+      </div>
+
+      <div class="tag-menu-list" id="tagEditorList"></div>
+
+      <div class="menu-divider"></div>
+      <div class="menu-option" onclick="clearTagsForCurrentItem()">Очистить теги</div>
     </div>
 
     <!-- Settings -->

@@ -3,11 +3,13 @@
 
 // ===== CONFIG =====
 const ICONS = "icons.svg";
-const VIEWED_KEY_PREFIX = "__viewed__:";     // внутренний префикс (не показываем текстом)
-const OLD_VIEWED_PREFIX = "✓ ";             // миграция со старых данных
+const VIEWED_KEY_PREFIX = "__viewed__:"; // внутренний префикс (не показываем текстом)
+const OLD_VIEWED_PREFIX = "✓ "; // миграция со старых данных
 
 const SECTION_UNDO_MS = 10000;
-const ITEM_UNDO_MS = 19000;
+const ITEM_UNDO_MS = 10000; // требование: 10 сек на отмену удаления позиции
+
+const TAG_FILTER_LS_KEY = "tag_filter";
 
 let GIST_ID = localStorage.getItem("gist_id") || "";
 let TOKEN = localStorage.getItem("github_token") || "";
@@ -45,6 +47,10 @@ let undoPayload = null; // {type, ...}
 // edit context for filtered editing
 let editCtx = null; // {mode, filterLower, showViewedInAll, masksBySection? / mask? / sectionKey?}
 
+// tags
+let tagFilter = loadTagFilter(); // Set<string>
+let tagEditorCtx = null; // {sectionKey, index}
+
 // ===== INIT =====
 async function init() {
   applyUrlSetupSilently();
@@ -52,6 +58,7 @@ async function init() {
   updateShareButton();
   setupFilterUI();
   updateViewedToggleUI();
+  updateTagFilterBtnUI();
 
   if (!GIST_ID || !TOKEN) {
     document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">Откройте настройки</div>`;
@@ -60,8 +67,11 @@ async function init() {
   }
 
   await loadData();
+  normalizeDataModel();
   ensureDefaultSections();
   migrateViewedPrefixesIfNeeded();
+  normalizeDataModel();
+
   renderSectionList();
   updateSectionButton();
   render();
@@ -84,6 +94,82 @@ function applyUrlSetupSilently() {
       window.history.replaceState({}, "", window.location.pathname);
     }
   } catch (_) {}
+}
+
+// ===== Data model: items =====
+function isItemObject(it) {
+  return it && typeof it === "object" && !Array.isArray(it) && typeof it.text === "string";
+}
+
+function getItemText(it) {
+  if (typeof it === "string") return it;
+  if (isItemObject(it)) return it.text;
+  return String(it ?? "");
+}
+
+function normalizeTag(tag) {
+  return String(tag || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function uniqueNormalizedTags(tags) {
+  const out = [];
+  const seen = new Set();
+  for (const t of Array.isArray(tags) ? tags : []) {
+    const nt = normalizeTag(t);
+    if (!nt) continue;
+    if (seen.has(nt)) continue;
+    seen.add(nt);
+    out.push(nt);
+  }
+  return out;
+}
+
+function createItem(text, createdIso) {
+  return {
+    text: String(text ?? "").trim(),
+    tags: [],
+    created: createdIso || new Date().toISOString(),
+  };
+}
+
+function ensureItemObject(it, createdIso) {
+  if (isItemObject(it)) {
+    it.text = String(it.text ?? "");
+    it.tags = uniqueNormalizedTags(it.tags);
+    if (!it.created) it.created = createdIso || new Date().toISOString();
+    return it;
+  }
+  return createItem(getItemText(it), createdIso);
+}
+
+function normalizeDataModel() {
+  if (!data || typeof data !== "object") data = { sections: {} };
+  if (!data.sections || typeof data.sections !== "object") data.sections = {};
+
+  for (const sectionKey of Object.keys(data.sections)) {
+    let sec = data.sections[sectionKey];
+
+    // extremely old: section value is an array
+    if (Array.isArray(sec)) {
+      sec = { items: sec, modified: new Date().toISOString() };
+    }
+
+    if (!sec || typeof sec !== "object") sec = { items: [], modified: new Date().toISOString() };
+    if (!Array.isArray(sec.items)) sec.items = [];
+    if (!sec.modified) sec.modified = new Date().toISOString();
+
+    const baseMs = Date.parse(sec.modified) || Date.now();
+
+    sec.items = sec.items.map((it, i) => {
+      const createdIso = new Date(baseMs + i).toISOString();
+      return ensureItemObject(it, createdIso);
+    });
+
+    data.sections[sectionKey] = sec;
+  }
 }
 
 // ===== Viewed helpers =====
@@ -154,7 +240,7 @@ function migrateViewedPrefixesIfNeeded() {
   saveData();
 }
 
-// ===== Filter =====
+// ===== Filter (text) =====
 function setupFilterUI() {
   const input = document.getElementById("filterInput");
   const clear = document.getElementById("filterClear");
@@ -169,6 +255,7 @@ function setupFilterUI() {
     clear.classList.toggle("hidden", !filterQuery);
     selectedKey = null;
     disarmItemDelete();
+    closeTagEditor();
     render();
   };
 
@@ -197,8 +284,285 @@ function clearFilter() {
   document.getElementById("filterClear").classList.add("hidden");
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   render();
   input.focus();
+}
+
+// ===== Tag filter =====
+function loadTagFilter() {
+  try {
+    const raw = localStorage.getItem(TAG_FILTER_LS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.map(normalizeTag).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveTagFilter() {
+  localStorage.setItem(TAG_FILTER_LS_KEY, JSON.stringify([...tagFilter]));
+}
+
+function updateTagFilterBtnUI() {
+  const btn = document.getElementById("tagFilterBtn");
+  if (!btn) return;
+  btn.classList.toggle("on", tagFilter.size > 0);
+}
+
+function toggleTagFilterMenu() {
+  if (isEditing) return;
+
+  const menu = document.getElementById("tagFilterMenu");
+  const btn = document.getElementById("tagFilterBtn");
+
+  if (!menu || !btn) return;
+
+  if (!menu.classList.contains("hidden")) {
+    menu.classList.add("hidden");
+    return;
+  }
+
+  renderTagFilterMenu();
+  openMenu("tagFilterMenu", btn, "right");
+}
+
+function getScopeItems() {
+  // items in current section context, respecting showViewedInAll when in "Все"
+  const out = [];
+
+  if (currentSection === "__all__") {
+    for (const sectionKey of Object.keys(data.sections)) {
+      if (!shouldIncludeSectionInAll(sectionKey)) continue;
+      const arr = data.sections[sectionKey]?.items || [];
+      for (let i = 0; i < arr.length; i++) {
+        const item = ensureItemObject(arr[i]);
+        out.push({ item, sectionKey, index: i });
+      }
+    }
+  } else {
+    const arr = data.sections[currentSection]?.items || [];
+    for (let i = 0; i < arr.length; i++) {
+      const item = ensureItemObject(arr[i]);
+      out.push({ item, sectionKey: currentSection, index: i });
+    }
+  }
+
+  return out;
+}
+
+function buildTagCounts() {
+  const counts = new Map();
+  for (const { item } of getScopeItems()) {
+    const tags = uniqueNormalizedTags(item.tags);
+    for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  return counts;
+}
+
+function renderTagFilterMenu() {
+  const list = document.getElementById("tagFilterList");
+  const hint = document.getElementById("tagFilterHint");
+  if (!list || !hint) return;
+
+  const counts = buildTagCounts();
+  const tags = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ru"));
+
+  if (!tags.length) {
+    list.innerHTML = `<div class="tag-empty">Тегов нет</div>`;
+    hint.textContent = "";
+    return;
+  }
+
+  list.innerHTML = tags
+    .map((t) => {
+      const on = tagFilter.has(t);
+      const count = counts.get(t) || 0;
+      return `
+        <div class="tag-option ${on ? "on" : ""}" onclick="toggleTagFilter('${escapeQuotes(t)}')">
+          <span class="tag-check">
+            <svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-check"></use></svg>
+          </span>
+          <span class="tag-name">${escapeHtml(t)}</span>
+          <span class="tag-count">${count}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  hint.textContent = tagFilter.size ? `Выбрано: ${tagFilter.size}` : "Фильтр выключен";
+}
+
+function toggleTagFilter(tag) {
+  if (isEditing) return;
+  const t = normalizeTag(tag);
+  if (!t) return;
+
+  if (tagFilter.has(t)) tagFilter.delete(t);
+  else tagFilter.add(t);
+
+  saveTagFilter();
+  updateTagFilterBtnUI();
+  selectedKey = null;
+  disarmItemDelete();
+  closeTagEditor();
+
+  // keep menu open and update checkmarks/counts
+  renderTagFilterMenu();
+  render();
+}
+
+function clearTagFilter() {
+  if (isEditing) return;
+  tagFilter = new Set();
+  saveTagFilter();
+  updateTagFilterBtnUI();
+  selectedKey = null;
+  disarmItemDelete();
+  closeTagEditor();
+  renderTagFilterMenu();
+  render();
+}
+
+// ===== Tag editor (per item) =====
+function openTagEditor(sectionKey, index, anchorEl) {
+  if (isEditing) return;
+
+  const menu = document.getElementById("tagEditorMenu");
+  if (!menu) return;
+
+  const sec = data.sections[sectionKey];
+  const idx = Number(index);
+  if (!sec || !Array.isArray(sec.items) || !Number.isFinite(idx) || idx < 0 || idx >= sec.items.length) return;
+
+  const item = ensureItemObject(sec.items[idx]);
+  sec.items[idx] = item;
+
+  tagEditorCtx = { sectionKey, index: idx };
+
+  const title = document.getElementById("tagEditorTitle");
+  if (title) title.textContent = `Теги: ${truncate(item.text, 28)}`;
+
+  const input = document.getElementById("tagAddInput");
+  if (input) input.value = "";
+
+  renderTagEditorList();
+  openMenu("tagEditorMenu", anchorEl, "right");
+
+  if (input) input.focus();
+}
+
+function closeTagEditor() {
+  tagEditorCtx = null;
+  const menu = document.getElementById("tagEditorMenu");
+  if (menu) menu.classList.add("hidden");
+}
+
+function getCurrentTagEditorItem() {
+  if (!tagEditorCtx) return null;
+  const { sectionKey, index } = tagEditorCtx;
+  const item = data.sections?.[sectionKey]?.items?.[index];
+  if (!item) return null;
+  return ensureItemObject(item);
+}
+
+function renderTagEditorList() {
+  const list = document.getElementById("tagEditorList");
+  if (!list) return;
+
+  const item = getCurrentTagEditorItem();
+  if (!item) {
+    list.innerHTML = `<div class="tag-empty">—</div>`;
+    return;
+  }
+
+  const tags = uniqueNormalizedTags(item.tags).sort((a, b) => a.localeCompare(b, "ru"));
+  if (!tags.length) {
+    list.innerHTML = `<div class="tag-empty">Нет тегов</div>`;
+    return;
+  }
+
+  list.innerHTML = tags
+    .map((t) => {
+      return `
+        <div class="tag-pill">
+          <div class="tag-pill-text">${escapeHtml(t)}</div>
+          <button class="mini-btn danger" title="Удалить" onclick="removeTagFromCurrentItem('${escapeQuotes(t)}')">×</button>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function handleTagAdd(e) {
+  if (e.key === "Enter") {
+    addTagFromInput();
+  } else if (e.key === "Escape") {
+    closeTagEditor();
+  }
+}
+
+function addTagFromInput() {
+  const input = document.getElementById("tagAddInput");
+  if (!input) return;
+  const t = normalizeTag(input.value);
+  if (!t) return;
+  input.value = "";
+  addTagToCurrentItem(t);
+}
+
+function addTagToCurrentItem(tag) {
+  const item = getCurrentTagEditorItem();
+  if (!item || !tagEditorCtx) return;
+
+  const t = normalizeTag(tag);
+  if (!t) return;
+
+  item.tags = uniqueNormalizedTags([...(item.tags || []), t]);
+
+  const { sectionKey, index } = tagEditorCtx;
+  data.sections[sectionKey].items[index] = item;
+  data.sections[sectionKey].modified = new Date().toISOString();
+
+  saveData();
+  render();
+  renderTagEditorList();
+  renderTagFilterMenu();
+}
+
+function removeTagFromCurrentItem(tag) {
+  const item = getCurrentTagEditorItem();
+  if (!item || !tagEditorCtx) return;
+
+  const t = normalizeTag(tag);
+  item.tags = uniqueNormalizedTags((item.tags || []).filter((x) => normalizeTag(x) !== t));
+
+  const { sectionKey, index } = tagEditorCtx;
+  data.sections[sectionKey].items[index] = item;
+  data.sections[sectionKey].modified = new Date().toISOString();
+
+  saveData();
+  render();
+  renderTagEditorList();
+  renderTagFilterMenu();
+}
+
+function clearTagsForCurrentItem() {
+  const item = getCurrentTagEditorItem();
+  if (!item || !tagEditorCtx) return;
+
+  item.tags = [];
+
+  const { sectionKey, index } = tagEditorCtx;
+  data.sections[sectionKey].items[index] = item;
+  data.sections[sectionKey].modified = new Date().toISOString();
+
+  saveData();
+  render();
+  renderTagEditorList();
+  renderTagFilterMenu();
 }
 
 // ===== Viewed toggle in "All" =====
@@ -217,6 +581,7 @@ function toggleShowViewed() {
   localStorage.setItem("show_viewed_all", showViewedInAll ? "1" : "0");
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   updateViewedToggleUI();
   render();
 }
@@ -227,6 +592,8 @@ function openMenu(menuId, anchorEl, align = "left") {
 
   const menu = document.getElementById(menuId);
   const container = document.getElementById("container");
+
+  if (!menu || !container || !anchorEl) return;
 
   menu.classList.remove("hidden");
   menu.style.visibility = "hidden";
@@ -357,6 +724,7 @@ function selectSection(sectionKey) {
   localStorage.setItem("current_section", sectionKey);
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   disarmSectionDelete();
   updateSectionButton();
   updateViewedToggleUI();
@@ -421,6 +789,7 @@ function handleSectionDelete(sectionKey) {
 
     selectedKey = null;
     disarmItemDelete();
+    closeTagEditor();
     disarmSectionDelete();
 
     saveData();
@@ -476,6 +845,7 @@ function setSortKey(key) {
   localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   updateSortMenuUI();
   document.getElementById("sortMenu").classList.add("hidden");
   render();
@@ -483,6 +853,7 @@ function setSortKey(key) {
 
 function defaultDirForKey(key) {
   if (key === "alpha") return "asc";
+  if (key === "date") return "desc";
   return "desc";
 }
 
@@ -506,11 +877,17 @@ function updateSortMenuUI() {
   });
 }
 
+function createdMs(item) {
+  const v = item?.created;
+  const ms = typeof v === "number" ? v : Date.parse(String(v || ""));
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 function getSortedItems(items) {
   if (!items || sortState.key === "manual") return items;
 
   const sorted = [...items];
-  const getText = (x) => x.text ?? x;
+  const getText = (x) => x.text ?? getItemText(x.item) ?? x;
 
   switch (sortState.key) {
     case "alpha":
@@ -528,6 +905,7 @@ function getSortedItems(items) {
       break;
 
     case "date":
+      sorted.sort((a, b) => createdMs(a.item) - createdMs(b.item));
       if (sortState.dir === "desc") sorted.reverse();
       break;
   }
@@ -548,8 +926,16 @@ async function loadData() {
     const gist = await res.json();
     if (gist.files?.["contents.json"]) {
       const loaded = JSON.parse(gist.files["contents.json"].content);
-      if (loaded.users && !loaded.sections) data.sections = loaded.users; // migration old schema
-      else data = loaded.sections ? loaded : { sections: {} };
+
+      if (loaded?.users && !loaded?.sections) {
+        // very old schema: { users: { section: ["..."] } }
+        data = { sections: {} };
+        for (const [k, v] of Object.entries(loaded.users || {})) {
+          data.sections[k] = Array.isArray(v) ? { items: v, modified: new Date().toISOString() } : v;
+        }
+      } else {
+        data = loaded?.sections ? loaded : { sections: {} };
+      }
     } else {
       data = { sections: {} };
       await saveData();
@@ -626,14 +1012,18 @@ document.getElementById("undoBtn").addEventListener("click", () => {
   }
 
   if (undoPayload.type === "item") {
-    const { sectionKey, index, text } = undoPayload;
+    const { sectionKey, index, item } = undoPayload;
 
     if (!data.sections[sectionKey]) {
       data.sections[sectionKey] = { items: [], modified: new Date().toISOString() };
     }
+
+    normalizeDataModel();
+
     const arr = data.sections[sectionKey].items || (data.sections[sectionKey].items = []);
     const idx = Math.max(0, Math.min(Number(index), arr.length));
-    arr.splice(idx, 0, text);
+
+    arr.splice(idx, 0, ensureItemObject(item));
     data.sections[sectionKey].modified = new Date().toISOString();
 
     saveData();
@@ -651,21 +1041,26 @@ function moveItemToViewed(sectionKey, index) {
   if (!data.sections[sectionKey]) return;
   if (isViewedSection(sectionKey)) return;
 
+  normalizeDataModel();
+
   const srcItems = data.sections[sectionKey].items || [];
   const idx = Number(index);
   if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
 
-  const itemText = srcItems[idx];
+  const item = ensureItemObject(srcItems[idx]);
   srcItems.splice(idx, 1);
   data.sections[sectionKey].modified = new Date().toISOString();
 
   const destKey = viewedSectionKeyFor(sectionKey);
   if (!data.sections[destKey]) data.sections[destKey] = { items: [], modified: new Date().toISOString() };
-  data.sections[destKey].items.push(itemText);
+  normalizeDataModel();
+
+  data.sections[destKey].items.push(item);
   data.sections[destKey].modified = new Date().toISOString();
 
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   saveData();
   renderSectionList();
   render();
@@ -675,21 +1070,26 @@ function returnItemFromViewed(viewedSectionKey, index) {
   if (!data.sections[viewedSectionKey]) return;
   if (!isViewedSection(viewedSectionKey)) return;
 
+  normalizeDataModel();
+
   const srcItems = data.sections[viewedSectionKey].items || [];
   const idx = Number(index);
   if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
 
-  const itemText = srcItems[idx];
+  const item = ensureItemObject(srcItems[idx]);
   srcItems.splice(idx, 1);
   data.sections[viewedSectionKey].modified = new Date().toISOString();
 
   const baseKey = baseSectionName(viewedSectionKey);
   if (!data.sections[baseKey]) data.sections[baseKey] = { items: [], modified: new Date().toISOString() };
-  data.sections[baseKey].items.push(itemText);
+  normalizeDataModel();
+
+  data.sections[baseKey].items.push(item);
   data.sections[baseKey].modified = new Date().toISOString();
 
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
   saveData();
   renderSectionList();
   render();
@@ -722,18 +1122,23 @@ function deleteItemNow(sectionKey, index) {
   const idx = Number(index);
   if (!Number.isFinite(idx) || idx < 0 || idx >= arr.length) return;
 
-  const text = arr[idx];
+  const item = ensureItemObject(arr[idx]);
 
   arr.splice(idx, 1);
   data.sections[sectionKey].modified = new Date().toISOString();
 
   disarmItemDelete();
+  closeTagEditor();
   selectedKey = null;
 
   saveData();
   render();
 
-  startUndo({ type: "item", sectionKey, index: idx, text }, ITEM_UNDO_MS, `Запись удалена`);
+  startUndo(
+    { type: "item", sectionKey, index: idx, item: JSON.parse(JSON.stringify(item)) },
+    ITEM_UNDO_MS,
+    `Запись удалена`
+  );
 }
 
 // ===== EDIT (filtered editing supported) =====
@@ -749,6 +1154,7 @@ function startEdit() {
   isEditing = true;
   selectedKey = null;
   disarmItemDelete();
+  closeTagEditor();
 
   setFilterLock(true);
 
@@ -758,6 +1164,8 @@ function startEdit() {
 
   const filterLower = (filterQuery || "").trim().toLowerCase();
 
+  normalizeDataModel();
+
   if (currentSection === "__all__") {
     const masksBySection = {};
     const lines = [];
@@ -766,12 +1174,12 @@ function startEdit() {
       if (!showViewedInAll && isViewedSection(sectionKey)) continue;
 
       const items = data.sections[sectionKey]?.items || [];
-      const mask = items.map((it) => !filterLower || String(it).toLowerCase().includes(filterLower));
+      const mask = items.map((it) => !filterLower || getItemText(it).toLowerCase().includes(filterLower));
 
       if (mask.some(Boolean)) masksBySection[sectionKey] = mask;
 
       for (let i = 0; i < items.length; i++) {
-        if (mask[i]) lines.push(`[${editorLabelForSectionKey(sectionKey)}] ${items[i]}`);
+        if (mask[i]) lines.push(`[${editorLabelForSectionKey(sectionKey)}] ${getItemText(items[i])}`);
       }
     }
 
@@ -781,8 +1189,8 @@ function startEdit() {
   } else {
     const sectionKey = currentSection;
     const orig = data.sections[sectionKey]?.items || [];
-    const mask = orig.map((it) => !filterLower || String(it).toLowerCase().includes(filterLower));
-    const lines = orig.filter((_, i) => mask[i]);
+    const mask = orig.map((it) => !filterLower || getItemText(it).toLowerCase().includes(filterLower));
+    const lines = orig.filter((_, i) => mask[i]).map(getItemText);
 
     editor.value = lines.join("\n");
     hint.classList.add("hidden");
@@ -806,18 +1214,29 @@ function cancelEdit() {
   document.getElementById("editUse").setAttribute("href", `${ICONS}#i-pencil`);
 }
 
-function mergeByMask(original, mask, replacement) {
+function mergeByMask(original, mask, replacementTexts) {
+  // original: array of item objects
   const out = [];
   let ri = 0;
   const m = Array.isArray(mask) ? mask : new Array(original.length).fill(false);
 
   for (let i = 0; i < original.length; i++) {
     if (m[i]) {
-      if (ri < replacement.length) out.push(replacement[ri++]);
+      if (ri < replacementTexts.length) {
+        const nextText = replacementTexts[ri++];
+        const origItem = ensureItemObject(original[i]);
+        out.push({ ...origItem, text: String(nextText ?? "").trim() });
+      }
       // else delete matched item
     } else out.push(original[i]);
   }
-  while (ri < replacement.length) out.push(replacement[ri++]); // new items appended
+
+  while (ri < replacementTexts.length) {
+    const t = String(replacementTexts[ri++] ?? "").trim();
+    if (!t) continue;
+    out.push(createItem(t));
+  }
+
   return out;
 }
 
@@ -854,6 +1273,8 @@ async function saveEdit() {
     .filter(Boolean);
 
   if (!editCtx) return;
+
+  normalizeDataModel();
 
   if (editCtx.mode === "section") {
     const sectionKey = editCtx.sectionKey;
@@ -894,26 +1315,43 @@ function shouldIncludeSectionInAll(sectionKey) {
   return !isViewedSection(sectionKey);
 }
 
-function applyFilter(items) {
+function applyTextFilter(items) {
   const q = (filterQuery || "").trim().toLowerCase();
   if (!q) return items;
   return items.filter((it) => String(it.text || "").toLowerCase().includes(q));
 }
 
+function applyTagFilter(items) {
+  if (!tagFilter || tagFilter.size === 0) return items;
+  return items.filter((it) => {
+    const tags = uniqueNormalizedTags(it.item?.tags);
+    return tags.some((t) => tagFilter.has(t));
+  });
+}
+
 function buildItemsForView() {
+  normalizeDataModel();
+
   let items = [];
   if (currentSection === "__all__") {
     for (const sectionKey of Object.keys(data.sections)) {
       if (!shouldIncludeSectionInAll(sectionKey)) continue;
       const arr = data.sections[sectionKey]?.items || [];
-      for (let i = 0; i < arr.length; i++) items.push({ text: arr[i], sectionKey, index: i });
+      for (let i = 0; i < arr.length; i++) {
+        const item = ensureItemObject(arr[i]);
+        items.push({ item, text: item.text, sectionKey, index: i });
+      }
     }
   } else {
     const arr = data.sections[currentSection]?.items || [];
-    for (let i = 0; i < arr.length; i++) items.push({ text: arr[i], sectionKey: currentSection, index: i });
+    for (let i = 0; i < arr.length; i++) {
+      const item = ensureItemObject(arr[i]);
+      items.push({ item, text: item.text, sectionKey: currentSection, index: i });
+    }
   }
 
-  items = applyFilter(items);
+  items = applyTextFilter(items);
+  items = applyTagFilter(items);
   items = getSortedItems(items);
   return items;
 }
@@ -921,6 +1359,8 @@ function buildItemsForView() {
 function render() {
   const view = document.getElementById("viewMode");
   const items = buildItemsForView();
+
+  updateTagFilterBtnUI();
 
   if (!items.length) {
     view.innerHTML = "";
@@ -932,6 +1372,7 @@ function render() {
   if (selectedKey && !keySet.has(selectedKey)) {
     selectedKey = null;
     disarmItemDelete();
+    closeTagEditor();
   }
 
   view.innerHTML = items
@@ -939,10 +1380,10 @@ function render() {
       const key = `${it.sectionKey}|${it.index}`;
       const selected = selectedKey === key;
 
-      const showTag = currentSection === "__all__";
+      const showSecTag = currentSection === "__all__";
       const viewed = isViewedSection(it.sectionKey);
 
-      const secTag = showTag
+      const secTag = showSecTag
         ? `<span class="item-section-tag">
              ${
                viewed
@@ -951,6 +1392,11 @@ function render() {
              }
              ${escapeHtml(baseSectionName(it.sectionKey))}
            </span>`
+        : "";
+
+      const tags = uniqueNormalizedTags(it.item?.tags).sort((a, b) => a.localeCompare(b, "ru"));
+      const tagsHtml = tags.length
+        ? `<span class="item-tags">${tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</span>`
         : "";
 
       const rightAction = viewed
@@ -973,7 +1419,15 @@ function render() {
           </button>
 
           ${secTag}
-          <span class="item-text">${escapeHtml(it.text)}</span>
+
+          <div class="item-main">
+            <span class="item-text">${escapeHtml(it.text)}</span>
+            ${tagsHtml}
+          </div>
+
+          <button class="tag-action" data-action="tags" title="Теги">
+            <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg>
+          </button>
 
           ${rightAction}
         </div>
@@ -1028,11 +1482,22 @@ viewModeEl.addEventListener("click", (e) => {
       returnItemFromViewed(sectionKey, index);
       return;
     }
+    if (action === "tags") {
+      // если строка не выбрана — сначала выбираем
+      if (selectedKey !== key) {
+        selectedKey = key;
+        disarmItemDelete();
+        render();
+      }
+      openTagEditor(sectionKey, index, actionEl);
+      return;
+    }
     if (action === "item-del") {
       // если строка не выбрана — сначала выбираем (чтобы появился сдвиг)
       if (selectedKey !== key) {
         selectedKey = key;
         disarmItemDelete();
+        closeTagEditor();
         render();
         // после render — взводим удаление
         armItemDelete(key);
@@ -1065,6 +1530,7 @@ viewModeEl.addEventListener("click", (e) => {
 
   selectedKey = nowSelected ? key : null;
   disarmItemDelete();
+  closeTagEditor();
 
   document.querySelectorAll("#viewMode .item-line.selected").forEach((el) => el.classList.remove("selected"));
   if (selectedKey) line.classList.add("selected");
@@ -1072,9 +1538,13 @@ viewModeEl.addEventListener("click", (e) => {
 
 // ===== Close menus =====
 function closeAllMenus(except) {
-  ["sortMenu", "settingsMenu", "sectionMenu"].forEach((id) => {
-    if (id !== except) document.getElementById(id).classList.add("hidden");
+  ["sortMenu", "settingsMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu"].forEach((id) => {
+    if (id === except) return;
+    const el = document.getElementById(id);
+    if (el) el.classList.add("hidden");
   });
+
+  if (except !== "tagEditorMenu") tagEditorCtx = null;
 }
 
 document.addEventListener("click", (e) => {
@@ -1115,6 +1585,12 @@ function escapeQuotes(str) {
   return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 }
 
+function truncate(str, max) {
+  const s = String(str || "");
+  if (s.length <= max) return s;
+  return s.slice(0, Math.max(0, max - 1)) + "…";
+}
+
 // Expose functions used by inline HTML handlers (explicitly)
 Object.assign(window, {
   toggleSectionMenu,
@@ -1132,6 +1608,16 @@ Object.assign(window, {
   showNewSectionInput,
   handleNewSection,
   handleSectionDelete,
+
+  // tags
+  toggleTagFilterMenu,
+  clearTagFilter,
+  toggleTagFilter,
+  closeTagEditor,
+  handleTagAdd,
+  addTagFromInput,
+  removeTagFromCurrentItem,
+  clearTagsForCurrentItem,
 });
 
 init();
