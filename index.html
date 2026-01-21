@@ -7,313 +7,354 @@
 
   <style>
     :root{
-      --bg: #0d1117;
-      --panel: #161b22;
-      --panel2: #0f141b;
-      --border: #30363d;
-      --border2: #21262d;
-      --text: #c9d1d9;
-      --muted: #6e7681;
-      --muted2:#484f58;
-      --blue: #58a6ff;
-      --red: #f85149;
-      --green: #238636;
+      --bg:#0d1117;
+      --panel:#161b22;
+      --panel2:#0f141b;
+      --border:#30363d;
+      --border2:#21262d;
 
-      --r8: 8px;
-      --r10: 10px;
-      --tap: transparent;
+      --text:#c9d1d9;
+      --muted:#6e7681;
+      --muted2:#484f58;
+
+      --blue:#58a6ff;
+      --red:#f85149;
+      --green:#238636;
+
+      --r10:10px;
+      --tap:transparent;
     }
 
     *{ box-sizing:border-box; margin:0; padding:0; }
 
     body{
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 16px;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      padding:16px;
     }
 
-    .container{
-      max-width: 800px;
-      margin: 0 auto;
-      position: relative;
-    }
+    .container{ max-width:800px; margin:0 auto; position:relative; }
 
     /* ===== Sticky header ===== */
     header{
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--bg);
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border2);
-      margin-bottom: 12px;
+      position:sticky;
+      top:0;
+      z-index:100;
+      background:var(--bg);
+      padding:10px 0;
+      border-bottom:1px solid var(--border2);
+      margin-bottom:12px;
     }
 
     .header-row{
       display:flex;
-      justify-content:space-between;
       align-items:center;
-      gap: 10px;
+      gap:10px;
     }
 
     .section-btn{
-      height: 40px;
-      min-width: 170px;
-      padding: 0 12px;
+      height:40px;
+      min-width:170px;
+      padding:0 12px;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap: 10px;
+      gap:10px;
 
-      background: var(--border2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: var(--r10);
-      cursor: pointer;
-
-      -webkit-tap-highlight-color: var(--tap);
+      background:var(--border2);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      cursor:pointer;
+      -webkit-tap-highlight-color:var(--tap);
+      flex: 0 0 auto;
     }
-    .section-btn:hover{ border-color: var(--blue); }
-    .section-btn:active{ transform: translateY(.5px); }
+    .section-btn:hover{ border-color:var(--blue); }
+    .section-btn:active{ transform:translateY(.5px); }
+
+    /* ===== Filter ===== */
+    .filter-wrap{
+      flex: 1 1 auto;
+      min-width: 0;
+      height:40px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      padding:0 8px;
+    }
+
+    .filter-input{
+      width:100%;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      font-size:14px;
+      line-height:1;
+      min-width:0;
+    }
+    .filter-input::placeholder{ color:var(--muted); }
+
+    .filter-clear{
+      width:28px;
+      height:28px;
+      border:none;
+      border-radius:8px;
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      -webkit-tap-highlight-color:var(--tap);
+    }
+    .filter-clear:hover{ color:var(--text); background:var(--panel2); }
+    .filter-clear.hidden{ display:none; }
 
     .header-buttons{
       display:flex;
       align-items:center;
-      gap: 8px;
+      gap:8px;
+      flex: 0 0 auto;
     }
 
     .icon-btn{
-      width: 40px;
-      height: 40px;
-      border-radius: var(--r10);
-      background: transparent;
-      border: 1px solid transparent;
-      color: var(--muted);
-      cursor: pointer;
-
+      width:40px;
+      height:40px;
+      border-radius:var(--r10);
+      background:transparent;
+      border:1px solid transparent;
+      color:var(--muted);
+      cursor:pointer;
       display:grid;
       place-items:center;
+      transition:color .15s,background .15s,border-color .15s;
+      -webkit-tap-highlight-color:var(--tap);
+    }
+    .icon-btn:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
+    .icon-btn:active{ transform:translateY(.5px); }
+    .icon-btn.error{ color:var(--red); background:var(--panel); border-color:#3d1f22; }
 
-      transition: color .15s, background .15s, border-color .15s;
-      -webkit-tap-highlight-color: var(--tap);
-    }
-    .icon-btn:hover{
-      color: var(--text);
-      background: var(--panel);
-      border-color: var(--border);
-    }
-    .icon-btn:active{ transform: translateY(.5px); }
-    .icon-btn.error{
-      color: var(--red);
-      background: var(--panel);
-      border-color: #3d1f22;
-    }
-
-    .icon{ width:18px; height:18px; fill: currentColor; display:block; }
+    .icon{ width:18px; height:18px; fill:currentColor; display:block; }
     .icon.small{ width:14px; height:14px; }
 
     /* ===== Content ===== */
     .content-area{
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--r10);
-      min-height: 420px;
-      overflow: hidden;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      min-height:420px;
+      overflow:hidden;
     }
 
     .content-list{
-      padding: 14px 15px;
-      min-height: 420px;
+      padding:14px 15px;
+      min-height:420px;
 
-      /* ЧУТЬ МЕНЬШЕ чем было в "Все" ранее, но больше чем в прошлой текущей версии */
-      line-height: 1.42;
+      /* 1) Расстояние как было "тогда во Все": побольше */
+      line-height:1.55;
     }
 
     .content-list:empty::before{
-      content: "—";
-      color: var(--muted2);
-      font-size: 32px;
+      content:"—";
+      color:var(--muted2);
+      font-size:32px;
       display:flex;
       justify-content:center;
-      padding-top: 160px;
+      padding-top:160px;
     }
 
-    /* Позиции: теперь одинаковые отступы и в "Все", и в разделах */
+    /* 1+2) Позиции: одинаковый отступ в "Все" и в разделах */
     .item-line{
       display:flex;
       align-items:center;
-      gap: 6px;
+      gap:8px;
 
-      /* расстояние между строками */
-      padding: 3px 6px;     /* ↑ увеличено */
-      margin: 0 -6px;       /* чтобы подсветка была чуть шире текста */
-      border-radius: var(--r10);
+      /* заметно больше между строками */
+      padding:6px 8px;
+      margin:0 -8px 6px; /* разрыв между строками + чуть шире подсветка */
+      border-radius:var(--r10);
 
-      cursor: pointer;
-      -webkit-tap-highlight-color: var(--tap);
+      background:transparent;
+      cursor:default;
+      -webkit-tap-highlight-color:var(--tap);
 
-      /* ВАЖНО: разрешаем выделение текста */
-      user-select: text;
-      -webkit-user-select: text;
+      /* 2) Текст можно выделять */
+      user-select:text;
+      -webkit-user-select:text;
     }
+    .item-line:last-child{ margin-bottom:0; }
 
-    .item-line:hover{ background: #0f141b; }
+    .item-line:hover{ background:var(--panel2); }
 
     .item-line.selected{
-      background: var(--border2);
-      box-shadow: inset 0 0 0 1px var(--border);
+      background:var(--border2);
+      box-shadow:inset 0 0 0 1px var(--border);
     }
 
     .item-section-tag{
-      background: var(--border);
-      color: #8b949e;
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 4px;
-      white-space: nowrap;
-      flex-shrink: 0;
+      background:var(--border);
+      color:#8b949e;
+      font-size:10px;
+      padding:1px 6px;
+      border-radius:6px;
+      white-space:nowrap;
+      flex-shrink:0;
 
-      /* тег можно не выделять, чтобы выделение текста было более предсказуемым */
-      user-select: none;
-      -webkit-user-select: none;
+      user-select:none;
+      -webkit-user-select:none;
     }
 
     .item-text{
-      flex: 1;
-      white-space: pre-wrap;
-      word-break: break-word;
+      flex:1;
+      white-space:pre-wrap;
+      word-break:break-word;
 
-      /* гарантируем, что текст выделяемый */
-      user-select: text;
-      -webkit-user-select: text;
+      cursor:text; /* чтобы было понятно, что текст выделяемый */
+      user-select:text;
+      -webkit-user-select:text;
     }
 
     /* ===== Edit ===== */
     .hidden{ display:none; }
 
     .edit-hint{
-      font-size: 11px;
-      color: var(--muted);
-      padding: 8px 15px;
-      border-bottom: 1px solid var(--border);
-      background: var(--panel2);
+      font-size:11px;
+      color:var(--muted);
+      padding:8px 15px;
+      border-bottom:1px solid var(--border);
+      background:var(--panel2);
     }
 
     .content-edit{
-      width: 100%;
-      min-height: 420px;
-      border: none;
-      background: var(--bg);
-      color: var(--text);
-      padding: 14px 15px;
-      font-size: 14px;
-      font-family: inherit;
-      line-height: 1.6;
-      resize: vertical;
+      width:100%;
+      min-height:420px;
+      border:none;
+      background:var(--bg);
+      color:var(--text);
+      padding:14px 15px;
+      font-size:14px;
+      font-family:inherit;
+      line-height:1.6;
+      resize:vertical;
     }
     .content-edit:focus{ outline:none; }
 
     .edit-panel{
       display:flex;
       justify-content:flex-end;
-      gap: 10px;
-      padding: 10px 15px;
-      border-top: 1px solid var(--border);
-      background: var(--panel2);
+      gap:10px;
+      padding:10px 15px;
+      border-top:1px solid var(--border);
+      background:var(--panel2);
     }
 
     .edit-panel button{
-      width: 42px;
-      height: 42px;
-      border: none;
-      border-radius: var(--r10);
-      cursor: pointer;
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:var(--r10);
+      cursor:pointer;
       display:grid;
       place-items:center;
-      color: white;
-      -webkit-tap-highlight-color: var(--tap);
+      color:white;
+      -webkit-tap-highlight-color:var(--tap);
     }
-    .btn-cancel{ background: var(--border); }
-    .btn-save{ background: var(--green); }
+    .btn-cancel{ background:var(--border); }
+    .btn-save{ background:var(--green); }
 
     .counter{
       text-align:right;
-      padding: 10px 15px;
-      color: var(--muted2);
-      font-size: 12px;
-      border-top: 1px solid var(--border);
-      background: var(--panel2);
+      padding:10px 15px;
+      color:var(--muted2);
+      font-size:12px;
+      border-top:1px solid var(--border);
+      background:var(--panel2);
     }
 
     /* ===== Dropdowns ===== */
     .dropdown-menu{
       position:absolute;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--r10);
-      z-index: 120;
-      overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      z-index:120;
+      overflow:hidden;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
     }
 
-    .dropdown-menu.section-menu{ padding: 8px 0; min-width: 220px; }
-    .dropdown-menu.sort-menu{ padding: 6px 0; width: 170px; min-width: 170px; } /* фикс ширина */
-    .dropdown-menu.settings-menu{ padding: 14px; width: 260px; min-width: 260px; }
+    .dropdown-menu.section-menu{ padding:8px 0; min-width:240px; }
+    .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
+    .dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
 
     .menu-option{
-      padding: 8px 14px;
+      padding:8px 14px;
       cursor:pointer;
       font-size:14px;
       display:flex;
       align-items:center;
-      gap: 10px;
+      gap:10px;
       user-select:none;
-      -webkit-tap-highlight-color: var(--tap);
+      -webkit-tap-highlight-color:var(--tap);
     }
-    .menu-option:hover{ background: var(--border2); }
-    .menu-option.active{ color: var(--blue); }
+    .menu-option:hover{ background:var(--border2); }
+    .menu-option.active{ color:var(--blue); }
 
     .menu-option.all-sections{
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 6px;
-      padding-bottom: 10px;
+      border-bottom:1px solid var(--border);
+      margin-bottom:6px;
+      padding-bottom:10px;
     }
 
-    .menu-divider{
-      border-top: 1px solid var(--border);
-      margin: 6px 0;
-    }
+    .menu-divider{ border-top:1px solid var(--border); margin:6px 0; }
 
-    .menu-option.add-new{ color: var(--blue); }
+    .menu-option.add-new{ color:var(--blue); }
 
-    .menu-option .delete-section{
+    /* delete with inline confirm */
+    .menu-actions{
       margin-left:auto;
-      color: var(--muted);
-      font-size: 14px;
-      padding: 2px 6px;
-      border-radius: 6px;
+      display:flex;
+      gap:6px;
+      align-items:center;
     }
-    .menu-option .delete-section:hover{ color: var(--red); background: var(--panel2); }
+
+    .mini-btn{
+      width:26px;
+      height:26px;
+      border-radius:8px;
+      display:grid;
+      place-items:center;
+      background:transparent;
+      border:1px solid transparent;
+      color:var(--muted);
+      cursor:pointer;
+      -webkit-tap-highlight-color:var(--tap);
+    }
+    .mini-btn:hover{ background:var(--panel2); color:var(--text); border-color:var(--border); }
+    .mini-btn.danger:hover{ color:var(--red); border-color:#3d1f22; }
+    .mini-btn.confirm{ color:#7ee787; }
+    .mini-btn.confirm:hover{ border-color:#1d3b22; background:#0f1a12; }
+
+    .mini-btn.hidden{ display:none; }
 
     .new-section-input{
-      width: calc(100% - 28px);
-      margin: 8px 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--r10);
-      color: var(--text);
-      padding: 8px 10px;
-      font-size: 13px;
+      width:calc(100% - 28px);
+      margin:8px 14px;
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      color:var(--text);
+      padding:8px 10px;
+      font-size:13px;
     }
-    .new-section-input:focus{ outline:none; border-color: var(--blue); }
+    .new-section-input:focus{ outline:none; border-color:var(--blue); }
 
-    .sort-dir{
-      margin-left:auto;
-      color:#8b949e;
-      font-size:12px;
-    }
+    .sort-dir{ margin-left:auto; color:#8b949e; font-size:12px; }
 
     .settings-menu label{
       display:block;
@@ -323,64 +364,105 @@
     }
     .settings-menu input{
       width:100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--r10);
-      color: var(--text);
-      padding: 8px 10px;
-      font-size: 13px;
-      margin-bottom: 12px;
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-radius:var(--r10);
+      color:var(--text);
+      padding:8px 10px;
+      font-size:13px;
+      margin-bottom:12px;
     }
-    .settings-menu input:focus{ outline:none; border-color: var(--blue); }
+    .settings-menu input:focus{ outline:none; border-color:var(--blue); }
 
-    .settings-buttons{
-      display:flex;
-      gap: 8px;
-    }
+    .settings-buttons{ display:flex; gap:8px; }
     .settings-btn{
       flex:1;
-      height: 42px;
-      border: none;
-      border-radius: var(--r10);
-      cursor: pointer;
+      height:42px;
+      border:none;
+      border-radius:var(--r10);
+      cursor:pointer;
       display:grid;
       place-items:center;
-      color: white;
-      -webkit-tap-highlight-color: var(--tap);
+      color:white;
+      -webkit-tap-highlight-color:var(--tap);
     }
-    .btn-primary{ background: var(--green); }
-    .btn-share{ background: #1f6feb; }
+    .btn-primary{ background:var(--green); }
+    .btn-share{ background:#1f6feb; }
 
-    .setup-prompt{
-      padding: 16px;
-      color: #8b949e;
-      text-align:center;
+    .setup-prompt{ padding:16px; color:#8b949e; text-align:center; }
+
+    /* ===== Undo bar ===== */
+    .undo-bar{
+      position:fixed;
+      left:50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      z-index:200;
+
+      display:flex;
+      align-items:center;
+      gap:10px;
+
+      background:#0b0f15;
+      border:1px solid var(--border);
+      box-shadow:0 10px 25px rgba(0,0,0,.35);
+      border-radius:999px;
+      padding:8px 10px 8px 12px;
+      max-width:min(92vw, 560px);
     }
+    .undo-text{
+      color:#8b949e;
+      font-size:13px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 420px;
+    }
+    .undo-btn{
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      -webkit-tap-highlight-color:var(--tap);
+    }
+    .undo-btn:hover{ border-color:var(--blue); }
+    .undo-bar.hidden{ display:none; }
   </style>
 </head>
 
 <body>
-  <!-- монохромные SVG-иконки -->
+  <!-- Mono SVG icons -->
   <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
     <symbol id="i-chevron-down" viewBox="0 0 16 16">
       <path d="M4.2 6.2a1 1 0 0 1 1.4 0L8 8.6l2.4-2.4a1 1 0 1 1 1.4 1.4l-3.1 3.1a1 1 0 0 1-1.4 0L4.2 7.6a1 1 0 0 1 0-1.4z"></path>
     </symbol>
+
     <symbol id="i-sort" viewBox="0 0 16 16">
       <path d="M6 2a1 1 0 0 1 1 1v9.6l1.3-1.3a1 1 0 1 1 1.4 1.4l-3 3a1 1 0 0 1-1.4 0l-3-3a1 1 0 0 1 1.4-1.4L5 12.6V3a1 1 0 0 1 1-1z"></path>
       <path d="M10 14a1 1 0 0 1-1-1V3.4L7.7 4.7a1 1 0 1 1-1.4-1.4l3-3a1 1 0 0 1 1.4 0l3 3a1 1 0 0 1-1.4 1.4L11 3.4V13a1 1 0 0 1-1 1z" opacity=".35"></path>
     </symbol>
+
     <symbol id="i-pencil" viewBox="0 0 16 16">
       <path d="M12.9 1.7a2 2 0 0 1 2.8 2.8l-9 9L3 14l.5-3.7 9.4-8.6zM4.6 10.9 4.3 13l2.1-.3 8.2-8.2-1.8-1.8-8.2 8.2z"></path>
     </symbol>
+
     <symbol id="i-x" viewBox="0 0 16 16">
       <path d="M4 4a1 1 0 0 1 1.4 0L8 6.6 10.6 4A1 1 0 1 1 12 5.4L9.4 8 12 10.6A1 1 0 0 1 10.6 12L8 9.4 5.4 12A1 1 0 0 1 4 10.6L6.6 8 4 5.4A1 1 0 0 1 4 4z"></path>
     </symbol>
+
     <symbol id="i-check" viewBox="0 0 16 16">
       <path d="M6.5 11.2 3.3 8a1 1 0 1 1 1.4-1.4l1.8 1.8 4.8-4.8a1 1 0 1 1 1.4 1.4l-6.2 6.2a1 1 0 0 1-1.4 0z"></path>
     </symbol>
+
     <symbol id="i-gear" viewBox="0 0 16 16">
       <path d="M9.7 1.2 10 2.6c.3.1.6.3.9.5l1.3-.7 1.1 2-1.1 1c.1.3.2.6.2 1s-.1.7-.2 1l1.1 1-1.1 2-1.3-.7c-.3.2-.6.4-.9.5l-.3 1.4H6.3L6 13.4c-.3-.1-.6-.3-.9-.5l-1.3.7-1.1-2 1.1-1c-.1-.3-.2-.6-.2-1s.1-.7.2-1l-1.1-1 1.1-2 1.3.7c.3-.2.6-.4.9-.5l.3-1.4h3.4zM8 10.5A2.5 2.5 0 1 0 8 5.5a2.5 2.5 0 0 0 0 5z"></path>
     </symbol>
+
     <symbol id="i-copy" viewBox="0 0 16 16">
       <path d="M5 2.5A2.5 2.5 0 0 1 7.5 0h6A2.5 2.5 0 0 1 16 2.5v6A2.5 2.5 0 0 1 13.5 11h-6A2.5 2.5 0 0 1 5 8.5v-6zM7.5 2A.5.5 0 0 0 7 2.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-6a.5.5 0 0 0-.5-.5h-6z"></path>
       <path d="M0 6.5A2.5 2.5 0 0 1 2.5 4H4v2H2.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V11h2v1.5A2.5 2.5 0 0 1 8.5 15h-6A2.5 2.5 0 0 1 0 12.5v-6z" opacity=".45"></path>
@@ -394,6 +476,14 @@
           <span id="currentSectionName">Все</span>
           <svg class="icon small" viewBox="0 0 16 16"><use href="#i-chevron-down"></use></svg>
         </button>
+
+        <!-- 3) Filter -->
+        <div class="filter-wrap" title="Фильтр">
+          <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
+          <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
+            <svg class="icon small" viewBox="0 0 16 16"><use href="#i-x"></use></svg>
+          </button>
+        </div>
 
         <div class="header-buttons">
           <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
@@ -445,7 +535,7 @@
       />
     </div>
 
-    <!-- Sort (compact, toggle direction) -->
+    <!-- Sort (compact toggle direction) -->
     <div class="dropdown-menu sort-menu hidden" id="sortMenu">
       <div class="menu-option" data-key="manual" onclick="setSortKey('manual')">
         Вручную <span class="sort-dir"></span>
@@ -480,6 +570,14 @@
     </div>
   </div>
 
+  <!-- 2) Undo bar -->
+  <div class="undo-bar hidden" id="undoBar">
+    <div class="undo-text" id="undoText"></div>
+    <button class="undo-btn" id="undoBtn" title="Отменить удаление">
+      <svg class="icon" viewBox="0 0 16 16"><use href="#i-check"></use></svg>
+    </button>
+  </div>
+
   <script>
     // ===== CONFIG =====
     let GIST_ID = localStorage.getItem("gist_id") || "";
@@ -488,22 +586,35 @@
     let currentSection = localStorage.getItem("current_section") || "__all__";
     let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "manual", dir: "desc" };
 
+    let filterQuery = localStorage.getItem("filter_query") || "";
+
     let data = { sections: {} };
     let isEditing = false;
 
     const defaultSections = ["Фильмы", "Сериалы", "Аниме"];
 
-    // Выделенная строка (визуально)
-    let selectedKey = null; // "section|index"
+    // selection highlight in view mode
+    let selectedKey = null;
 
-    // Для корректного поведения: тап = выделение строки, но если пользователь выделяет текст — не мешаем
-    let pointerStart = null; // {x,y, line}
+    // prevent selecting item when user is selecting text
+    let pointer = { down:false, startX:0, startY:0, moved:false, startedAt:0, line:null };
+
+    // delete confirmation state
+    let deleteArm = null;           // section name awaiting confirm
+    let deleteArmTimer = null;
+
+    // undo state
+    let undoTimer = null;
+    let undoPayload = null;         // {name, sectionData, prevCurrentSection}
+    const UNDO_MS = 10000;
 
     // ===== INIT =====
     async function init() {
       applyUrlSetupSilently();
       updateSettingsIcon();
       updateShareButton();
+
+      setupFilterUI();
 
       if (!GIST_ID || !TOKEN) {
         document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">Откройте настройки</div>`;
@@ -535,6 +646,41 @@
           window.history.replaceState({}, "", window.location.pathname);
         }
       } catch (_) {}
+    }
+
+    // ===== Filter =====
+    function setupFilterUI() {
+      const input = document.getElementById("filterInput");
+      const clear = document.getElementById("filterClear");
+
+      input.value = filterQuery;
+      clear.classList.toggle("hidden", !filterQuery);
+
+      input.addEventListener("input", () => {
+        filterQuery = input.value || "";
+        localStorage.setItem("filter_query", filterQuery);
+        clear.classList.toggle("hidden", !filterQuery);
+        selectedKey = null;
+        render();
+      });
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          clearFilter();
+          input.blur();
+        }
+      });
+    }
+
+    function clearFilter() {
+      filterQuery = "";
+      localStorage.setItem("filter_query", "");
+      const input = document.getElementById("filterInput");
+      input.value = "";
+      document.getElementById("filterClear").classList.add("hidden");
+      selectedKey = null;
+      render();
+      input.focus();
     }
 
     // ===== Menu positioning =====
@@ -606,7 +752,6 @@
     function copyShareLink() {
       if (!GIST_ID || !TOKEN) return;
       const link = `${location.origin}${location.pathname}?s=${btoa(`${GIST_ID}:${TOKEN}`)}`;
-
       if (navigator.clipboard) navigator.clipboard.writeText(link);
       else {
         const ta = document.createElement("textarea");
@@ -626,6 +771,7 @@
       if (!menu.classList.contains("hidden")) {
         menu.classList.add("hidden");
         document.getElementById("newSectionInput").classList.add("hidden");
+        disarmDelete();
         return;
       }
 
@@ -641,25 +787,35 @@
 
     function renderSectionList() {
       const list = document.getElementById("sectionList");
-      list.innerHTML = Object.keys(data.sections).map((name) => `
-        <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
-          <span>${escapeHtml(name)}</span>
-          <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${escapeQuotes(name)}')">×</span>
-        </div>
-      `).join("");
+
+      list.innerHTML = Object.keys(data.sections).map((name) => {
+        const armed = (deleteArm === name);
+        return `
+          <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
+            <span>${escapeHtml(name)}</span>
+
+            <span class="menu-actions" onclick="event.stopPropagation()">
+              <button class="mini-btn danger" title="Удалить" onclick="armDelete('${escapeQuotes(name)}')">×</button>
+              <button class="mini-btn confirm ${armed ? "" : "hidden"}" title="Подтвердить" onclick="confirmDelete('${escapeQuotes(name)}')">✓</button>
+            </span>
+          </div>
+        `;
+      }).join("");
     }
 
     function selectSection(name) {
       currentSection = name;
       localStorage.setItem("current_section", name);
       selectedKey = null;
+      disarmDelete();
       updateSectionButton();
       document.getElementById("sectionMenu").classList.add("hidden");
       render();
     }
 
     function updateSectionButton() {
-      document.getElementById("currentSectionName").textContent = (currentSection === "__all__") ? "Все" : currentSection;
+      document.getElementById("currentSectionName").textContent =
+        (currentSection === "__all__") ? "Все" : currentSection;
     }
 
     function showNewSectionInput() {
@@ -667,6 +823,7 @@
       input.classList.remove("hidden");
       input.value = "";
       input.focus();
+      disarmDelete();
     }
 
     function handleNewSection(e) {
@@ -684,20 +841,112 @@
       }
     }
 
-    function deleteSection(name) {
+    // ===== 2) Delete confirm + undo =====
+    function armDelete(name) {
       if (Object.keys(data.sections).length <= 1) return;
-      delete data.sections[name];
-      saveData();
 
+      // toggle
+      if (deleteArm === name) {
+        disarmDelete();
+        renderSectionList();
+        return;
+      }
+
+      deleteArm = name;
+      renderSectionList();
+
+      if (deleteArmTimer) clearTimeout(deleteArmTimer);
+      deleteArmTimer = setTimeout(() => {
+        disarmDelete();
+        renderSectionList();
+      }, 6000);
+    }
+
+    function disarmDelete() {
+      deleteArm = null;
+      if (deleteArmTimer) clearTimeout(deleteArmTimer);
+      deleteArmTimer = null;
+    }
+
+    function confirmDelete(name) {
+      if (Object.keys(data.sections).length <= 1) return;
+      if (!data.sections[name]) return;
+
+      disarmDelete();
+
+      // stash for undo
+      if (undoTimer) clearTimeout(undoTimer);
+      undoPayload = {
+        name,
+        sectionData: JSON.parse(JSON.stringify(data.sections[name])),
+        prevCurrentSection: currentSection
+      };
+
+      // delete
+      delete data.sections[name];
+
+      // if current section deleted -> fall back
       if (currentSection === name) {
         currentSection = "__all__";
         localStorage.setItem("current_section", "__all__");
         updateSectionButton();
       }
+
       selectedKey = null;
+      saveData();
+
       renderSectionList();
       render();
+
+      // show undo bar for 10 sec
+      showUndo(name);
+
+      undoTimer = setTimeout(() => {
+        hideUndo();
+        undoPayload = null;
+        undoTimer = null;
+      }, UNDO_MS);
     }
+
+    function showUndo(name) {
+      const bar = document.getElementById("undoBar");
+      document.getElementById("undoText").textContent = `Раздел удалён: ${name}`;
+      bar.classList.remove("hidden");
+    }
+
+    function hideUndo() {
+      document.getElementById("undoBar").classList.add("hidden");
+    }
+
+    document.getElementById("undoBtn").addEventListener("click", () => {
+      if (!undoPayload) return;
+
+      // restore (avoid overwrite if recreated)
+      let restoreName = undoPayload.name;
+      if (data.sections[restoreName]) {
+        let i = 2;
+        while (data.sections[`${restoreName} (${i})`]) i++;
+        restoreName = `${restoreName} (${i})`;
+      }
+
+      data.sections[restoreName] = undoPayload.sectionData;
+
+      // restore current section if it was deleted and user was in it
+      if (undoPayload.prevCurrentSection === undoPayload.name) {
+        currentSection = restoreName;
+        localStorage.setItem("current_section", restoreName);
+        updateSectionButton();
+      }
+
+      saveData();
+      renderSectionList();
+      render();
+
+      if (undoTimer) clearTimeout(undoTimer);
+      undoTimer = null;
+      undoPayload = null;
+      hideUndo();
+    });
 
     // ===== SORT (compact, toggles direction) =====
     function toggleSort() {
@@ -731,7 +980,7 @@
 
     function defaultDirForKey(key) {
       if (key === "alpha") return "asc";
-      return "desc"; // date/year default: новые/больше сверху
+      return "desc";
     }
 
     function updateSortMenuUI() {
@@ -739,7 +988,6 @@
         const key = el.dataset.key;
         const dirSpan = el.querySelector(".sort-dir");
         const active = (key === sortState.key);
-
         el.classList.toggle("active", active);
 
         if (!dirSpan) return;
@@ -777,7 +1025,6 @@
           break;
 
         case "date":
-          // "дата" как порядок добавления (reverse для новых сверху)
           if (sortState.dir === "desc") sorted.reverse();
           break;
       }
@@ -796,7 +1043,7 @@
         const gist = await res.json();
         if (gist.files?.["contents.json"]) {
           const loaded = JSON.parse(gist.files["contents.json"].content);
-          if (loaded.users && !loaded.sections) data.sections = loaded.users; // миграция
+          if (loaded.users && !loaded.sections) data.sections = loaded.users; // migration
           else data = loaded.sections ? loaded : { sections: {} };
         } else {
           data = { sections: {} };
@@ -898,10 +1145,7 @@
           data.sections[section].modified = new Date().toISOString();
         }
       } else {
-        data.sections[currentSection] = {
-          items: lines,
-          modified: new Date().toISOString(),
-        };
+        data.sections[currentSection] = { items: lines, modified: new Date().toISOString() };
       }
 
       await saveData();
@@ -911,9 +1155,14 @@
     }
 
     // ===== RENDER =====
+    function applyFilter(items) {
+      const q = (filterQuery || "").trim().toLowerCase();
+      if (!q) return items;
+      return items.filter(it => String(it.text || "").toLowerCase().includes(q));
+    }
+
     function render() {
       const view = document.getElementById("viewMode");
-      selectedKey = null;
 
       let items = [];
       if (currentSection === "__all__") {
@@ -924,31 +1173,33 @@
         items = (data.sections[currentSection]?.items || []).map((item, idx) => ({ text: item, section: currentSection, index: idx }));
       }
 
-      const sorted = getSortedItems(items);
+      items = applyFilter(items);
+      items = getSortedItems(items);
 
-      if (!sorted.length) {
+      if (!items.length) {
         view.innerHTML = "";
         document.getElementById("counter").textContent = "0";
         return;
       }
 
-      view.innerHTML = sorted.map((it) => {
+      view.innerHTML = items.map((it) => {
+        const key = `${it.section}|${it.index}`;
         const tag = (currentSection === "__all__")
           ? `<span class="item-section-tag">${escapeHtml(it.section)}</span>`
           : "";
 
         return `
-          <div class="item-line" data-key="${escapeAttr(it.section + '|' + it.index)}">
+          <div class="item-line ${selectedKey === key ? "selected" : ""}" data-key="${escapeAttr(key)}">
             ${tag}
             <span class="item-text">${escapeHtml(it.text)}</span>
           </div>
         `;
       }).join("");
 
-      document.getElementById("counter").textContent = String(sorted.length);
+      document.getElementById("counter").textContent = String(items.length);
     }
 
-    // ===== View mode selection + allow text selection =====
+    // ===== View mode selection (without breaking text selection) =====
     const viewModeEl = document.getElementById("viewMode");
 
     viewModeEl.addEventListener("pointerdown", (e) => {
@@ -956,32 +1207,49 @@
       const line = e.target.closest(".item-line");
       if (!line) return;
 
-      pointerStart = { x: e.clientX, y: e.clientY, line };
+      pointer.down = true;
+      pointer.moved = false;
+      pointer.startX = e.clientX;
+      pointer.startY = e.clientY;
+      pointer.startedAt = Date.now();
+      pointer.line = line;
+    });
+
+    viewModeEl.addEventListener("pointermove", (e) => {
+      if (!pointer.down) return;
+      if (Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) {
+        pointer.moved = true;
+      }
     });
 
     viewModeEl.addEventListener("pointerup", () => {
+      pointer.down = false;
+    });
+
+    viewModeEl.addEventListener("click", (e) => {
       if (isEditing) return;
-      if (!pointerStart) return;
 
-      const sel = (window.getSelection && window.getSelection()) ? window.getSelection().toString() : "";
-      const moved = pointerStart && (Math.hypot((event?.clientX ?? pointerStart.x) - pointerStart.x, (event?.clientY ?? pointerStart.y) - pointerStart.y) > 8);
+      const line = e.target.closest(".item-line");
+      if (!line) return;
 
-      // Если пользователь выделял текст (selection не пустая) — НЕ трогаем "выбор позиции"
-      if (sel && sel.trim().length) { pointerStart = null; return; }
+      // If user selected text, do not toggle row selection
+      const sel = window.getSelection ? window.getSelection() : null;
+      if (sel && !sel.isCollapsed) return;
 
-      // Если был заметный сдвиг (скролл/drag) — не считаем тапом
-      if (moved) { pointerStart = null; return; }
+      // Ignore long-press-like interactions
+      const longPress = pointer.startedAt && (Date.now() - pointer.startedAt > 350);
+      if (longPress) return;
 
-      const line = pointerStart.line;
+      // Ignore drag/scroll gestures
+      if (pointer.moved) return;
+
       const key = line.dataset.key;
-
-      // toggle single selection
       const already = (selectedKey === key);
-      document.querySelectorAll("#viewMode .item-line.selected").forEach((el) => el.classList.remove("selected"));
-      selectedKey = already ? null : key;
-      if (selectedKey) line.classList.add("selected");
 
-      pointerStart = null;
+      selectedKey = already ? null : key;
+
+      document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
+      if (selectedKey) line.classList.add("selected");
     });
 
     // ===== Close menus =====
@@ -994,10 +1262,16 @@
     document.addEventListener("click", (e) => {
       if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn")) {
         closeAllMenus();
+        disarmDelete();
+        renderSectionList();
       }
     });
 
-    window.addEventListener("scroll", () => closeAllMenus(), { passive: true });
+    window.addEventListener("scroll", () => {
+      closeAllMenus();
+      disarmDelete();
+      // не перерисовываем список разделов на каждый скролл
+    }, { passive: true });
 
     // ===== Utils =====
     function escapeHtml(str) {
@@ -1008,12 +1282,8 @@
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
     }
-    function escapeAttr(str) {
-      return escapeHtml(str).replaceAll("`", "&#096;");
-    }
-    function escapeQuotes(str) {
-      return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
-    }
+    function escapeAttr(str) { return escapeHtml(str).replaceAll("`", "&#096;"); }
+    function escapeQuotes(str) { return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'"); }
 
     init();
   </script>
