@@ -4,285 +4,382 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contents</title>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
+    body{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      min-height: 100vh;
-      padding: 20px;
+      background:#0d1117;
+      color:#c9d1d9;
+      min-height:100vh;
+      padding:16px;
     }
 
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      position: relative;
+    .container{
+      max-width:800px;
+      margin:0 auto;
+      position:relative;
     }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #21262d;
+    /* ===== Sticky header ===== */
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background:#0d1117;
+      padding: 10px 0 10px;
+      border-bottom:1px solid #21262d;
+      margin-bottom:12px;
     }
 
-    .section-btn {
-      background: #21262d;
-      border: 1px solid #30363d;
-      color: #c9d1d9;
-      font-size: 15px;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 160px;
-      justify-content: space-between;
+    .header-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
     }
 
-    .section-btn:hover { border-color: #58a6ff; }
-    .section-btn .arrow { font-size: 10px; color: #6e7681; }
+    .section-btn{
+      height:40px;
+      background:#21262d;
+      border:1px solid #30363d;
+      color:#c9d1d9;
+      font-size:15px;
+      padding:0 12px;
+      border-radius:8px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:170px;
+      justify-content:space-between;
+    }
+    .section-btn:hover{ border-color:#58a6ff; }
+    .section-btn:active{ transform: translateY(0.5px); }
 
-    .header-buttons {
-      display: flex;
-      gap: 12px;
+    .header-buttons{
+      display:flex;
+      gap:8px;
+      align-items:center;
     }
 
-    .icon-btn {
-      background: none;
-      border: none;
-      color: #6e7681;
-      cursor: pointer;
-      font-size: 18px;
-      padding: 5px;
-      transition: color 0.2s;
-      line-height: 1;
+    .icon-btn{
+      width:40px;
+      height:40px;
+      border-radius:8px;
+      background:transparent;
+      border:1px solid transparent;
+      color:#6e7681;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      transition: color .15s, background .15s, border-color .15s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .icon-btn:hover { color: #c9d1d9; }
-    .icon-btn.error { color: #f85149; }
-
-    .content-area {
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      min-height: 400px;
-      position: relative;
+    .icon-btn:hover{
+      color:#c9d1d9;
+      background:#161b22;
+      border-color:#30363d;
     }
-
-    .content-list {
-      padding: 15px;
-      white-space: pre-line;
-      line-height: 1.8;
-      min-height: 400px;
+    .icon-btn:active{ transform: translateY(0.5px); }
+    .icon-btn.error{
+      color:#f85149;
+      border-color:#3d1f22;
+      background:#161b22;
     }
 
-    .content-list:empty::before {
-      content: "—";
-      color: #484f58;
-      font-size: 32px;
-      display: flex;
-      justify-content: center;
-      padding-top: 150px;
+    .icon{
+      width:18px;
+      height:18px;
+      fill: currentColor;
+      display:block;
+    }
+    .icon.small{ width:14px; height:14px; }
+
+    /* ===== Content area ===== */
+    .content-area{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:10px;
+      min-height:420px;
+      position:relative;
+      overflow:hidden;
     }
 
-    /* Плотнее "Все" */
-    .content-list.all-mode { line-height: 1.2; }
-
-    .item-line {
-      display: flex;
-      gap: 6px;
-      padding: 0;            /* максимально близко к обычному списку */
-      align-items: center;
+    .content-list{
+      padding:14px 15px;
+      min-height:420px;
+      line-height:1.35; /* одинаково для "Все" и разделов */
     }
-    .item-section-tag {
-      background: #30363d;
-      color: #8b949e;
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .item-text { flex: 1; }
 
-    .content-edit {
-      width: 100%;
-      height: 100%;
-      min-height: 400px;
-      background: #0d1117;
-      border: none;
-      border-radius: 8px;
-      color: #c9d1d9;
-      padding: 15px;
-      font-size: 14px;
+    .content-list:empty::before{
+      content:"—";
+      color:#484f58;
+      font-size:32px;
+      display:flex;
+      justify-content:center;
+      padding-top:160px;
+    }
+
+    /* строки (и в разделе, и в "Все") */
+    .item-line{
+      display:flex;
+      gap:6px;
+      align-items:center;
+      padding: 1px 6px;   /* компактно, но читаемо */
+      margin: 0 -6px;     /* чтобы выделение красиво ложилось по ширине */
+      border-radius:8px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .item-line:hover{
+      background:#0f141b;
+    }
+    .item-line.selected{
+      background:#21262d;
+      box-shadow: inset 0 0 0 1px #30363d;
+    }
+
+    .item-section-tag{
+      background:#30363d;
+      color:#8b949e;
+      font-size:10px;
+      padding:1px 5px;
+      border-radius:4px;
+      white-space:nowrap;
+      flex-shrink:0;
+    }
+    .item-text{
+      flex:1;
+      white-space:pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ===== Edit ===== */
+    .hidden{ display:none; }
+
+    .content-edit{
+      width:100%;
+      height:100%;
+      min-height:420px;
+      background:#0d1117;
+      border:none;
+      color:#c9d1d9;
+      padding:14px 15px;
+      font-size:14px;
       font-family: inherit;
-      line-height: 1.8;
+      line-height:1.6;
       resize: vertical;
     }
-    .content-edit:focus { outline: none; }
-    .content-edit::placeholder { color: #484f58; }
+    .content-edit:focus{ outline:none; }
 
-    .hidden { display: none; }
-
-    .counter {
-      text-align: right;
-      padding: 10px 15px;
-      color: #484f58;
-      font-size: 12px;
-      border-top: 1px solid #30363d;
+    .edit-hint{
+      font-size:11px;
+      color:#6e7681;
+      padding:8px 15px;
+      border-bottom:1px solid #30363d;
+      background:#0f141b;
     }
 
-    .edit-panel {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      padding: 10px 15px;
-      border-top: 1px solid #30363d;
+    .edit-panel{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      padding:10px 15px;
+      border-top:1px solid #30363d;
+      background:#0f141b;
     }
 
-    .edit-panel button {
-      color: white;
-      border: none;
-      width: 40px;
-      height: 40px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 18px;
-      display: grid;
-      place-items: center;
+    .edit-panel button{
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      color:white;
+    }
+    .btn-cancel{ background:#30363d; }
+    .btn-save{ background:#238636; }
+
+    .counter{
+      text-align:right;
+      padding:10px 15px;
+      color:#484f58;
+      font-size:12px;
+      border-top:1px solid #30363d;
+      background:#0f141b;
     }
 
-    .btn-save { background: #238636; }
-    .btn-cancel { background: #30363d; }
-
-    /* Dropdowns */
-    .dropdown-menu {
-      position: absolute;
-      background: #161b22;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-      z-index: 50;
-      min-width: 180px;
-      overflow: hidden;
+    /* ===== Dropdowns ===== */
+    .dropdown-menu{
+      position:absolute;
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:10px;
+      z-index:120;
+      overflow:hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
     }
 
-    .dropdown-menu.section-menu { padding: 8px 0; }
-    .dropdown-menu.sort-menu { padding: 8px 0; }
-    .dropdown-menu.settings-menu { padding: 15px; width: 260px; }
+    .dropdown-menu.section-menu{ padding:8px 0; min-width: 220px; }
+    .dropdown-menu.sort-menu{ padding:6px 0; width: 170px; min-width: 170px; } /* фикс ширина */
+    .dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
 
-    .menu-option {
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      user-select: none;
+    .menu-option{
+      padding:8px 14px;
+      cursor:pointer;
+      font-size:14px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      user-select:none;
     }
-    .menu-option:hover { background: #21262d; }
-    .menu-option.active { color: #58a6ff; }
+    .menu-option:hover{ background:#21262d; }
+    .menu-option.active{ color:#58a6ff; }
 
-    .menu-option.all-sections {
-      border-bottom: 1px solid #30363d;
-      margin-bottom: 5px;
-      padding-bottom: 10px;
-    }
-    .menu-divider {
-      border-top: 1px solid #30363d;
-      margin: 5px 0;
-    }
-    .menu-option.add-new { color: #58a6ff; }
-
-    .menu-option .delete-section {
-      margin-left: auto;
-      color: #6e7681;
-      font-size: 14px;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .menu-option .delete-section:hover { color: #f85149; background: #21262d; }
-
-    .new-section-input {
-      width: calc(100% - 32px);
-      margin: 8px 16px;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #c9d1d9;
-      padding: 8px 10px;
-      font-size: 13px;
-    }
-    .new-section-input:focus { outline: none; border-color: #58a6ff; }
-
-    /* Settings */
-    .settings-menu label {
-      display: block;
-      font-size: 11px;
-      color: #8b949e;
-      margin-bottom: 4px;
+    .menu-option.all-sections{
+      border-bottom:1px solid #30363d;
+      margin-bottom:6px;
+      padding-bottom:10px;
     }
 
-    .settings-menu input {
-      width: 100%;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 6px;
-      color: #c9d1d9;
-      padding: 8px 10px;
-      font-size: 13px;
-      margin-bottom: 12px;
-    }
-    .settings-menu input:focus { outline: none; border-color: #58a6ff; }
-
-    .settings-buttons {
-      display: flex;
-      gap: 8px;
-    }
-    .settings-btn {
-      flex: 1;
-      height: 40px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      display: grid;
-      place-items: center;
-    }
-    .btn-primary { background: #238636; color: white; }
-    .btn-share { background: #1f6feb; color: white; }
-
-    .setup-prompt {
-      padding: 15px;
-      color: #8b949e;
-      text-align: center;
+    .menu-divider{
+      border-top:1px solid #30363d;
+      margin:6px 0;
     }
 
-    .edit-hint {
-      font-size: 11px;
-      color: #6e7681;
-      padding: 8px 15px;
-      border-bottom: 1px solid #30363d;
+    .menu-option.add-new{ color:#58a6ff; }
+
+    .menu-option .delete-section{
+      margin-left:auto;
+      color:#6e7681;
+      font-size:14px;
+      padding:2px 6px;
+      border-radius:6px;
+    }
+    .menu-option .delete-section:hover{ color:#f85149; background:#0f141b; }
+
+    .new-section-input{
+      width: calc(100% - 28px);
+      margin:8px 14px;
+      background:#0d1117;
+      border:1px solid #30363d;
+      border-radius:8px;
+      color:#c9d1d9;
+      padding:8px 10px;
+      font-size:13px;
+    }
+    .new-section-input:focus{ outline:none; border-color:#58a6ff; }
+
+    /* sort menu right arrow indicator */
+    .sort-dir{
+      margin-left:auto;
+      color:#8b949e;
+      font-size:12px;
+    }
+
+    /* settings */
+    .settings-menu label{
+      display:block;
+      font-size:11px;
+      color:#8b949e;
+      margin-bottom:4px;
+    }
+    .settings-menu input{
+      width:100%;
+      background:#0d1117;
+      border:1px solid #30363d;
+      border-radius:8px;
+      color:#c9d1d9;
+      padding:8px 10px;
+      font-size:13px;
+      margin-bottom:12px;
+    }
+    .settings-menu input:focus{ outline:none; border-color:#58a6ff; }
+
+    .settings-buttons{
+      display:flex;
+      gap:8px;
+    }
+    .settings-btn{
+      flex:1;
+      height:42px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      color:white;
+    }
+    .btn-primary{ background:#238636; }
+    .btn-share{ background:#1f6feb; }
+
+    .setup-prompt{
+      padding:16px;
+      color:#8b949e;
+      text-align:center;
     }
   </style>
 </head>
 
 <body>
+  <!-- SVG icons (монохромные, без emoji) -->
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="i-chevron-down" viewBox="0 0 16 16">
+      <path d="M4.2 6.2a1 1 0 0 1 1.4 0L8 8.6l2.4-2.4a1 1 0 1 1 1.4 1.4l-3.1 3.1a1 1 0 0 1-1.4 0L4.2 7.6a1 1 0 0 1 0-1.4z"></path>
+    </symbol>
+
+    <symbol id="i-sort" viewBox="0 0 16 16">
+      <path d="M6 2a1 1 0 0 1 1 1v9.6l1.3-1.3a1 1 0 1 1 1.4 1.4l-3 3a1 1 0 0 1-1.4 0l-3-3a1 1 0 0 1 1.4-1.4L5 12.6V3a1 1 0 0 1 1-1z"></path>
+      <path d="M10 14a1 1 0 0 1-1-1V3.4L7.7 4.7a1 1 0 1 1-1.4-1.4l3-3a1 1 0 0 1 1.4 0l3 3a1 1 0 0 1-1.4 1.4L11 3.4V13a1 1 0 0 1-1 1z" opacity=".35"></path>
+    </symbol>
+
+    <symbol id="i-pencil" viewBox="0 0 16 16">
+      <path d="M12.9 1.7a2 2 0 0 1 2.8 2.8l-9 9L3 14l.5-3.7 9.4-8.6zM4.6 10.9 4.3 13l2.1-.3 8.2-8.2-1.8-1.8-8.2 8.2z"></path>
+    </symbol>
+
+    <symbol id="i-x" viewBox="0 0 16 16">
+      <path d="M4 4a1 1 0 0 1 1.4 0L8 6.6 10.6 4A1 1 0 1 1 12 5.4L9.4 8 12 10.6A1 1 0 0 1 10.6 12L8 9.4 5.4 12A1 1 0 0 1 4 10.6L6.6 8 4 5.4A1 1 0 0 1 4 4z"></path>
+    </symbol>
+
+    <symbol id="i-check" viewBox="0 0 16 16">
+      <path d="M6.5 11.2 3.3 8a1 1 0 1 1 1.4-1.4l1.8 1.8 4.8-4.8a1 1 0 1 1 1.4 1.4l-6.2 6.2a1 1 0 0 1-1.4 0z"></path>
+    </symbol>
+
+    <symbol id="i-gear" viewBox="0 0 16 16">
+      <path d="M9.7 1.2 10 2.6c.3.1.6.3.9.5l1.3-.7 1.1 2-1.1 1c.1.3.2.6.2 1s-.1.7-.2 1l1.1 1-1.1 2-1.3-.7c-.3.2-.6.4-.9.5l-.3 1.4H6.3L6 13.4c-.3-.1-.6-.3-.9-.5l-1.3.7-1.1-2 1.1-1c-.1-.3-.2-.6-.2-1s.1-.7.2-1l-1.1-1 1.1-2 1.3.7c.3-.2.6-.4.9-.5l.3-1.4h3.4zM8 10.5A2.5 2.5 0 1 0 8 5.5a2.5 2.5 0 0 0 0 5z"></path>
+    </symbol>
+
+    <symbol id="i-copy" viewBox="0 0 16 16">
+      <path d="M5 2.5A2.5 2.5 0 0 1 7.5 0h6A2.5 2.5 0 0 1 16 2.5v6A2.5 2.5 0 0 1 13.5 11h-6A2.5 2.5 0 0 1 5 8.5v-6zM7.5 2A.5.5 0 0 0 7 2.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5v-6a.5.5 0 0 0-.5-.5h-6z"></path>
+      <path d="M0 6.5A2.5 2.5 0 0 1 2.5 4H4v2H2.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V11h2v1.5A2.5 2.5 0 0 1 8.5 15h-6A2.5 2.5 0 0 1 0 12.5v-6z" opacity=".45"></path>
+    </symbol>
+  </svg>
+
   <div class="container" id="container">
     <header>
-      <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
-        <span id="currentSectionName">Все</span>
-        <span class="arrow">▼</span>
-      </button>
+      <div class="header-row">
+        <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
+          <span id="currentSectionName">Все</span>
+          <svg class="icon small" viewBox="0 0 16 16"><use href="#i-chevron-down"></use></svg>
+        </button>
 
-      <div class="header-buttons">
-        <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">⇅</button>
-        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">✎</button>
-        <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Настройки">⚙</button>
+        <div class="header-buttons">
+          <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
+            <svg class="icon"><use href="#i-sort"></use></svg>
+          </button>
+
+          <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
+            <svg class="icon" id="editIcon"><use href="#i-pencil"></use></svg>
+          </button>
+
+          <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Настройки">
+            <svg class="icon"><use href="#i-gear"></use></svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -293,19 +390,21 @@
         <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
         <textarea class="content-edit" id="editor" placeholder="..."></textarea>
         <div class="edit-panel">
-          <button class="btn-cancel" onclick="cancelEdit()">✕</button>
-          <button class="btn-save" onclick="saveEdit()">✓</button>
+          <button class="btn-cancel" onclick="cancelEdit()" title="Отмена">
+            <svg class="icon"><use href="#i-x"></use></svg>
+          </button>
+          <button class="btn-save" onclick="saveEdit()" title="Сохранить">
+            <svg class="icon"><use href="#i-check"></use></svg>
+          </button>
         </div>
       </div>
 
       <div class="counter" id="counter"></div>
     </div>
 
-    <!-- Меню разделов -->
+    <!-- Sections menu -->
     <div class="dropdown-menu section-menu hidden" id="sectionMenu">
-      <div class="menu-option all-sections" data-section="__all__" onclick="selectSection('__all__')">
-        Все
-      </div>
+      <div class="menu-option all-sections" onclick="selectSection('__all__')">Все</div>
       <div id="sectionList"></div>
       <div class="menu-divider"></div>
       <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый</div>
@@ -318,18 +417,27 @@
       />
     </div>
 
-    <!-- Меню сортировки -->
+    <!-- Sort menu (compact, Windows-like toggle direction) -->
     <div class="dropdown-menu sort-menu hidden" id="sortMenu">
-      <div class="menu-option" data-sort="manual" onclick="setSort('manual')">Вручную</div>
-      <div class="menu-option" data-sort="newest" onclick="setSort('newest')">По дате ↓</div>
-      <div class="menu-option" data-sort="oldest" onclick="setSort('oldest')">По дате ↑</div>
-      <div class="menu-option" data-sort="az" onclick="setSort('az')">А → Я</div>
-      <div class="menu-option" data-sort="za" onclick="setSort('za')">Я → А</div>
-      <div class="menu-option" data-sort="year-desc" onclick="setSort('year-desc')">По году ↓</div>
-      <div class="menu-option" data-sort="year-asc" onclick="setSort('year-asc')">По году ↑</div>
+      <div class="menu-option" data-key="manual" onclick="setSortKey('manual')">
+        Вручную
+        <span class="sort-dir"></span>
+      </div>
+      <div class="menu-option" data-key="date" onclick="setSortKey('date')">
+        Дата
+        <span class="sort-dir"></span>
+      </div>
+      <div class="menu-option" data-key="alpha" onclick="setSortKey('alpha')">
+        А-Я
+        <span class="sort-dir"></span>
+      </div>
+      <div class="menu-option" data-key="year" onclick="setSortKey('year')">
+        Год
+        <span class="sort-dir"></span>
+      </div>
     </div>
 
-    <!-- Меню настроек -->
+    <!-- Settings menu -->
     <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
       <label>Gist ID</label>
       <input type="text" id="inputGistId" placeholder="abc123..." />
@@ -338,8 +446,12 @@
       <input type="password" id="inputToken" placeholder="ghp_..." />
 
       <div class="settings-buttons">
-        <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">✓</button>
-        <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">⎘</button>
+        <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">
+          <svg class="icon"><use href="#i-check"></use></svg>
+        </button>
+        <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">
+          <svg class="icon"><use href="#i-copy"></use></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -350,11 +462,17 @@
     let TOKEN = localStorage.getItem("github_token") || "";
 
     let currentSection = localStorage.getItem("current_section") || "__all__";
-    let currentSort = localStorage.getItem("sort_mode") || "manual";
+
+    // sort state: key + dir (dir for manual ignored)
+    let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "manual", dir: "desc" };
+
     let data = { sections: {} };
     let isEditing = false;
 
     const defaultSections = ["Фильмы", "Сериалы", "Аниме"];
+
+    // selection (view mode)
+    let selected = null; // {section, index} or {section, index, global:true}
 
     // ===== INIT =====
     async function init() {
@@ -363,7 +481,7 @@
       updateShareButton();
 
       if (!GIST_ID || !TOKEN) {
-        document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">⚙</div>`;
+        document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">Откройте настройки</div>`;
         document.getElementById("counter").textContent = "";
         return;
       }
@@ -391,14 +509,13 @@
           TOKEN = token;
           window.history.replaceState({}, "", window.location.pathname);
         }
-      } catch (e) {
-        // silent
-      }
+      } catch (_) {}
     }
 
-    // ===== MENU POSITIONING =====
+    // ===== Menu positioning =====
     function openMenu(menuId, anchorEl, align = "left") {
       closeAllMenus(menuId);
+
       const menu = document.getElementById(menuId);
       const container = document.getElementById("container");
 
@@ -410,15 +527,11 @@
       const mRect = menu.getBoundingClientRect();
 
       const top = aRect.bottom - cRect.top + 8;
-
       let left;
-      if (align === "right") {
-        left = aRect.right - cRect.left - mRect.width;
-      } else {
-        left = aRect.left - cRect.left;
-      }
 
-      // clamp inside container
+      if (align === "right") left = aRect.right - cRect.left - mRect.width;
+      else left = aRect.left - cRect.left;
+
       left = Math.max(0, Math.min(left, cRect.width - mRect.width));
 
       menu.style.top = `${top}px`;
@@ -501,28 +614,25 @@
 
     function ensureDefaultSections() {
       if (Object.keys(data.sections).length > 0) return;
-      defaultSections.forEach((s) => {
-        data.sections[s] = { items: [], modified: new Date().toISOString() };
-      });
+      defaultSections.forEach((s) => (data.sections[s] = { items: [], modified: new Date().toISOString() }));
     }
 
     function renderSectionList() {
       const list = document.getElementById("sectionList");
       list.innerHTML = Object.keys(data.sections)
-        .map(
-          (name) => `
-            <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
-              <span>${escapeHtml(name)}</span>
-              <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${escapeQuotes(name)}')">✕</span>
-            </div>
-          `
-        )
+        .map((name) => `
+          <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
+            <span>${escapeHtml(name)}</span>
+            <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${escapeQuotes(name)}')">×</span>
+          </div>
+        `)
         .join("");
     }
 
     function selectSection(name) {
       currentSection = name;
       localStorage.setItem("current_section", name);
+      selected = null; // сброс выбора
       updateSectionButton();
       document.getElementById("sectionMenu").classList.add("hidden");
       render();
@@ -557,7 +667,6 @@
 
     function deleteSection(name) {
       if (Object.keys(data.sections).length <= 1) return;
-
       delete data.sections[name];
       saveData();
 
@@ -567,8 +676,108 @@
         updateSectionButton();
       }
 
+      selected = null;
       renderSectionList();
       render();
+    }
+
+    // ===== SORT (compact, toggles direction) =====
+    function toggleSort() {
+      const menu = document.getElementById("sortMenu");
+      const btn = document.getElementById("sortBtn");
+
+      if (!menu.classList.contains("hidden")) {
+        menu.classList.add("hidden");
+        return;
+      }
+
+      openMenu("sortMenu", btn, "right");
+      updateSortMenuUI();
+    }
+
+    function setSortKey(key) {
+      // Windows-like:
+      // - click same key => toggle dir
+      // - click new key => set default dir for that key
+      if (key === "manual") {
+        sortState = { key: "manual", dir: "desc" };
+      } else if (sortState.key === key) {
+        sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+      } else {
+        sortState = { key, dir: defaultDirForKey(key) };
+      }
+
+      localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
+      selected = null; // сброс выбора
+      updateSortMenuUI();
+      document.getElementById("sortMenu").classList.add("hidden");
+      render();
+    }
+
+    function defaultDirForKey(key) {
+      // привычные дефолты:
+      // дата/год: сверху новые/больше => desc
+      // алфавит: А-Я => asc
+      if (key === "alpha") return "asc";
+      return "desc";
+    }
+
+    function updateSortMenuUI() {
+      document.querySelectorAll("#sortMenu .menu-option").forEach((el) => {
+        const key = el.dataset.key;
+        const dirSpan = el.querySelector(".sort-dir");
+        const active = key === sortState.key;
+
+        el.classList.toggle("active", active);
+
+        if (!dirSpan) return;
+
+        if (!active || key === "manual") {
+          dirSpan.textContent = "";
+          return;
+        }
+
+        // стрелки направления
+        dirSpan.textContent = sortState.dir === "asc" ? "↑" : "↓";
+      });
+    }
+
+    function parseSortState(str) {
+      if (!str) return null;
+      const [key, dir] = String(str).split(":");
+      if (!key) return null;
+      return { key, dir: dir === "asc" ? "asc" : "desc" };
+    }
+
+    function getSortedItems(items) {
+      if (!items || sortState.key === "manual") return items;
+
+      const sorted = [...items];
+      const getText = (x) => (x.text ?? x);
+
+      switch (sortState.key) {
+        case "alpha":
+          sorted.sort((a, b) => getText(a).localeCompare(getText(b), "ru"));
+          if (sortState.dir === "desc") sorted.reverse();
+          break;
+
+        case "year":
+          sorted.sort((a, b) => {
+            const yA = (getText(a).match(/\((\d{4})\)/) || [, 0])[1];
+            const yB = (getText(b).match(/\((\d{4})\)/) || [, 0])[1];
+            return Number(yA) - Number(yB);
+          });
+          if (sortState.dir === "desc") sorted.reverse();
+          break;
+
+        case "date":
+          // без явных дат считаем "порядок добавления":
+          // asc = старые сверху (как есть), desc = новые сверху (reverse)
+          if (sortState.dir === "desc") sorted.reverse();
+          break;
+      }
+
+      return sorted;
     }
 
     // ===== API =====
@@ -585,11 +794,8 @@
         if (gist.files?.["contents.json"]) {
           const loaded = JSON.parse(gist.files["contents.json"].content);
           // миграция со старой структуры
-          if (loaded.users && !loaded.sections) {
-            data.sections = loaded.users;
-          } else {
-            data = loaded.sections ? loaded : { sections: {} };
-          }
+          if (loaded.users && !loaded.sections) data.sections = loaded.users;
+          else data = loaded.sections ? loaded : { sections: {} };
         } else {
           data = { sections: {} };
           await saveData();
@@ -629,48 +835,49 @@
 
     function startEdit() {
       isEditing = true;
+      selected = null;
+
       const editor = document.getElementById("editor");
       const hint = document.getElementById("editHint");
+      const editIcon = document.getElementById("editIcon");
+
+      // change icon to X while editing
+      editIcon.setAttribute("href", "#i-x");
 
       if (currentSection === "__all__") {
-        // [Раздел] Текст
         const lines = [];
         Object.entries(data.sections).forEach(([section, sectionData]) => {
-          (sectionData.items || []).forEach((item) => {
-            lines.push(`[${section}] ${item}`);
-          });
+          (sectionData.items || []).forEach((item) => lines.push(`[${section}] ${item}`));
         });
         editor.value = lines.join("\n");
         hint.classList.remove("hidden");
       } else {
-        const items = data.sections[currentSection]?.items || [];
-        editor.value = items.join("\n");
+        editor.value = (data.sections[currentSection]?.items || []).join("\n");
         hint.classList.add("hidden");
       }
 
       document.getElementById("viewMode").classList.add("hidden");
       document.getElementById("editMode").classList.remove("hidden");
-      document.getElementById("editBtn").textContent = "✕";
       editor.focus();
     }
 
     function cancelEdit() {
       isEditing = false;
+
       document.getElementById("viewMode").classList.remove("hidden");
       document.getElementById("editMode").classList.add("hidden");
-      document.getElementById("editBtn").textContent = "✎";
       document.getElementById("editHint").classList.add("hidden");
+
+      // restore edit icon
+      document.getElementById("editIcon").setAttribute("href", "#i-pencil");
     }
 
     async function saveEdit() {
       const text = document.getElementById("editor").value;
-      const lines = text
-        .split("\n")
-        .map((s) => s.trim())
-        .filter((s) => s);
+      const lines = text.split("\n").map((s) => s.trim()).filter(Boolean);
 
       if (currentSection === "__all__") {
-        // rebuild items per section from editor lines
+        // rebuild per section from "[Раздел] Текст"
         const newData = {};
         Object.keys(data.sections).forEach((s) => (newData[s] = []));
 
@@ -710,100 +917,67 @@
       render();
     }
 
-    // ===== SORT =====
-    function toggleSort() {
-      const menu = document.getElementById("sortMenu");
-      const btn = document.getElementById("sortBtn");
-
-      if (!menu.classList.contains("hidden")) {
-        menu.classList.add("hidden");
-        return;
-      }
-
-      openMenu("sortMenu", btn, "right");
-      document.querySelectorAll("#sortMenu .menu-option").forEach((el) => {
-        el.classList.toggle("active", el.dataset.sort === currentSort);
-      });
-    }
-
-    function setSort(mode) {
-      currentSort = mode;
-      localStorage.setItem("sort_mode", mode);
-      document.getElementById("sortMenu").classList.add("hidden");
-      render();
-    }
-
-    function getSortedItems(items) {
-      if (!items || currentSort === "manual") return items;
-      const sorted = [...items];
-
-      switch (currentSort) {
-        case "az":
-          sorted.sort((a, b) => (a.text || a).localeCompare(b.text || b, "ru"));
-          break;
-        case "za":
-          sorted.sort((a, b) => (b.text || b).localeCompare(a.text || a, "ru"));
-          break;
-        case "year-desc":
-        case "year-asc":
-          sorted.sort((a, b) => {
-            const textA = a.text || a;
-            const textB = b.text || b;
-            const yA = (textA.match(/\((\d{4})\)/) || [, 0])[1];
-            const yB = (textB.match(/\((\d{4})\)/) || [, 0])[1];
-            return currentSort === "year-desc" ? yB - yA : yA - yB;
-          });
-          break;
-        case "newest":
-          sorted.reverse();
-          break;
-        case "oldest":
-          // already oldest by default for manual; keep as-is
-          break;
-      }
-      return sorted;
-    }
-
-    // ===== RENDER =====
+    // ===== RENDER (both modes as clickable lines) =====
     function render() {
       const view = document.getElementById("viewMode");
-      let items = [];
+      selected = null;
 
+      let items = [];
       if (currentSection === "__all__") {
         Object.entries(data.sections).forEach(([section, sectionData]) => {
-          (sectionData.items || []).forEach((item) => {
-            items.push({ text: item, section });
+          (sectionData.items || []).forEach((item, idx) => {
+            items.push({ text: item, section, index: idx });
           });
         });
-        view.classList.add("all-mode");
       } else {
-        items = (data.sections[currentSection]?.items || []).map((item) => ({ text: item, section: null }));
-        view.classList.remove("all-mode");
+        items = (data.sections[currentSection]?.items || []).map((item, idx) => ({
+          text: item,
+          section: currentSection,
+          index: idx,
+          single: true,
+        }));
       }
 
       const sorted = getSortedItems(items);
 
       if (sorted.length === 0) {
         view.innerHTML = "";
-      } else if (currentSection === "__all__") {
-        view.innerHTML = sorted
-          .map(
-            (item) => `
-            <div class="item-line">
-              <span class="item-section-tag">${escapeHtml(item.section)}</span>
-              <span class="item-text">${escapeHtml(item.text)}</span>
-            </div>
-          `
-          )
-          .join("");
-      } else {
-        view.textContent = sorted.map((i) => i.text).join("\n");
+        document.getElementById("counter").textContent = "0";
+        return;
       }
 
-      document.getElementById("counter").textContent = sorted.length;
+      // render html lines
+      view.innerHTML = sorted
+        .map((it) => {
+          const tag = (currentSection === "__all__")
+            ? `<span class="item-section-tag">${escapeHtml(it.section)}</span>`
+            : "";
+          return `
+            <div class="item-line"
+                 data-section="${escapeAttr(it.section)}"
+                 data-index="${String(it.index)}">
+              ${tag}
+              <span class="item-text">${escapeHtml(it.text)}</span>
+            </div>
+          `;
+        })
+        .join("");
+
+      document.getElementById("counter").textContent = String(sorted.length);
     }
 
-    // ===== CLOSE MENUS =====
+    // click-to-select in view mode
+    document.getElementById("viewMode").addEventListener("click", (e) => {
+      const line = e.target.closest(".item-line");
+      if (!line) return;
+
+      // toggle selection
+      const already = line.classList.contains("selected");
+      document.querySelectorAll("#viewMode .item-line.selected").forEach((el) => el.classList.remove("selected"));
+      if (!already) line.classList.add("selected");
+    });
+
+    // ===== Close menus =====
     function closeAllMenus(except) {
       ["sortMenu", "settingsMenu", "sectionMenu"].forEach((id) => {
         if (id !== except) document.getElementById(id).classList.add("hidden");
@@ -811,16 +985,15 @@
     }
 
     document.addEventListener("click", (e) => {
-      if (
-        !e.target.closest(".dropdown-menu") &&
-        !e.target.closest(".icon-btn") &&
-        !e.target.closest(".section-btn")
-      ) {
+      if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn")) {
         closeAllMenus();
       }
     });
 
-    // ===== UTILS =====
+    // закрывать меню при прокрутке (иначе позиционирование у sticky может "уехать")
+    window.addEventListener("scroll", () => closeAllMenus(), { passive: true });
+
+    // ===== Utils =====
     function escapeHtml(str) {
       return String(str)
         .replaceAll("&", "&amp;")
@@ -829,9 +1002,10 @@
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
     }
-
+    function escapeAttr(str) {
+      return escapeHtml(str).replaceAll("`", "&#096;");
+    }
     function escapeQuotes(str) {
-      // для вставки в onclick='...'
       return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
     }
 
