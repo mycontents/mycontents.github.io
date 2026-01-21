@@ -26,10 +26,11 @@
           <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="icons.svg#i-eye-off"></use></svg>
         </button>
 
+        <button class="icon-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu()" title="Фильтр по тегам">
+          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-tag"></use></svg>
+        </button>
+
         <div class="filter-wrap" title="Фильтр">
-          <button class="filter-tag-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu(event)" title="Фильтр по тегам">
-            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-filter"></use></svg>
-          </button>
           <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
           <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
             <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
