@@ -160,6 +160,7 @@
 
     .icon{ width:18px; height:18px; fill:currentColor; display:block; }
     .icon.small{ width:14px; height:14px; }
+    .icon.tiny{ width:12px; height:12px; }
 
     /* ===== Content ===== */
     .content-area{
@@ -173,7 +174,7 @@
     .content-list{
       padding:14px 15px;
       min-height:420px;
-      line-height:1.5; /* "как было тогда во Все" (свободнее) */
+      line-height:1.5;
     }
 
     .content-list:empty::before{
@@ -185,14 +186,13 @@
       padding-top:160px;
     }
 
-    /* Позиции — увеличили расстояние между строками */
     .item-line{
       display:flex;
       align-items:center;
       gap:8px;
 
       padding:6px 8px;
-      margin:0 -8px 8px; /* ВОТ где основное расстояние между строками */
+      margin:0 -8px 8px;
       border-radius:var(--r10);
 
       background:transparent;
@@ -211,6 +211,53 @@
       box-shadow:inset 0 0 0 1px var(--border);
     }
 
+    .item-actions-left{
+      display:flex;
+      gap:6px;
+      align-items:center;
+      flex:0 0 auto;
+
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .12s;
+    }
+    .item-line.selected .item-actions-left{
+      opacity:1;
+      pointer-events:auto;
+    }
+
+    .mini-action{
+      width:30px;
+      height:30px;
+      border-radius:10px;
+      border:1px solid transparent;
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      -webkit-tap-highlight-color:var(--tap);
+      transition:color .12s, background .12s, border-color .12s, opacity .12s;
+    }
+    .mini-action:hover{ color:var(--text); background:#0b0f15; border-color:var(--border); }
+    .mini-action.danger:hover{ color:var(--red); border-color:#3d1f22; }
+
+    /* confirm is reserved in layout but hidden unless armed */
+    .mini-action.confirm{
+      opacity:0;
+      pointer-events:none;
+      color:#7ee787;
+    }
+    .item-line.del-armed .mini-action.confirm{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .mini-action.confirm:hover{
+      color:#7ee787;
+      border-color:#1d3b22;
+      background:#0f1a12;
+    }
+
     .item-section-tag{
       background:var(--border);
       color:#8b949e;
@@ -219,6 +266,10 @@
       border-radius:6px;
       white-space:nowrap;
       flex-shrink:0;
+
+      display:flex;
+      align-items:center;
+      gap:6px;
 
       user-select:none;
       -webkit-user-select:none;
@@ -233,8 +284,8 @@
       -webkit-user-select:text;
     }
 
-    /* 4) Кнопка переноса (видна только у выбранной строки) */
-    .move-btn{
+    /* Right action (mark seen / return) */
+    .right-action{
       width:30px;
       height:30px;
       border-radius:10px;
@@ -251,11 +302,11 @@
       pointer-events:none;
       transition:opacity .12s, background .12s, border-color .12s, color .12s;
     }
-    .item-line.selected .move-btn{
+    .item-line.selected .right-action{
       opacity:1;
       pointer-events:auto;
     }
-    .move-btn:hover{
+    .right-action:hover{
       color:var(--text);
       background:#0b0f15;
       border-color:var(--border);
@@ -329,7 +380,7 @@
       box-shadow:0 10px 30px rgba(0,0,0,.35);
     }
 
-    .dropdown-menu.section-menu{ padding:8px 0; min-width:240px; }
+    .dropdown-menu.section-menu{ padding:8px 0; min-width:260px; }
     .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
     .dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
 
@@ -353,10 +404,9 @@
     }
 
     .menu-divider{ border-top:1px solid var(--border); margin:6px 0; }
-
     .menu-option.add-new{ color:var(--blue); }
 
-    /* delete confirm inline (confirm appears LEFT of delete) */
+    /* delete confirm inline (confirm reserved at left) */
     .menu-actions{
       margin-left:auto;
       display:flex;
@@ -375,12 +425,21 @@
       color:var(--muted);
       cursor:pointer;
       -webkit-tap-highlight-color:var(--tap);
+      transition:color .12s, background .12s, border-color .12s, opacity .12s;
     }
     .mini-btn:hover{ background:var(--panel2); color:var(--text); border-color:var(--border); }
     .mini-btn.danger:hover{ color:var(--red); border-color:#3d1f22; }
-    .mini-btn.confirm{ color:#7ee787; }
+
+    .mini-btn.confirm{
+      opacity:0;
+      pointer-events:none;
+      color:#7ee787;
+    }
+    .menu-option.armed .mini-btn.confirm{
+      opacity:1;
+      pointer-events:auto;
+    }
     .mini-btn.confirm:hover{ border-color:#1d3b22; background:#0f1a12; }
-    .mini-btn.hidden{ display:none; }
 
     .new-section-input{
       width:calc(100% - 28px);
@@ -508,19 +567,12 @@
       <path d="M0 6.5A2.5 2.5 0 0 1 2.5 4H4v2H2.5a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V11h2v1.5A2.5 2.5 0 0 1 8.5 15h-6A2.5 2.5 0 0 1 0 12.5v-6z" opacity=".45"></path>
     </symbol>
 
-    <!-- 2) Undo icon -->
+    <!-- undo/back arrow -->
     <symbol id="i-undo" viewBox="0 0 16 16">
-      <path d="M7 4H3.9l1.6-1.6A1 1 0 0 0 4.1 1L1 4.1a1 1 0 0 0 0 1.4L4.1 8.6A1 1 0 1 0 5.5 7.2L3.9 5.6H7c3 0 5.5 2.1 5.5 4.8S10 15.2 7 15.2H6a1 1 0 1 0 0 2h1c4.1 0 7.5-2.9 7.5-6.8S11.1 4 7 4z" transform="translate(0,-1.2)"></path>
+      <path d="M6.2 4.1a1 1 0 0 1 0 1.4L4.7 7h6.1c2 0 3.7 1.5 3.7 3.5S12.8 14 10.8 14H7a1 1 0 1 1 0-2h3.8c.9 0 1.7-.7 1.7-1.5S11.7 9 10.8 9H4.7l1.5 1.5a1 1 0 1 1-1.4 1.4L1.6 8.7a1 1 0 0 1 0-1.4l3.2-3.2a1 1 0 0 1 1.4 0z"></path>
     </symbol>
 
-    <!-- 4) Move icon -->
-    <symbol id="i-move" viewBox="0 0 16 16">
-      <path d="M6 3a1 1 0 0 1 1-1h6a2 2 0 0 1 2 2v6a1 1 0 1 1-2 0V4H7a1 1 0 0 1-1-1z"></path>
-      <path d="M9.5 7a1 1 0 0 1 .7 1.7l-2 2a1 1 0 0 1-1.4 0l-2-2A1 1 0 1 1 6.2 7.3L7 8.1V3a1 1 0 1 1 2 0v5.1l.8-.8A1 1 0 0 1 9.5 7z" opacity=".55"></path>
-      <path d="M2 6a2 2 0 0 1 2-2h2a1 1 0 1 1 0 2H4v6h6v-2a1 1 0 1 1 2 0v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6z" opacity=".55"></path>
-    </symbol>
-
-    <!-- 6) Eye icons -->
+    <!-- eye (toggle) -->
     <symbol id="i-eye" viewBox="0 0 16 16">
       <path d="M8 3C3.5 3 1 8 1 8s2.5 5 7 5 7-5 7-5-2.5-5-7-5zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"></path>
       <path d="M8 6.5A1.5 1.5 0 1 0 8 9.5a1.5 1.5 0 0 0 0-3z"></path>
@@ -528,6 +580,14 @@
     <symbol id="i-eye-off" viewBox="0 0 16 16">
       <path d="M2 2a1 1 0 0 1 1.4 0l10.6 10.6A1 1 0 1 1 12.6 14L11 12.4C9.9 13 8.8 13.3 8 13.3 3.5 13.3 1 8.3 1 8.3c.6-1.2 1.7-2.8 3.3-3.9L2 2zm4 4 1.1 1.1A1.9 1.9 0 0 0 7 8a1.9 1.9 0 0 0 .9 1.6L9 10.7A3 3 0 0 1 6 6z"></path>
       <path d="M8 3.3c4.5 0 7 5 7 5-.5 1-1.3 2.3-2.5 3.4L10.9 10c.6-.5 1.1-1.1 1.5-1.7 0 0-2.5-3.9-4.4-3.9-.3 0-.6 0-1 .1L5.4 3.9c.8-.4 1.7-.6 2.6-.6z"></path>
+    </symbol>
+
+    <!-- "viewed" marker icon (monochrome) -->
+    <symbol id="i-eye-done" viewBox="0 0 16 16">
+      <path d="M8 3C3.5 3 1 8 1 8s2.5 5 7 5 7-5 7-5-2.5-5-7-5zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"></path>
+      <path d="M8 6.5A1.5 1.5 0 1 0 8 9.5a1.5 1.5 0 0 0 0-3z"></path>
+      <!-- small marker dot (top-right) -->
+      <path d="M13.2 3.2a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z"></path>
     </symbol>
   </svg>
 
@@ -539,12 +599,11 @@
           <svg class="icon small" viewBox="0 0 16 16"><use href="#i-chevron-down"></use></svg>
         </button>
 
-        <!-- 6) Toggle only for "Все": include/exclude viewed sections -->
+        <!-- toggle only for "Все": include/exclude viewed sections -->
         <button class="all-toggle hidden" id="viewedToggleBtn" onclick="toggleShowViewed()" title="Показывать/скрывать просмотренное">
           <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="#i-eye-off"></use></svg>
         </button>
 
-        <!-- 3) Filter -->
         <div class="filter-wrap" title="Фильтр">
           <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
           <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
@@ -640,15 +699,18 @@
   <!-- Undo bar -->
   <div class="undo-bar hidden" id="undoBar">
     <div class="undo-text" id="undoText"></div>
-    <button class="undo-btn" id="undoBtn" title="Отменить удаление">
+    <button class="undo-btn" id="undoBtn" title="Отменить">
       <svg class="icon" viewBox="0 0 16 16"><use href="#i-undo"></use></svg>
     </button>
   </div>
 
   <script>
     // ===== CONFIG =====
-    const VIEWED_PREFIX = "✓ ";                 // символ вместо слова "Просмотренное"
-    const UNDO_MS = 10000;
+    const VIEWED_KEY_PREFIX = "__viewed__:";     // внутренний префикс (не показываем как текст)
+    const OLD_VIEWED_PREFIX = "✓ ";             // миграция со старых данных
+
+    const SECTION_UNDO_MS = 10000;
+    const ITEM_UNDO_MS = 19000;
 
     let GIST_ID = localStorage.getItem("gist_id") || "";
     let TOKEN = localStorage.getItem("github_token") || "";
@@ -666,22 +728,26 @@
 
     const defaultSections = ["Фильмы", "Сериалы", "Аниме"];
 
-    // view selection highlight
+    // selection highlight
     let selectedKey = null; // `${section}|${index}`
 
     // pointer/text selection helper
     let pointer = { down:false, startX:0, startY:0, moved:false, startedAt:0 };
 
-    // delete confirmation state
-    let deleteArm = null;
+    // delete confirmation state for sections
+    let deleteArmSection = null;
     let deleteArmTimer = null;
 
-    // undo state
+    // delete confirmation state for item
+    let deleteArmItemKey = null;
+    let deleteArmItemTimer = null;
+
+    // undo state (single slot)
     let undoTimer = null;
-    let undoPayload = null; // {name, sectionData, prevCurrentSection}
+    let undoPayload = null; // {type, ...}
 
     // edit context for filtered editing
-    let editCtx = null; // {mode, filterLower, showViewedInAll, masksBySection? or mask?, section?}
+    let editCtx = null; // {mode, filterLower, showViewedInAll, masksBySection? / mask? / section?}
 
     // ===== INIT =====
     async function init() {
@@ -699,6 +765,7 @@
 
       await loadData();
       ensureDefaultSections();
+      migrateViewedPrefixesIfNeeded();
       renderSectionList();
       updateSectionButton();
       render();
@@ -723,6 +790,60 @@
       } catch (_) {}
     }
 
+    // ===== Viewed helpers =====
+    function isViewedSection(name) {
+      return typeof name === "string" && (name.startsWith(VIEWED_KEY_PREFIX) || name.startsWith(OLD_VIEWED_PREFIX));
+    }
+
+    function baseSectionName(name) {
+      if (typeof name !== "string") return "";
+      if (name.startsWith(VIEWED_KEY_PREFIX)) return name.slice(VIEWED_KEY_PREFIX.length);
+      if (name.startsWith(OLD_VIEWED_PREFIX)) return name.slice(OLD_VIEWED_PREFIX.length);
+      return name;
+    }
+
+    function viewedSectionKeyFor(sourceSectionName) {
+      return VIEWED_KEY_PREFIX + baseSectionName(sourceSectionName);
+    }
+
+    function labelHTMLForSection(name) {
+      const base = escapeHtml(baseSectionName(name));
+      if (!isViewedSection(name)) return base;
+      return `<svg class="icon tiny" viewBox="0 0 16 16"><use href="#i-eye-done"></use></svg>${base}`;
+    }
+
+    function migrateViewedPrefixesIfNeeded() {
+      // rename keys "✓ X" -> "__viewed__:X"
+      const keys = Object.keys(data.sections || {});
+      const toRename = keys.filter(k => k.startsWith(OLD_VIEWED_PREFIX));
+      if (!toRename.length) return;
+
+      for (const oldKey of toRename) {
+        const base = oldKey.slice(OLD_VIEWED_PREFIX.length);
+        const newKey = VIEWED_KEY_PREFIX + base;
+
+        if (!data.sections[newKey]) {
+          data.sections[newKey] = data.sections[oldKey];
+          delete data.sections[oldKey];
+        } else {
+          // merge items if both exist
+          const a = data.sections[newKey]?.items || [];
+          const b = data.sections[oldKey]?.items || [];
+          data.sections[newKey].items = [...a, ...b];
+          delete data.sections[oldKey];
+        }
+
+        // fix currentSection if needed
+        if (currentSection === oldKey) {
+          currentSection = newKey;
+          localStorage.setItem("current_section", newKey);
+        }
+      }
+
+      // persist migration
+      saveData();
+    }
+
     // ===== Filter =====
     function setupFilterUI() {
       const input = document.getElementById("filterInput");
@@ -732,11 +853,12 @@
       clear.classList.toggle("hidden", !filterQuery);
 
       input.oninput = () => {
-        if (isEditing) return; // lock during edit
+        if (isEditing) return;
         filterQuery = input.value || "";
         localStorage.setItem("filter_query", filterQuery);
         clear.classList.toggle("hidden", !filterQuery);
         selectedKey = null;
+        disarmItemDelete();
         render();
       };
 
@@ -764,18 +886,17 @@
       input.value = "";
       document.getElementById("filterClear").classList.add("hidden");
       selectedKey = null;
+      disarmItemDelete();
       render();
       input.focus();
     }
 
-    // ===== Viewed toggle (only in All) =====
+    // ===== Viewed toggle in "All" =====
     function updateViewedToggleUI() {
       const btn = document.getElementById("viewedToggleBtn");
       const use = document.getElementById("viewedToggleUse");
 
-      const shouldShow = currentSection === "__all__";
-      btn.classList.toggle("hidden", !shouldShow);
-
+      btn.classList.toggle("hidden", currentSection !== "__all__");
       btn.classList.toggle("on", showViewedInAll);
       use.setAttribute("href", showViewedInAll ? "#i-eye" : "#i-eye-off");
     }
@@ -785,6 +906,7 @@
       showViewedInAll = !showViewedInAll;
       localStorage.setItem("show_viewed_all", showViewedInAll ? "1" : "0");
       selectedKey = null;
+      disarmItemDelete();
       updateViewedToggleUI();
       render();
     }
@@ -881,7 +1003,7 @@
       if (!menu.classList.contains("hidden")) {
         menu.classList.add("hidden");
         document.getElementById("newSectionInput").classList.add("hidden");
-        disarmDelete();
+        disarmSectionDelete();
         return;
       }
 
@@ -897,19 +1019,24 @@
 
     function renderSectionList() {
       const list = document.getElementById("sectionList");
+      const keys = Object.keys(data.sections);
 
-      list.innerHTML = Object.keys(data.sections).map((name) => {
-        const armed = (deleteArm === name);
-
-        // confirm should appear LEFT of delete:
-        // [confirm][delete]
+      list.innerHTML = keys.map((name) => {
+        const armed = (deleteArmSection === name);
         return `
-          <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
-            <span>${escapeHtml(name)}</span>
+          <div class="menu-option ${currentSection === name ? "active" : ""} ${armed ? "armed" : ""}"
+               onclick="selectSection('${escapeQuotes(name)}')">
+            <span style="display:flex;align-items:center;gap:8px;">
+              ${labelHTMLForSection(name)}
+            </span>
 
             <span class="menu-actions" onclick="event.stopPropagation()">
-              <button class="mini-btn confirm ${armed ? "" : "hidden"}" title="Подтвердить" onclick="confirmDelete('${escapeQuotes(name)}')">✓</button>
-              <button class="mini-btn danger" title="Удалить" onclick="armDelete('${escapeQuotes(name)}')">×</button>
+              <button class="mini-btn confirm" title="Подтвердить" onclick="confirmDeleteSection('${escapeQuotes(name)}')">
+                ✓
+              </button>
+              <button class="mini-btn danger" title="Удалить" onclick="armDeleteSection('${escapeQuotes(name)}')">
+                ×
+              </button>
             </span>
           </div>
         `;
@@ -920,7 +1047,8 @@
       currentSection = name;
       localStorage.setItem("current_section", name);
       selectedKey = null;
-      disarmDelete();
+      disarmItemDelete();
+      disarmSectionDelete();
       updateSectionButton();
       updateViewedToggleUI();
       document.getElementById("sectionMenu").classList.add("hidden");
@@ -928,8 +1056,12 @@
     }
 
     function updateSectionButton() {
-      document.getElementById("currentSectionName").textContent =
-        (currentSection === "__all__") ? "Все" : currentSection;
+      const el = document.getElementById("currentSectionName");
+      if (currentSection === "__all__") {
+        el.textContent = "Все";
+        return;
+      }
+      el.innerHTML = labelHTMLForSection(currentSection);
     }
 
     function showNewSectionInput() {
@@ -937,7 +1069,7 @@
       input.classList.remove("hidden");
       input.value = "";
       input.focus();
-      disarmDelete();
+      disarmSectionDelete();
     }
 
     function handleNewSection(e) {
@@ -955,40 +1087,41 @@
       }
     }
 
-    // ===== Delete confirm + undo =====
-    function armDelete(name) {
+    // ===== Section delete confirm + undo =====
+    function armDeleteSection(name) {
       if (Object.keys(data.sections).length <= 1) return;
 
-      if (deleteArm === name) {
-        disarmDelete();
+      if (deleteArmSection === name) {
+        disarmSectionDelete();
         renderSectionList();
         return;
       }
 
-      deleteArm = name;
+      deleteArmSection = name;
       renderSectionList();
 
       if (deleteArmTimer) clearTimeout(deleteArmTimer);
       deleteArmTimer = setTimeout(() => {
-        disarmDelete();
+        disarmSectionDelete();
         renderSectionList();
       }, 6000);
     }
 
-    function disarmDelete() {
-      deleteArm = null;
+    function disarmSectionDelete() {
+      deleteArmSection = null;
       if (deleteArmTimer) clearTimeout(deleteArmTimer);
       deleteArmTimer = null;
     }
 
-    function confirmDelete(name) {
+    function confirmDeleteSection(name) {
       if (Object.keys(data.sections).length <= 1) return;
       if (!data.sections[name]) return;
+      if (deleteArmSection !== name) return;
 
-      disarmDelete();
+      disarmSectionDelete();
 
-      if (undoTimer) clearTimeout(undoTimer);
-      undoPayload = {
+      const payload = {
+        type: "section",
         name,
         sectionData: JSON.parse(JSON.stringify(data.sections[name])),
         prevCurrentSection: currentSection
@@ -1004,55 +1137,14 @@
       }
 
       selectedKey = null;
-      saveData();
-      renderSectionList();
-      render();
-
-      showUndo(name);
-
-      undoTimer = setTimeout(() => {
-        hideUndo();
-        undoPayload = null;
-        undoTimer = null;
-      }, UNDO_MS);
-    }
-
-    function showUndo(name) {
-      document.getElementById("undoText").textContent = `Раздел удалён: ${name}`;
-      document.getElementById("undoBar").classList.remove("hidden");
-    }
-    function hideUndo() {
-      document.getElementById("undoBar").classList.add("hidden");
-    }
-
-    document.getElementById("undoBtn").addEventListener("click", () => {
-      if (!undoPayload) return;
-
-      let restoreName = undoPayload.name;
-      if (data.sections[restoreName]) {
-        let i = 2;
-        while (data.sections[`${restoreName} (${i})`]) i++;
-        restoreName = `${restoreName} (${i})`;
-      }
-
-      data.sections[restoreName] = undoPayload.sectionData;
-
-      if (undoPayload.prevCurrentSection === undoPayload.name) {
-        currentSection = restoreName;
-        localStorage.setItem("current_section", restoreName);
-        updateSectionButton();
-        updateViewedToggleUI();
-      }
+      disarmItemDelete();
 
       saveData();
       renderSectionList();
       render();
 
-      if (undoTimer) clearTimeout(undoTimer);
-      undoTimer = null;
-      undoPayload = null;
-      hideUndo();
-    });
+      startUndo(payload, SECTION_UNDO_MS, `Раздел удалён: ${baseSectionName(name)}`);
+    }
 
     // ===== SORT (compact toggle direction) =====
     function toggleSort() {
@@ -1081,6 +1173,7 @@
 
       localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
       selectedKey = null;
+      disarmItemDelete();
       updateSortMenuUI();
       document.getElementById("sortMenu").classList.add("hidden");
       render();
@@ -1133,7 +1226,6 @@
           break;
 
         case "date":
-          // "дата" как порядок добавления
           if (sortState.dir === "desc") sorted.reverse();
           break;
       }
@@ -1152,7 +1244,7 @@
         const gist = await res.json();
         if (gist.files?.["contents.json"]) {
           const loaded = JSON.parse(gist.files["contents.json"].content);
-          if (loaded.users && !loaded.sections) data.sections = loaded.users; // migration
+          if (loaded.users && !loaded.sections) data.sections = loaded.users; // migration old schema
           else data = loaded.sections ? loaded : { sections: {} };
         } else {
           data = { sections: {} };
@@ -1182,20 +1274,174 @@
       }
     }
 
-    // ===== VIEWED helpers =====
-    function isViewedSection(name) {
-      return typeof name === "string" && name.startsWith(VIEWED_PREFIX);
+    // ===== ITEM actions: move / return / delete =====
+    function moveItemToViewed(sectionKey, index) {
+      if (!data.sections[sectionKey]) return;
+      if (isViewedSection(sectionKey)) return;
+
+      const srcItems = data.sections[sectionKey].items || [];
+      const idx = Number(index);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
+
+      const itemText = srcItems[idx];
+      srcItems.splice(idx, 1);
+      data.sections[sectionKey].modified = new Date().toISOString();
+
+      const destKey = viewedSectionKeyFor(sectionKey);
+      if (!data.sections[destKey]) data.sections[destKey] = { items: [], modified: new Date().toISOString() };
+      data.sections[destKey].items.push(itemText);
+      data.sections[destKey].modified = new Date().toISOString();
+
+      selectedKey = null;
+      disarmItemDelete();
+      saveData();
+      renderSectionList();
+      render();
     }
 
-    function baseSectionName(name) {
-      return isViewedSection(name) ? name.slice(VIEWED_PREFIX.length) : name;
+    function returnItemFromViewed(viewedSectionKey, index) {
+      if (!data.sections[viewedSectionKey]) return;
+      if (!isViewedSection(viewedSectionKey)) return;
+
+      const srcItems = data.sections[viewedSectionKey].items || [];
+      const idx = Number(index);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
+
+      const itemText = srcItems[idx];
+      srcItems.splice(idx, 1);
+      data.sections[viewedSectionKey].modified = new Date().toISOString();
+
+      const baseKey = baseSectionName(viewedSectionKey);
+      if (!data.sections[baseKey]) data.sections[baseKey] = { items: [], modified: new Date().toISOString() };
+      data.sections[baseKey].items.push(itemText);
+      data.sections[baseKey].modified = new Date().toISOString();
+
+      selectedKey = null;
+      disarmItemDelete();
+      saveData();
+      renderSectionList();
+      render();
     }
 
-    function viewedSectionNameFor(sourceSection) {
-      return VIEWED_PREFIX + baseSectionName(sourceSection);
+    function armItemDelete(key) {
+      if (!key) return;
+      deleteArmItemKey = key;
+
+      if (deleteArmItemTimer) clearTimeout(deleteArmItemTimer);
+      deleteArmItemTimer = setTimeout(() => {
+        disarmItemDelete();
+        // remove class without full rerender:
+        document.querySelectorAll("#viewMode .item-line.del-armed").forEach(el => el.classList.remove("del-armed"));
+      }, 6000);
+
+      // apply class to selected line
+      document.querySelectorAll("#viewMode .item-line").forEach(el => {
+        el.classList.toggle("del-armed", el.dataset.key === key);
+      });
     }
 
-    // ===== EDIT (filtered editing supported) =====
+    function disarmItemDelete() {
+      deleteArmItemKey = null;
+      if (deleteArmItemTimer) clearTimeout(deleteArmItemTimer);
+      deleteArmItemTimer = null;
+      document.querySelectorAll("#viewMode .item-line.del-armed").forEach(el => el.classList.remove("del-armed"));
+    }
+
+    function confirmItemDelete(sectionKey, index) {
+      const key = `${sectionKey}|${index}`;
+      if (deleteArmItemKey !== key) return;
+
+      const arr = data.sections[sectionKey]?.items;
+      if (!arr) return;
+
+      const idx = Number(index);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= arr.length) return;
+
+      const text = arr[idx];
+
+      // remove
+      arr.splice(idx, 1);
+      data.sections[sectionKey].modified = new Date().toISOString();
+
+      disarmItemDelete();
+      selectedKey = null;
+
+      saveData();
+      render();
+
+      startUndo(
+        { type: "item", sectionKey, index: idx, text },
+        ITEM_UNDO_MS,
+        `Запись удалена`
+      );
+    }
+
+    // ===== Undo (single slot) =====
+    function startUndo(payload, ms, label) {
+      undoPayload = payload;
+
+      if (undoTimer) clearTimeout(undoTimer);
+      undoTimer = setTimeout(() => {
+        hideUndo();
+        undoPayload = null;
+        undoTimer = null;
+      }, ms);
+
+      document.getElementById("undoText").textContent = label;
+      document.getElementById("undoBar").classList.remove("hidden");
+    }
+
+    function hideUndo() {
+      document.getElementById("undoBar").classList.add("hidden");
+    }
+
+    document.getElementById("undoBtn").addEventListener("click", () => {
+      if (!undoPayload) return;
+
+      if (undoPayload.type === "section") {
+        let restoreKey = undoPayload.name;
+
+        // avoid overwrite if recreated
+        if (data.sections[restoreKey]) {
+          let i = 2;
+          while (data.sections[`${restoreKey} (${i})`]) i++;
+          restoreKey = `${restoreKey} (${i})`;
+        }
+
+        data.sections[restoreKey] = undoPayload.sectionData;
+
+        if (undoPayload.prevCurrentSection === undoPayload.name) {
+          currentSection = restoreKey;
+          localStorage.setItem("current_section", restoreKey);
+          updateSectionButton();
+          updateViewedToggleUI();
+        }
+
+        saveData();
+        renderSectionList();
+        render();
+      }
+
+      if (undoPayload.type === "item") {
+        const { sectionKey, index, text } = undoPayload;
+        if (!data.sections[sectionKey]) data.sections[sectionKey] = { items: [], modified: new Date().toISOString() };
+
+        const arr = data.sections[sectionKey].items || (data.sections[sectionKey].items = []);
+        const idx = Math.max(0, Math.min(Number(index), arr.length));
+        arr.splice(idx, 0, text);
+        data.sections[sectionKey].modified = new Date().toISOString();
+
+        saveData();
+        render();
+      }
+
+      if (undoTimer) clearTimeout(undoTimer);
+      undoTimer = null;
+      undoPayload = null;
+      hideUndo();
+    });
+
+    // ===== EDIT (filtered editing supported, like before) =====
     function toggleEdit() {
       if (!TOKEN || !GIST_ID) {
         toggleSettings();
@@ -1207,8 +1453,8 @@
     function startEdit() {
       isEditing = true;
       selectedKey = null;
+      disarmItemDelete();
 
-      // lock filter to avoid confusing edits
       setFilterLock(true);
 
       const editor = document.getElementById("editor");
@@ -1218,38 +1464,35 @@
       const filterLower = (filterQuery || "").trim().toLowerCase();
 
       if (currentSection === "__all__") {
-        // build filtered list (no sort, stored order), respecting showViewedInAll
         const masksBySection = {};
         const lines = [];
 
-        for (const section of Object.keys(data.sections)) {
-          if (!showViewedInAll && isViewedSection(section)) continue;
+        for (const sectionKey of Object.keys(data.sections)) {
+          if (!showViewedInAll && isViewedSection(sectionKey)) continue;
 
-          const items = data.sections[section]?.items || [];
+          const items = data.sections[sectionKey]?.items || [];
           const mask = items.map(it => !filterLower || String(it).toLowerCase().includes(filterLower));
 
-          if (mask.some(Boolean)) masksBySection[section] = mask;
+          if (mask.some(Boolean)) masksBySection[sectionKey] = mask;
 
           for (let i = 0; i < items.length; i++) {
-            if (mask[i]) lines.push(`[${section}] ${items[i]}`);
+            if (mask[i]) lines.push(`[${sectionKey}] ${items[i]}`);
           }
         }
 
         editor.value = lines.join("\n");
         hint.classList.remove("hidden");
-
         editCtx = { mode: "all", filterLower, showViewedInAll, masksBySection };
 
       } else {
-        const section = currentSection;
-        const orig = data.sections[section]?.items || [];
+        const sectionKey = currentSection;
+        const orig = data.sections[sectionKey]?.items || [];
         const mask = orig.map(it => !filterLower || String(it).toLowerCase().includes(filterLower));
         const lines = orig.filter((_, i) => mask[i]);
 
         editor.value = lines.join("\n");
         hint.classList.add("hidden");
-
-        editCtx = { mode: "section", section, filterLower, mask };
+        editCtx = { mode: "section", sectionKey, filterLower, mask };
       }
 
       document.getElementById("viewMode").classList.add("hidden");
@@ -1272,23 +1515,19 @@
     function mergeByMask(original, mask, replacement) {
       const out = [];
       let ri = 0;
-
       const m = Array.isArray(mask) ? mask : new Array(original.length).fill(false);
 
       for (let i = 0; i < original.length; i++) {
         if (m[i]) {
           if (ri < replacement.length) out.push(replacement[ri++]);
-          // else: delete this matched item
-        } else {
-          out.push(original[i]);
-        }
+          // else delete matched item
+        } else out.push(original[i]);
       }
       while (ri < replacement.length) out.push(replacement[ri++]); // new items appended
       return out;
     }
 
     function parseAllEditorLines(lines) {
-      // returns { bySection: {sectionName: [items...] } }
       const bySection = {};
       let lastSection = Object.keys(data.sections)[0] || "Раздел";
 
@@ -1318,34 +1557,28 @@
       if (!editCtx) return;
 
       if (editCtx.mode === "section") {
-        const section = editCtx.section;
-        const orig = data.sections[section]?.items || [];
-        const replacement = lines;
-        const merged = mergeByMask(orig, editCtx.mask, replacement);
+        const sectionKey = editCtx.sectionKey;
+        const orig = data.sections[sectionKey]?.items || [];
+        const merged = mergeByMask(orig, editCtx.mask, lines);
 
-        data.sections[section] = {
-          items: merged,
-          modified: new Date().toISOString()
-        };
+        data.sections[sectionKey] = { items: merged, modified: new Date().toISOString() };
+      }
 
-      } else if (editCtx.mode === "all") {
+      if (editCtx.mode === "all") {
         const parsed = parseAllEditorLines(lines);
         const newBySection = parsed.bySection;
 
-        // union of sections: existing + newly referenced
         const allSections = new Set([...Object.keys(data.sections), ...Object.keys(newBySection)]);
 
-        for (const section of allSections) {
-          const orig = data.sections[section]?.items || [];
-          const mask = editCtx.masksBySection[section] || new Array(orig.length).fill(false);
-          const replacement = newBySection[section] || [];
+        for (const sectionKey of allSections) {
+          const orig = data.sections[sectionKey]?.items || [];
+          const mask = editCtx.masksBySection[sectionKey] || new Array(orig.length).fill(false);
+          const replacement = newBySection[sectionKey] || [];
           const merged = mergeByMask(orig, mask, replacement);
 
-          if (!data.sections[section]) {
-            data.sections[section] = { items: [], modified: new Date().toISOString() };
-          }
-          data.sections[section].items = merged;
-          data.sections[section].modified = new Date().toISOString();
+          if (!data.sections[sectionKey]) data.sections[sectionKey] = { items: [], modified: new Date().toISOString() };
+          data.sections[sectionKey].items = merged;
+          data.sections[sectionKey].modified = new Date().toISOString();
         }
       }
 
@@ -1355,39 +1588,11 @@
       render();
     }
 
-    // ===== MOVE to viewed (4+5) =====
-    function moveItemToViewed(section, index) {
-      if (!data.sections[section]) return;
-      if (isViewedSection(section)) return; // already viewed
-
-      const srcItems = data.sections[section].items || [];
-      let idx = Number(index);
-
-      if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
-
-      const itemText = srcItems[idx];
-
-      // remove from source
-      srcItems.splice(idx, 1);
-      data.sections[section].modified = new Date().toISOString();
-
-      // destination
-      const dest = viewedSectionNameFor(section);
-      if (!data.sections[dest]) data.sections[dest] = { items: [], modified: new Date().toISOString() };
-      data.sections[dest].items.push(itemText);
-      data.sections[dest].modified = new Date().toISOString();
-
-      selectedKey = null;
-      saveData();
-      renderSectionList();
-      render();
-    }
-
     // ===== RENDER =====
-    function shouldIncludeSectionInAll(name) {
+    function shouldIncludeSectionInAll(sectionKey) {
       if (currentSection !== "__all__") return true;
       if (showViewedInAll) return true;
-      return !isViewedSection(name);
+      return !isViewedSection(sectionKey);
     }
 
     function applyFilter(items) {
@@ -1399,17 +1604,17 @@
     function buildItemsForView() {
       let items = [];
       if (currentSection === "__all__") {
-        for (const section of Object.keys(data.sections)) {
-          if (!shouldIncludeSectionInAll(section)) continue;
-          const arr = data.sections[section]?.items || [];
+        for (const sectionKey of Object.keys(data.sections)) {
+          if (!shouldIncludeSectionInAll(sectionKey)) continue;
+          const arr = data.sections[sectionKey]?.items || [];
           for (let i = 0; i < arr.length; i++) {
-            items.push({ text: arr[i], section, index: i });
+            items.push({ text: arr[i], sectionKey, index: i });
           }
         }
       } else {
         const arr = (data.sections[currentSection]?.items || []);
         for (let i = 0; i < arr.length; i++) {
-          items.push({ text: arr[i], section: currentSection, index: i });
+          items.push({ text: arr[i], sectionKey: currentSection, index: i });
         }
       }
       items = applyFilter(items);
@@ -1427,31 +1632,55 @@
         return;
       }
 
-      // if current selectedKey doesn't exist anymore, drop it
-      const keySet = new Set(items.map(it => `${it.section}|${it.index}`));
-      if (selectedKey && !keySet.has(selectedKey)) selectedKey = null;
-
-      const inViewedSection = (currentSection !== "__all__" && isViewedSection(currentSection));
+      // drop selection if it no longer exists
+      const keySet = new Set(items.map(it => `${it.sectionKey}|${it.index}`));
+      if (selectedKey && !keySet.has(selectedKey)) {
+        selectedKey = null;
+        disarmItemDelete();
+      }
 
       view.innerHTML = items.map((it) => {
-        const key = `${it.section}|${it.index}`;
+        const key = `${it.sectionKey}|${it.index}`;
         const selected = selectedKey === key;
+        const armed = deleteArmItemKey === key;
 
-        const showTag = (currentSection === "__all__");
-        const canMove = !inViewedSection && !isViewedSection(it.section);
+        const secTag = (currentSection === "__all__")
+          ? `<span class="item-section-tag">
+               ${isViewedSection(it.sectionKey) ? `<svg class="icon tiny" viewBox="0 0 16 16"><use href="#i-eye-done"></use></svg>` : ``}
+               ${escapeHtml(baseSectionName(it.sectionKey))}
+             </span>`
+          : "";
+
+        // right button logic:
+        // - if viewed section => return (undo icon)
+        // - else => mark as viewed (eye-done icon)
+        const viewed = isViewedSection(it.sectionKey);
+        const rightAction = viewed
+          ? `<button class="right-action" data-action="back" title="Вернуть из просмотренного">
+               <svg class="icon" viewBox="0 0 16 16"><use href="#i-undo"></use></svg>
+             </button>`
+          : `<button class="right-action" data-action="mark" title="Переместить в просмотренное">
+               <svg class="icon" viewBox="0 0 16 16"><use href="#i-eye-done"></use></svg>
+             </button>`;
 
         return `
-          <div class="item-line ${selected ? "selected" : ""}"
+          <div class="item-line ${selected ? "selected" : ""} ${armed ? "del-armed" : ""}"
                data-key="${escapeAttr(key)}"
-               data-section="${escapeAttr(it.section)}"
+               data-section="${escapeAttr(it.sectionKey)}"
                data-index="${String(it.index)}">
-            ${showTag ? `<span class="item-section-tag">${escapeHtml(it.section)}</span>` : ""}
-            <span class="item-text">${escapeHtml(it.text)}</span>
-            ${canMove ? `
-              <button class="move-btn" title="Переместить в ${escapeHtml(viewedSectionNameFor(it.section))}" data-action="move">
-                <svg class="icon" viewBox="0 0 16 16"><use href="#i-move"></use></svg>
+            <span class="item-actions-left">
+              <button class="mini-action confirm" data-action="item-del-confirm" title="Подтвердить удаление">
+                <svg class="icon small" viewBox="0 0 16 16"><use href="#i-check"></use></svg>
               </button>
-            ` : `<span style="width:30px;flex:0 0 auto;"></span>`}
+              <button class="mini-action danger" data-action="item-del" title="Удалить">
+                <svg class="icon small" viewBox="0 0 16 16"><use href="#i-x"></use></svg>
+              </button>
+            </span>
+
+            ${secTag}
+            <span class="item-text">${escapeHtml(it.text)}</span>
+
+            ${rightAction}
           </div>
         `;
       }).join("");
@@ -1459,7 +1688,7 @@
       document.getElementById("counter").textContent = String(items.length);
     }
 
-    // ===== View mode selection + move button =====
+    // ===== View mode: selection + actions =====
     const viewModeEl = document.getElementById("viewMode");
 
     viewModeEl.addEventListener("pointerdown", (e) => {
@@ -1473,30 +1702,52 @@
 
     viewModeEl.addEventListener("pointermove", (e) => {
       if (!pointer.down) return;
-      if (Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) {
-        pointer.moved = true;
-      }
+      if (Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) pointer.moved = true;
     });
 
-    viewModeEl.addEventListener("pointerup", () => {
-      pointer.down = false;
-    });
+    viewModeEl.addEventListener("pointerup", () => { pointer.down = false; });
 
     viewModeEl.addEventListener("click", (e) => {
       if (isEditing) return;
 
-      // 4) move action
-      const moveBtn = e.target.closest("[data-action='move']");
-      if (moveBtn) {
-        e.stopPropagation();
-        const line = moveBtn.closest(".item-line");
-        if (!line) return;
-        moveItemToViewed(line.dataset.section, line.dataset.index);
-        return;
-      }
-
       const line = e.target.closest(".item-line");
       if (!line) return;
+
+      const actionEl = e.target.closest("[data-action]");
+      if (actionEl) {
+        const action = actionEl.dataset.action;
+        const sectionKey = line.dataset.section;
+        const index = line.dataset.index;
+        const key = line.dataset.key;
+
+        e.stopPropagation();
+
+        if (action === "mark") {
+          moveItemToViewed(sectionKey, index);
+          return;
+        }
+        if (action === "back") {
+          returnItemFromViewed(sectionKey, index);
+          return;
+        }
+        if (action === "item-del") {
+          // arm delete only for currently selected row; if not selected, select first
+          if (selectedKey !== key) {
+            selectedKey = key;
+            disarmItemDelete();
+            render();
+            // after render, arm
+            armItemDelete(key);
+          } else {
+            armItemDelete(key);
+          }
+          return;
+        }
+        if (action === "item-del-confirm") {
+          confirmItemDelete(sectionKey, index);
+          return;
+        }
+      }
 
       // if user selected text - don't toggle selection
       const sel = window.getSelection ? window.getSelection() : null;
@@ -1508,7 +1759,10 @@
       if (pointer.moved) return;
 
       const key = line.dataset.key;
-      selectedKey = (selectedKey === key) ? null : key;
+      const nowSelected = (selectedKey !== key);
+
+      selectedKey = nowSelected ? key : null;
+      disarmItemDelete();
 
       document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
       if (selectedKey) line.classList.add("selected");
@@ -1522,16 +1776,19 @@
     }
 
     document.addEventListener("click", (e) => {
-      if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".all-toggle")) {
+      if (!e.target.closest(".dropdown-menu") &&
+          !e.target.closest(".icon-btn") &&
+          !e.target.closest(".section-btn") &&
+          !e.target.closest(".all-toggle")) {
         closeAllMenus();
-        disarmDelete();
+        disarmSectionDelete();
         renderSectionList();
       }
     });
 
     window.addEventListener("scroll", () => {
       closeAllMenus();
-      disarmDelete();
+      disarmSectionDelete();
     }, { passive: true });
 
     // ===== Utils =====
