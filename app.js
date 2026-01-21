@@ -343,7 +343,7 @@ function renderTagFilterMenu() {
       const on = tagFilter.has(t);
       const count = counts.get(t) || 0;
       return `
-        <div class="tag-option ${on ? "on" : ""}" onclick="toggleTagFilter('${escapeQuotes(t)}')">
+        <div class="tag-option ${on ? "on" : ""}" onclick="toggleTagFilter('${escapeQuotes(t)}', event)">
           <span class="tag-check">
             <svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-check"></use></svg>
           </span>
@@ -357,7 +357,8 @@ function renderTagFilterMenu() {
   hint.textContent = tagFilter.size ? `Выбрано: ${tagFilter.size}` : "Фильтр выключен";
 }
 
-function toggleTagFilter(tag) {
+function toggleTagFilter(tag, ev) {
+  if (ev && typeof ev.stopPropagation === "function") ev.stopPropagation();
   if (isEditing) return;
   const t = normalizeTag(tag);
   if (!t) return;

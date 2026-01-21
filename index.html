@@ -16,6 +16,10 @@
   <div class="container" id="container">
     <header>
       <div class="header-row">
+        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
+          <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
+        </button>
+
         <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
           <span id="currentSectionName">Все</span>
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
@@ -40,10 +44,6 @@
         <div class="header-buttons">
           <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-sort"></use></svg>
-          </button>
-
-          <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
-            <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
           </button>
 
           <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Настройки">
