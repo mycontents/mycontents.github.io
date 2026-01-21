@@ -1,805 +1,841 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contents</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0d1117;
-            color: #c9d1d9;
-            min-height: 100vh;
-            padding: 20px;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contents</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            position: relative;
-        }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #21262d;
-        }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+    }
 
-        .section-btn {
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            font-size: 15px;
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 140px;
-            justify-content: space-between;
-        }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #21262d;
+    }
 
-        .section-btn:hover { border-color: #58a6ff; }
-        .section-btn .arrow { font-size: 10px; color: #6e7681; }
+    .section-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      font-size: 15px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 160px;
+      justify-content: space-between;
+    }
 
-        .header-buttons {
-            display: flex;
-            gap: 12px;
-        }
+    .section-btn:hover { border-color: #58a6ff; }
+    .section-btn .arrow { font-size: 10px; color: #6e7681; }
 
-        .icon-btn {
-            background: none;
-            border: none;
-            color: #6e7681;
-            cursor: pointer;
-            font-size: 18px;
-            padding: 5px;
-            transition: color 0.2s;
-        }
+    .header-buttons {
+      display: flex;
+      gap: 12px;
+    }
 
-        .icon-btn:hover { color: #c9d1d9; }
-        .icon-btn.error { color: #f85149; }
-        .icon-btn.disabled { opacity: 0.3; cursor: default; }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #6e7681;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 5px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+    .icon-btn:hover { color: #c9d1d9; }
+    .icon-btn.error { color: #f85149; }
 
-        .content-area {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            min-height: 400px;
-            position: relative;
-        }
+    .content-area {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      min-height: 400px;
+      position: relative;
+    }
 
-        .content-list {
-            padding: 15px;
-            white-space: pre-line;
-            line-height: 1.8;
-            min-height: 400px;
-        }
+    .content-list {
+      padding: 15px;
+      white-space: pre-line;
+      line-height: 1.8;
+      min-height: 400px;
+    }
 
-        .content-list:empty::before {
-            content: '—';
-            color: #484f58;
-            font-size: 32px;
-            display: flex;
-            justify-content: center;
-            padding-top: 150px;
-        }
+    .content-list:empty::before {
+      content: "—";
+      color: #484f58;
+      font-size: 32px;
+      display: flex;
+      justify-content: center;
+      padding-top: 150px;
+    }
 
-        .content-list.all-mode {
-            line-height: 1.5;
-        }
+    /* Плотнее "Все" */
+    .content-list.all-mode { line-height: 1.2; }
 
-        .content-edit {
-            width: 100%;
-            height: 100%;
-            min-height: 400px;
-            background: #0d1117;
-            border: none;
-            border-radius: 8px;
-            color: #c9d1d9;
-            padding: 15px;
-            font-size: 14px;
-            font-family: inherit;
-            line-height: 1.8;
-            resize: vertical;
-        }
+    .item-line {
+      display: flex;
+      gap: 6px;
+      padding: 0;            /* максимально близко к обычному списку */
+      align-items: center;
+    }
+    .item-section-tag {
+      background: #30363d;
+      color: #8b949e;
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .item-text { flex: 1; }
 
-        .content-edit:focus { outline: none; }
-        .content-edit::placeholder { color: #484f58; }
+    .content-edit {
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+      background: #0d1117;
+      border: none;
+      border-radius: 8px;
+      color: #c9d1d9;
+      padding: 15px;
+      font-size: 14px;
+      font-family: inherit;
+      line-height: 1.8;
+      resize: vertical;
+    }
+    .content-edit:focus { outline: none; }
+    .content-edit::placeholder { color: #484f58; }
 
-        .hidden { display: none; }
+    .hidden { display: none; }
 
-        .counter {
-            text-align: right;
-            padding: 10px 15px;
-            color: #484f58;
-            font-size: 12px;
-            border-top: 1px solid #30363d;
-        }
+    .counter {
+      text-align: right;
+      padding: 10px 15px;
+      color: #484f58;
+      font-size: 12px;
+      border-top: 1px solid #30363d;
+    }
 
-        .edit-panel {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            padding: 10px 15px;
-            border-top: 1px solid #30363d;
-        }
+    .edit-panel {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 10px 15px;
+      border-top: 1px solid #30363d;
+    }
 
-        .edit-panel button {
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 18px;
-        }
+    .edit-panel button {
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+      display: grid;
+      place-items: center;
+    }
 
-        .btn-save { background: #238636; }
-        .btn-cancel { background: #30363d; }
+    .btn-save { background: #238636; }
+    .btn-cancel { background: #30363d; }
 
-        /* Выпадающие меню */
-        .dropdown-menu {
-            position: absolute;
-            top: 50px;
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            z-index: 50;
-            min-width: 180px;
-        }
+    /* Dropdowns */
+    .dropdown-menu {
+      position: absolute;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      z-index: 50;
+      min-width: 180px;
+      overflow: hidden;
+    }
 
-        .section-menu { left: 0; padding: 8px 0; }
-        .sort-menu { right: 80px; padding: 8px 0; }
-        .settings-menu { 
-            right: 0; 
-            padding: 15px;
-            width: 260px;
-        }
+    .dropdown-menu.section-menu { padding: 8px 0; }
+    .dropdown-menu.sort-menu { padding: 8px 0; }
+    .dropdown-menu.settings-menu { padding: 15px; width: 260px; }
 
-        .menu-option {
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    .menu-option {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+    .menu-option:hover { background: #21262d; }
+    .menu-option.active { color: #58a6ff; }
 
-        .menu-option:hover { background: #21262d; }
-        .menu-option.active { color: #58a6ff; }
-        
-        .menu-option.all-sections { 
-            border-bottom: 1px solid #30363d; 
-            margin-bottom: 5px;
-            padding-bottom: 10px;
-        }
+    .menu-option.all-sections {
+      border-bottom: 1px solid #30363d;
+      margin-bottom: 5px;
+      padding-bottom: 10px;
+    }
+    .menu-divider {
+      border-top: 1px solid #30363d;
+      margin: 5px 0;
+    }
+    .menu-option.add-new { color: #58a6ff; }
 
-        .menu-divider {
-            border-top: 1px solid #30363d;
-            margin: 5px 0;
-        }
+    .menu-option .delete-section {
+      margin-left: auto;
+      color: #6e7681;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .menu-option .delete-section:hover { color: #f85149; background: #21262d; }
 
-        .menu-option.add-new { color: #58a6ff; }
+    .new-section-input {
+      width: calc(100% - 32px);
+      margin: 8px 16px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .new-section-input:focus { outline: none; border-color: #58a6ff; }
 
-        .menu-option .delete-section {
-            margin-left: auto;
-            color: #6e7681;
-            font-size: 14px;
-            padding: 2px 6px;
-        }
+    /* Settings */
+    .settings-menu label {
+      display: block;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+    }
 
-        .menu-option .delete-section:hover { color: #f85149; }
+    .settings-menu input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .settings-menu input:focus { outline: none; border-color: #58a6ff; }
 
-        /* Настройки */
-        .settings-menu label {
-            display: block;
-            font-size: 11px;
-            color: #8b949e;
-            margin-bottom: 4px;
-        }
+    .settings-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .settings-btn {
+      flex: 1;
+      height: 40px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      display: grid;
+      place-items: center;
+    }
+    .btn-primary { background: #238636; color: white; }
+    .btn-share { background: #1f6feb; color: white; }
 
-        .settings-menu input {
-            width: 100%;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #c9d1d9;
-            padding: 8px 10px;
-            font-size: 13px;
-            margin-bottom: 12px;
-        }
+    .setup-prompt {
+      padding: 15px;
+      color: #8b949e;
+      text-align: center;
+    }
 
-        .settings-menu input:focus {
-            outline: none;
-            border-color: #58a6ff;
-        }
-
-        .settings-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        .settings-btn {
-            flex: 1;
-            height: 40px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-primary { background: #238636; color: white; }
-        .btn-share { background: #1f6feb; color: white; }
-
-        /* Item с меткой раздела */
-        .item-line {
-            display: flex;
-            gap: 8px;
-            padding: 2px 0;
-            align-items: baseline;
-        }
-
-        .item-section-tag {
-            background: #30363d;
-            color: #8b949e;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 3px;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .item-text { flex: 1; }
-
-        .new-section-input {
-            width: calc(100% - 32px);
-            margin: 8px 16px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #c9d1d9;
-            padding: 8px 10px;
-            font-size: 13px;
-        }
-
-        .new-section-input:focus {
-            outline: none;
-            border-color: #58a6ff;
-        }
-
-        .setup-prompt {
-            padding: 15px;
-            color: #8b949e;
-            text-align: center;
-        }
-
-        .edit-hint {
-            font-size: 11px;
-            color: #6e7681;
-            padding: 8px 15px;
-            border-bottom: 1px solid #30363d;
-        }
-    </style>
+    .edit-hint {
+      font-size: 11px;
+      color: #6e7681;
+      padding: 8px 15px;
+      border-bottom: 1px solid #30363d;
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <header>
-            <button class="section-btn" onclick="toggleSectionMenu()">
-                <span id="currentSectionName">Все</span>
-                <span class="arrow">▼</span>
-            </button>
-            <div class="header-buttons">
-                <button class="icon-btn" onclick="toggleSort()" title="Sort">⇅</button>
-                <button class="icon-btn" onclick="toggleEdit()" id="editBtn" title="Edit">✎</button>
-                <button class="icon-btn" onclick="toggleSettings()" id="settingsBtn" title="Settings">⚙</button>
-            </div>
-        </header>
+  <div class="container" id="container">
+    <header>
+      <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
+        <span id="currentSectionName">Все</span>
+        <span class="arrow">▼</span>
+      </button>
 
-        <div class="content-area">
-            <div class="content-list" id="viewMode"></div>
-            
-            <div class="hidden" id="editMode">
-                <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
-                <textarea 
-                    class="content-edit" 
-                    id="editor" 
-                    placeholder="..."
-                ></textarea>
-                <div class="edit-panel">
-                    <button class="btn-cancel" onclick="cancelEdit()">✕</button>
-                    <button class="btn-save" onclick="saveEdit()">✓</button>
-                </div>
-            </div>
-            
-            <div class="counter" id="counter"></div>
-        </div>
+      <div class="header-buttons">
+        <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">⇅</button>
+        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">✎</button>
+        <button class="icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Настройки">⚙</button>
+      </div>
+    </header>
 
-        <!-- Меню разделов -->
-        <div class="dropdown-menu section-menu hidden" id="sectionMenu">
-            <div class="menu-option all-sections" data-section="__all__" onclick="selectSection('__all__')">
-                Все
-            </div>
-            <div id="sectionList"></div>
-            <div class="menu-divider"></div>
-            <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый</div>
-            <input type="text" class="new-section-input hidden" id="newSectionInput" 
-                   placeholder="Название..." 
-                   onkeydown="handleNewSection(event)">
-        </div>
+    <div class="content-area">
+      <div class="content-list" id="viewMode"></div>
 
-        <!-- Меню сортировки -->
-        <div class="dropdown-menu sort-menu hidden" id="sortMenu">
-            <div class="menu-option" data-sort="manual" onclick="setSort('manual')">Manual</div>
-            <div class="menu-option" data-sort="newest" onclick="setSort('newest')">New ↓</div>
-            <div class="menu-option" data-sort="oldest" onclick="setSort('oldest')">Old ↑</div>
-            <div class="menu-option" data-sort="az" onclick="setSort('az')">A → Z</div>
-            <div class="menu-option" data-sort="za" onclick="setSort('za')">Z → A</div>
-            <div class="menu-option" data-sort="year-desc" onclick="setSort('year-desc')">Year ↓</div>
-            <div class="menu-option" data-sort="year-asc" onclick="setSort('year-asc')">Year ↑</div>
+      <div class="hidden" id="editMode">
+        <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
+        <textarea class="content-edit" id="editor" placeholder="..."></textarea>
+        <div class="edit-panel">
+          <button class="btn-cancel" onclick="cancelEdit()">✕</button>
+          <button class="btn-save" onclick="saveEdit()">✓</button>
         </div>
+      </div>
 
-        <!-- Меню настроек -->
-        <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
-            <label>Gist ID</label>
-            <input type="text" id="inputGistId" placeholder="abc123...">
-            
-            <label>Token</label>
-            <input type="password" id="inputToken" placeholder="ghp_...">
-            
-            <div class="settings-buttons">
-                <button class="settings-btn btn-primary" onclick="saveSettings()">✓</button>
-                <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn">⎘</button>
-            </div>
-        </div>
+      <div class="counter" id="counter"></div>
     </div>
 
-    <script>
-        // ===== КОНФИГУРАЦИЯ =====
-        let GIST_ID = localStorage.getItem('gist_id') || '';
-        let TOKEN = localStorage.getItem('github_token') || '';
+    <!-- Меню разделов -->
+    <div class="dropdown-menu section-menu hidden" id="sectionMenu">
+      <div class="menu-option all-sections" data-section="__all__" onclick="selectSection('__all__')">
+        Все
+      </div>
+      <div id="sectionList"></div>
+      <div class="menu-divider"></div>
+      <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый</div>
+      <input
+        type="text"
+        class="new-section-input hidden"
+        id="newSectionInput"
+        placeholder="Название..."
+        onkeydown="handleNewSection(event)"
+      />
+    </div>
 
-        let currentSection = localStorage.getItem('current_section') || '__all__';
-        let currentSort = localStorage.getItem('sort_mode') || 'manual';
-        let data = { sections: {} };
-        let isEditing = false;
+    <!-- Меню сортировки -->
+    <div class="dropdown-menu sort-menu hidden" id="sortMenu">
+      <div class="menu-option" data-sort="manual" onclick="setSort('manual')">Вручную</div>
+      <div class="menu-option" data-sort="newest" onclick="setSort('newest')">По дате ↓</div>
+      <div class="menu-option" data-sort="oldest" onclick="setSort('oldest')">По дате ↑</div>
+      <div class="menu-option" data-sort="az" onclick="setSort('az')">А → Я</div>
+      <div class="menu-option" data-sort="za" onclick="setSort('za')">Я → А</div>
+      <div class="menu-option" data-sort="year-desc" onclick="setSort('year-desc')">По году ↓</div>
+      <div class="menu-option" data-sort="year-asc" onclick="setSort('year-asc')">По году ↑</div>
+    </div>
 
-        const defaultSections = ['Фильмы', 'Сериалы', 'Аниме'];
+    <!-- Меню настроек -->
+    <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
+      <label>Gist ID</label>
+      <input type="text" id="inputGistId" placeholder="abc123..." />
 
-        // ===== INIT =====
-        async function init() {
-            checkUrlParams();
-            updateSettingsIcon();
-            updateShareButton();
-            
-            if (!GIST_ID || !TOKEN) {
-                document.getElementById('viewMode').innerHTML = `
-                    <div class="setup-prompt">⚙</div>
-                `;
-                document.getElementById('counter').textContent = '';
-                return;
-            }
-            
-            await loadData();
-            renderSectionList();
-            updateSectionButton();
-            render();
+      <label>Token</label>
+      <input type="password" id="inputToken" placeholder="ghp_..." />
+
+      <div class="settings-buttons">
+        <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">✓</button>
+        <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">⎘</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== CONFIG =====
+    let GIST_ID = localStorage.getItem("gist_id") || "";
+    let TOKEN = localStorage.getItem("github_token") || "";
+
+    let currentSection = localStorage.getItem("current_section") || "__all__";
+    let currentSort = localStorage.getItem("sort_mode") || "manual";
+    let data = { sections: {} };
+    let isEditing = false;
+
+    const defaultSections = ["Фильмы", "Сериалы", "Аниме"];
+
+    // ===== INIT =====
+    async function init() {
+      applyUrlSetupSilently();
+      updateSettingsIcon();
+      updateShareButton();
+
+      if (!GIST_ID || !TOKEN) {
+        document.getElementById("viewMode").innerHTML = `<div class="setup-prompt">⚙</div>`;
+        document.getElementById("counter").textContent = "";
+        return;
+      }
+
+      await loadData();
+      ensureDefaultSections();
+      renderSectionList();
+      updateSectionButton();
+      render();
+    }
+
+    // ===== URL SETUP (silent) =====
+    function applyUrlSetupSilently() {
+      const params = new URLSearchParams(window.location.search);
+      const setup = params.get("s");
+      if (!setup) return;
+
+      try {
+        const decoded = atob(setup);
+        const [gist, token] = decoded.split(":");
+        if (gist && token) {
+          localStorage.setItem("gist_id", gist);
+          localStorage.setItem("github_token", token);
+          GIST_ID = gist;
+          TOKEN = token;
+          window.history.replaceState({}, "", window.location.pathname);
         }
+      } catch (e) {
+        // silent
+      }
+    }
 
-        // ===== URL PARAMS =====
-        function checkUrlParams() {
-            const params = new URLSearchParams(window.location.search);
-            const setup = params.get('s');
-            
-            if (setup) {
-                try {
-                    const decoded = atob(setup);
-                    const [gist, token] = decoded.split(':');
-                    
-                    if (gist && token) {
-                        localStorage.setItem('gist_id', gist);
-                        localStorage.setItem('github_token', token);
-                        GIST_ID = gist;
-                        TOKEN = token;
-                        window.history.replaceState({}, '', window.location.pathname);
-                    }
-                } catch (e) {}
-            }
+    // ===== MENU POSITIONING =====
+    function openMenu(menuId, anchorEl, align = "left") {
+      closeAllMenus(menuId);
+      const menu = document.getElementById(menuId);
+      const container = document.getElementById("container");
+
+      menu.classList.remove("hidden");
+      menu.style.visibility = "hidden";
+
+      const cRect = container.getBoundingClientRect();
+      const aRect = anchorEl.getBoundingClientRect();
+      const mRect = menu.getBoundingClientRect();
+
+      const top = aRect.bottom - cRect.top + 8;
+
+      let left;
+      if (align === "right") {
+        left = aRect.right - cRect.left - mRect.width;
+      } else {
+        left = aRect.left - cRect.left;
+      }
+
+      // clamp inside container
+      left = Math.max(0, Math.min(left, cRect.width - mRect.width));
+
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
+      menu.style.visibility = "visible";
+    }
+
+    // ===== SETTINGS =====
+    function toggleSettings() {
+      const menu = document.getElementById("settingsMenu");
+      const btn = document.getElementById("settingsBtn");
+
+      if (!menu.classList.contains("hidden")) {
+        menu.classList.add("hidden");
+        return;
+      }
+
+      document.getElementById("inputGistId").value = GIST_ID;
+      document.getElementById("inputToken").value = TOKEN;
+      updateShareButton();
+
+      openMenu("settingsMenu", btn, "right");
+    }
+
+    function saveSettings() {
+      const gistId = document.getElementById("inputGistId").value.trim();
+      const token = document.getElementById("inputToken").value.trim();
+      if (!gistId || !token) return;
+
+      localStorage.setItem("gist_id", gistId);
+      localStorage.setItem("github_token", token);
+      GIST_ID = gistId;
+      TOKEN = token;
+
+      document.getElementById("settingsMenu").classList.add("hidden");
+      updateSettingsIcon();
+      updateShareButton();
+      init();
+    }
+
+    function updateSettingsIcon() {
+      document.getElementById("settingsBtn").classList.toggle("error", !GIST_ID || !TOKEN);
+    }
+
+    function updateShareButton() {
+      document.getElementById("shareBtn").style.display = GIST_ID && TOKEN ? "grid" : "none";
+    }
+
+    function copyShareLink() {
+      if (!GIST_ID || !TOKEN) return;
+      const link = `${location.origin}${location.pathname}?s=${btoa(`${GIST_ID}:${TOKEN}`)}`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(link);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = link;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+    }
+
+    // ===== SECTIONS =====
+    function toggleSectionMenu() {
+      const menu = document.getElementById("sectionMenu");
+      const btn = document.getElementById("sectionBtn");
+
+      if (!menu.classList.contains("hidden")) {
+        menu.classList.add("hidden");
+        document.getElementById("newSectionInput").classList.add("hidden");
+        return;
+      }
+
+      renderSectionList();
+      document.getElementById("newSectionInput").classList.add("hidden");
+      openMenu("sectionMenu", btn, "left");
+    }
+
+    function ensureDefaultSections() {
+      if (Object.keys(data.sections).length > 0) return;
+      defaultSections.forEach((s) => {
+        data.sections[s] = { items: [], modified: new Date().toISOString() };
+      });
+    }
+
+    function renderSectionList() {
+      const list = document.getElementById("sectionList");
+      list.innerHTML = Object.keys(data.sections)
+        .map(
+          (name) => `
+            <div class="menu-option ${currentSection === name ? "active" : ""}" onclick="selectSection('${escapeQuotes(name)}')">
+              <span>${escapeHtml(name)}</span>
+              <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${escapeQuotes(name)}')">✕</span>
+            </div>
+          `
+        )
+        .join("");
+    }
+
+    function selectSection(name) {
+      currentSection = name;
+      localStorage.setItem("current_section", name);
+      updateSectionButton();
+      document.getElementById("sectionMenu").classList.add("hidden");
+      render();
+    }
+
+    function updateSectionButton() {
+      document.getElementById("currentSectionName").textContent =
+        currentSection === "__all__" ? "Все" : currentSection;
+    }
+
+    function showNewSectionInput() {
+      const input = document.getElementById("newSectionInput");
+      input.classList.remove("hidden");
+      input.value = "";
+      input.focus();
+    }
+
+    function handleNewSection(e) {
+      if (e.key === "Enter") {
+        const name = e.target.value.trim();
+        if (name && !data.sections[name]) {
+          data.sections[name] = { items: [], modified: new Date().toISOString() };
+          saveData();
+          renderSectionList();
+          selectSection(name);
         }
+        e.target.classList.add("hidden");
+      } else if (e.key === "Escape") {
+        e.target.classList.add("hidden");
+      }
+    }
 
-        // ===== SETTINGS =====
-        function toggleSettings() {
-            closeAllMenus('settingsMenu');
-            const menu = document.getElementById('settingsMenu');
-            
-            if (menu.classList.contains('hidden')) {
-                document.getElementById('inputGistId').value = GIST_ID;
-                document.getElementById('inputToken').value = TOKEN;
-                updateShareButton();
-            }
-            
-            menu.classList.toggle('hidden');
-        }
+    function deleteSection(name) {
+      if (Object.keys(data.sections).length <= 1) return;
 
-        function saveSettings() {
-            const gistId = document.getElementById('inputGistId').value.trim();
-            const token = document.getElementById('inputToken').value.trim();
-            
-            if (!gistId || !token) return;
-            
-            localStorage.setItem('gist_id', gistId);
-            localStorage.setItem('github_token', token);
-            
-            GIST_ID = gistId;
-            TOKEN = token;
-            
-            document.getElementById('settingsMenu').classList.add('hidden');
-            updateSettingsIcon();
-            updateShareButton();
-            init();
-        }
+      delete data.sections[name];
+      saveData();
 
-        function updateSettingsIcon() {
-            const btn = document.getElementById('settingsBtn');
-            btn.classList.toggle('error', !GIST_ID || !TOKEN);
-        }
+      if (currentSection === name) {
+        currentSection = "__all__";
+        localStorage.setItem("current_section", "__all__");
+        updateSectionButton();
+      }
 
-        function updateShareButton() {
-            document.getElementById('shareBtn').style.display = (GIST_ID && TOKEN) ? 'flex' : 'none';
-        }
+      renderSectionList();
+      render();
+    }
 
-        function copyShareLink() {
-            if (!GIST_ID || !TOKEN) return;
-            const link = `${location.origin}${location.pathname}?s=${btoa(`${GIST_ID}:${TOKEN}`)}`;
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(link);
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = link;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-            }
-        }
-
-        // ===== SECTIONS =====
-        function toggleSectionMenu() {
-            closeAllMenus('sectionMenu');
-            document.getElementById('sectionMenu').classList.toggle('hidden');
-            document.getElementById('newSectionInput').classList.add('hidden');
-        }
-
-        function renderSectionList() {
-            const list = document.getElementById('sectionList');
-            const sections = Object.keys(data.sections);
-            
-            if (sections.length === 0) {
-                defaultSections.forEach(s => {
-                    data.sections[s] = { items: [], modified: new Date().toISOString() };
-                });
-            }
-            
-            list.innerHTML = Object.keys(data.sections).map(name => `
-                <div class="menu-option ${currentSection === name ? 'active' : ''}" onclick="selectSection('${name}')">
-                    <span>${name}</span>
-                    <span class="delete-section" onclick="event.stopPropagation(); deleteSection('${name}')">✕</span>
-                </div>
-            `).join('');
-        }
-
-        function selectSection(name) {
-            currentSection = name;
-            localStorage.setItem('current_section', name);
-            updateSectionButton();
-            document.getElementById('sectionMenu').classList.add('hidden');
-            render();
-        }
-
-        function updateSectionButton() {
-            document.getElementById('currentSectionName').textContent = 
-                currentSection === '__all__' ? 'Все' : currentSection;
-        }
-
-        function showNewSectionInput() {
-            const input = document.getElementById('newSectionInput');
-            input.classList.remove('hidden');
-            input.value = '';
-            input.focus();
-        }
-
-        function handleNewSection(e) {
-            if (e.key === 'Enter') {
-                const name = e.target.value.trim();
-                if (name && !data.sections[name]) {
-                    data.sections[name] = { items: [], modified: new Date().toISOString() };
-                    saveData();
-                    renderSectionList();
-                    selectSection(name);
-                }
-                e.target.classList.add('hidden');
-            } else if (e.key === 'Escape') {
-                e.target.classList.add('hidden');
-            }
-        }
-
-        function deleteSection(name) {
-            if (Object.keys(data.sections).length <= 1) return;
-            
-            delete data.sections[name];
-            saveData();
-            
-            if (currentSection === name) {
-                currentSection = '__all__';
-                localStorage.setItem('current_section', '__all__');
-                updateSectionButton();
-            }
-            
-            renderSectionList();
-            render();
-        }
-
-        // ===== API =====
-        async function loadData() {
-            try {
-                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                    headers: { 'Authorization': `token ${TOKEN}` }
-                });
-                
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                
-                const gist = await res.json();
-                
-                if (gist.files?.['contents.json']) {
-                    const loaded = JSON.parse(gist.files['contents.json'].content);
-                    if (loaded.users && !loaded.sections) {
-                        data.sections = loaded.users;
-                    } else {
-                        data = loaded.sections ? loaded : { sections: {} };
-                    }
-                } else {
-                    data = { sections: {} };
-                    await saveData();
-                }
-            } catch (e) {
-                console.error(e);
-                data = { sections: {} };
-            }
-        }
-
-        async function saveData() {
-            if (!TOKEN || !GIST_ID) return;
-            
-            try {
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `token ${TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        files: { 'contents.json': { content: JSON.stringify(data, null, 2) } }
-                    })
-                });
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        // ===== EDIT =====
-        function toggleEdit() {
-            if (!TOKEN || !GIST_ID) {
-                toggleSettings();
-                return;
-            }
-            isEditing ? cancelEdit() : startEdit();
-        }
-
-        function startEdit() {
-            isEditing = true;
-            const editor = document.getElementById('editor');
-            const hint = document.getElementById('editHint');
-            
-            if (currentSection === '__all__') {
-                // Режим "Все" - показываем с метками [Раздел]
-                let lines = [];
-                Object.entries(data.sections).forEach(([section, sectionData]) => {
-                    (sectionData.items || []).forEach(item => {
-                        lines.push(`[${section}] ${item}`);
-                    });
-                });
-                editor.value = lines.join('\n');
-                hint.classList.remove('hidden');
-            } else {
-                const items = data.sections[currentSection]?.items || [];
-                editor.value = items.join('\n');
-                hint.classList.add('hidden');
-            }
-            
-            document.getElementById('viewMode').classList.add('hidden');
-            document.getElementById('editMode').classList.remove('hidden');
-            document.getElementById('editBtn').textContent = '✕';
-            editor.focus();
-        }
-
-        function cancelEdit() {
-            isEditing = false;
-            document.getElementById('viewMode').classList.remove('hidden');
-            document.getElementById('editMode').classList.add('hidden');
-            document.getElementById('editBtn').textContent = '✎';
-            document.getElementById('editHint').classList.add('hidden');
-        }
-
-        async function saveEdit() {
-            const text = document.getElementById('editor').value;
-            const lines = text.split('\n').map(s => s.trim()).filter(s => s);
-            
-            if (currentSection === '__all__') {
-                // Парсим формат [Раздел] Текст
-                const newData = {};
-                
-                // Инициализируем пустые массивы для всех существующих разделов
-                Object.keys(data.sections).forEach(s => {
-                    newData[s] = [];
-                });
-                
-                let lastSection = Object.keys(data.sections)[0] || 'Default';
-                
-                lines.forEach(line => {
-                    const match = line.match(/^\[([^\]]+)\]\s*(.+)$/);
-                    if (match) {
-                        const section = match[1];
-                        const item = match[2];
-                        
-                        // Создаём раздел если не существует
-                        if (!newData[section]) {
-                            newData[section] = [];
-                        }
-                        newData[section].push(item);
-                        lastSection = section;
-                    } else {
-                        // Строка без метки - добавляем в последний использованный раздел
-                        if (!newData[lastSection]) {
-                            newData[lastSection] = [];
-                        }
-                        newData[lastSection].push(line);
-                    }
-                });
-                
-                // Обновляем data.sections
-                Object.keys(newData).forEach(section => {
-                    if (!data.sections[section]) {
-                        data.sections[section] = { items: [], modified: new Date().toISOString() };
-                    }
-                    data.sections[section].items = newData[section];
-                    data.sections[section].modified = new Date().toISOString();
-                });
-                
-                // Удаляем пустые разделы которые были созданы автоматически
-                // (но оставляем те, что пользователь создал явно)
-                
-            } else {
-                data.sections[currentSection] = {
-                    items: lines,
-                    modified: new Date().toISOString()
-                };
-            }
-            
-            await saveData();
-            renderSectionList();
-            cancelEdit();
-            render();
-        }
-
-        // ===== SORT =====
-        function toggleSort() {
-            closeAllMenus('sortMenu');
-            const menu = document.getElementById('sortMenu');
-            menu.classList.toggle('hidden');
-            document.querySelectorAll('#sortMenu .menu-option').forEach(el => {
-                el.classList.toggle('active', el.dataset.sort === currentSort);
-            });
-        }
-
-        function setSort(mode) {
-            currentSort = mode;
-            localStorage.setItem('sort_mode', mode);
-            document.getElementById('sortMenu').classList.add('hidden');
-            render();
-        }
-
-        function getSortedItems(items) {
-            if (!items || currentSort === 'manual') return items;
-            const sorted = [...items];
-            
-            switch (currentSort) {
-                case 'az': 
-                    sorted.sort((a, b) => (a.text || a).localeCompare(b.text || b, 'ru')); 
-                    break;
-                case 'za': 
-                    sorted.sort((a, b) => (b.text || b).localeCompare(a.text || a, 'ru')); 
-                    break;
-                case 'year-desc':
-                case 'year-asc':
-                    sorted.sort((a, b) => {
-                        const textA = a.text || a;
-                        const textB = b.text || b;
-                        const yA = (textA.match(/\((\d{4})\)/) || [, 0])[1];
-                        const yB = (textB.match(/\((\d{4})\)/) || [, 0])[1];
-                        return currentSort === 'year-desc' ? yB - yA : yA - yB;
-                    });
-                    break;
-                case 'newest': 
-                    sorted.reverse(); 
-                    break;
-            }
-            return sorted;
-        }
-
-        // ===== RENDER =====
-        function render() {
-            const view = document.getElementById('viewMode');
-            
-            let items = [];
-            
-            if (currentSection === '__all__') {
-                Object.entries(data.sections).forEach(([section, sectionData]) => {
-                    (sectionData.items || []).forEach(item => {
-                        items.push({ text: item, section: section });
-                    });
-                });
-                view.classList.add('all-mode');
-            } else {
-                items = (data.sections[currentSection]?.items || []).map(item => ({ text: item, section: null }));
-                view.classList.remove('all-mode');
-            }
-            
-            const sorted = getSortedItems(items);
-            
-            if (sorted.length === 0) {
-                view.innerHTML = '';
-            } else if (currentSection === '__all__') {
-                view.innerHTML = sorted.map(item => `
-                    <div class="item-line">
-                        <span class="item-section-tag">${item.section}</span>
-                        <span class="item-text">${item.text}</span>
-                    </div>
-                `).join('');
-            } else {
-                view.textContent = sorted.map(i => i.text).join('\n');
-            }
-            
-            document.getElementById('counter').textContent = sorted.length;
-        }
-
-        // ===== CLOSE MENUS =====
-        function closeAllMenus(except) {
-            ['sortMenu', 'settingsMenu', 'sectionMenu'].forEach(id => {
-                if (id !== except) {
-                    document.getElementById(id).classList.add('hidden');
-                }
-            });
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.dropdown-menu') && 
-                !e.target.closest('.icon-btn') && 
-                !e.target.closest('.section-btn')) {
-                closeAllMenus();
-            }
+    // ===== API =====
+    async function loadData() {
+      try {
+        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+          headers: { Authorization: `token ${TOKEN}` },
         });
 
-        init();
-    </script>
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const gist = await res.json();
+
+        if (gist.files?.["contents.json"]) {
+          const loaded = JSON.parse(gist.files["contents.json"].content);
+          // миграция со старой структуры
+          if (loaded.users && !loaded.sections) {
+            data.sections = loaded.users;
+          } else {
+            data = loaded.sections ? loaded : { sections: {} };
+          }
+        } else {
+          data = { sections: {} };
+          await saveData();
+        }
+      } catch (e) {
+        console.error(e);
+        data = { sections: {} };
+      }
+    }
+
+    async function saveData() {
+      if (!TOKEN || !GIST_ID) return;
+      try {
+        await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `token ${TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            files: { "contents.json": { content: JSON.stringify(data, null, 2) } },
+          }),
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // ===== EDIT =====
+    function toggleEdit() {
+      if (!TOKEN || !GIST_ID) {
+        toggleSettings();
+        return;
+      }
+      isEditing ? cancelEdit() : startEdit();
+    }
+
+    function startEdit() {
+      isEditing = true;
+      const editor = document.getElementById("editor");
+      const hint = document.getElementById("editHint");
+
+      if (currentSection === "__all__") {
+        // [Раздел] Текст
+        const lines = [];
+        Object.entries(data.sections).forEach(([section, sectionData]) => {
+          (sectionData.items || []).forEach((item) => {
+            lines.push(`[${section}] ${item}`);
+          });
+        });
+        editor.value = lines.join("\n");
+        hint.classList.remove("hidden");
+      } else {
+        const items = data.sections[currentSection]?.items || [];
+        editor.value = items.join("\n");
+        hint.classList.add("hidden");
+      }
+
+      document.getElementById("viewMode").classList.add("hidden");
+      document.getElementById("editMode").classList.remove("hidden");
+      document.getElementById("editBtn").textContent = "✕";
+      editor.focus();
+    }
+
+    function cancelEdit() {
+      isEditing = false;
+      document.getElementById("viewMode").classList.remove("hidden");
+      document.getElementById("editMode").classList.add("hidden");
+      document.getElementById("editBtn").textContent = "✎";
+      document.getElementById("editHint").classList.add("hidden");
+    }
+
+    async function saveEdit() {
+      const text = document.getElementById("editor").value;
+      const lines = text
+        .split("\n")
+        .map((s) => s.trim())
+        .filter((s) => s);
+
+      if (currentSection === "__all__") {
+        // rebuild items per section from editor lines
+        const newData = {};
+        Object.keys(data.sections).forEach((s) => (newData[s] = []));
+
+        let lastSection = Object.keys(data.sections)[0] || "Раздел";
+
+        for (const line of lines) {
+          const match = line.match(/^\[([^\]]+)\]\s*(.+)$/);
+          if (match) {
+            const section = match[1].trim();
+            const item = match[2].trim();
+            if (!newData[section]) newData[section] = [];
+            newData[section].push(item);
+            lastSection = section;
+          } else {
+            if (!newData[lastSection]) newData[lastSection] = [];
+            newData[lastSection].push(line);
+          }
+        }
+
+        for (const section of Object.keys(newData)) {
+          if (!data.sections[section]) {
+            data.sections[section] = { items: [], modified: new Date().toISOString() };
+          }
+          data.sections[section].items = newData[section];
+          data.sections[section].modified = new Date().toISOString();
+        }
+      } else {
+        data.sections[currentSection] = {
+          items: lines,
+          modified: new Date().toISOString(),
+        };
+      }
+
+      await saveData();
+      renderSectionList();
+      cancelEdit();
+      render();
+    }
+
+    // ===== SORT =====
+    function toggleSort() {
+      const menu = document.getElementById("sortMenu");
+      const btn = document.getElementById("sortBtn");
+
+      if (!menu.classList.contains("hidden")) {
+        menu.classList.add("hidden");
+        return;
+      }
+
+      openMenu("sortMenu", btn, "right");
+      document.querySelectorAll("#sortMenu .menu-option").forEach((el) => {
+        el.classList.toggle("active", el.dataset.sort === currentSort);
+      });
+    }
+
+    function setSort(mode) {
+      currentSort = mode;
+      localStorage.setItem("sort_mode", mode);
+      document.getElementById("sortMenu").classList.add("hidden");
+      render();
+    }
+
+    function getSortedItems(items) {
+      if (!items || currentSort === "manual") return items;
+      const sorted = [...items];
+
+      switch (currentSort) {
+        case "az":
+          sorted.sort((a, b) => (a.text || a).localeCompare(b.text || b, "ru"));
+          break;
+        case "za":
+          sorted.sort((a, b) => (b.text || b).localeCompare(a.text || a, "ru"));
+          break;
+        case "year-desc":
+        case "year-asc":
+          sorted.sort((a, b) => {
+            const textA = a.text || a;
+            const textB = b.text || b;
+            const yA = (textA.match(/\((\d{4})\)/) || [, 0])[1];
+            const yB = (textB.match(/\((\d{4})\)/) || [, 0])[1];
+            return currentSort === "year-desc" ? yB - yA : yA - yB;
+          });
+          break;
+        case "newest":
+          sorted.reverse();
+          break;
+        case "oldest":
+          // already oldest by default for manual; keep as-is
+          break;
+      }
+      return sorted;
+    }
+
+    // ===== RENDER =====
+    function render() {
+      const view = document.getElementById("viewMode");
+      let items = [];
+
+      if (currentSection === "__all__") {
+        Object.entries(data.sections).forEach(([section, sectionData]) => {
+          (sectionData.items || []).forEach((item) => {
+            items.push({ text: item, section });
+          });
+        });
+        view.classList.add("all-mode");
+      } else {
+        items = (data.sections[currentSection]?.items || []).map((item) => ({ text: item, section: null }));
+        view.classList.remove("all-mode");
+      }
+
+      const sorted = getSortedItems(items);
+
+      if (sorted.length === 0) {
+        view.innerHTML = "";
+      } else if (currentSection === "__all__") {
+        view.innerHTML = sorted
+          .map(
+            (item) => `
+            <div class="item-line">
+              <span class="item-section-tag">${escapeHtml(item.section)}</span>
+              <span class="item-text">${escapeHtml(item.text)}</span>
+            </div>
+          `
+          )
+          .join("");
+      } else {
+        view.textContent = sorted.map((i) => i.text).join("\n");
+      }
+
+      document.getElementById("counter").textContent = sorted.length;
+    }
+
+    // ===== CLOSE MENUS =====
+    function closeAllMenus(except) {
+      ["sortMenu", "settingsMenu", "sectionMenu"].forEach((id) => {
+        if (id !== except) document.getElementById(id).classList.add("hidden");
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      if (
+        !e.target.closest(".dropdown-menu") &&
+        !e.target.closest(".icon-btn") &&
+        !e.target.closest(".section-btn")
+      ) {
+        closeAllMenus();
+      }
+    });
+
+    // ===== UTILS =====
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeQuotes(str) {
+      // для вставки в onclick='...'
+      return String(str).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+    }
+
+    init();
+  </script>
 </body>
 </html>
