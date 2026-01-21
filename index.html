@@ -18,6 +18,7 @@
         .container {
             max-width: 500px;
             margin: 0 auto;
+            position: relative;
         }
 
         header {
@@ -63,6 +64,7 @@
         }
 
         .icon-btn:hover { color: #c9d1d9; }
+        .icon-btn.active { color: #238636; }
 
         .content-area {
             background: #161b22;
@@ -132,15 +134,24 @@
 
         .edit-panel .cancel { background: #30363d; }
 
-        .sort-menu {
+        /* Выпадающие меню */
+        .dropdown-menu {
             position: absolute;
-            right: 20px;
-            top: 60px;
+            right: 0;
+            top: 50px;
             background: #161b22;
             border: 1px solid #30363d;
             border-radius: 8px;
-            padding: 5px 0;
+            padding: 10px 0;
             z-index: 50;
+            min-width: 200px;
+        }
+
+        .sort-menu { right: 40px; }
+        .settings-menu { 
+            right: 0; 
+            padding: 15px;
+            width: 280px;
         }
 
         .sort-option {
@@ -153,110 +164,57 @@
         .sort-option.active { color: #58a6ff; }
         .sort-option.active::before { content: '✓ '; }
 
-        .loading { color: #484f58; }
-
-        /* Модалка настройки */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            padding: 20px;
-        }
-
-        .modal {
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 25px;
-            max-width: 350px;
-            width: 100%;
-        }
-
-        .modal h2 {
-            font-size: 18px;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .modal label {
+        /* Настройки */
+        .settings-menu label {
             display: block;
             font-size: 12px;
             color: #8b949e;
             margin-bottom: 5px;
         }
 
-        .modal input {
+        .settings-menu input {
             width: 100%;
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 6px;
             color: #c9d1d9;
-            padding: 10px 12px;
-            font-size: 14px;
-            margin-bottom: 15px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 12px;
         }
 
-        .modal input:focus {
+        .settings-menu input:focus {
             outline: none;
             border-color: #58a6ff;
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .modal-buttons button {
-            flex: 1;
-            padding: 10px;
+        .settings-menu button {
+            width: 100%;
+            padding: 8px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-        }
-
-        .btn-primary {
-            background: #238636;
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #30363d;
-            color: #c9d1d9;
-        }
-
-        .btn-link {
-            background: #1f6feb;
-            color: white;
-        }
-
-        .hint {
-            font-size: 11px;
-            color: #6e7681;
-            line-height: 1.5;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #30363d;
-        }
-
-        .share-section {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #30363d;
-        }
-
-        .share-section p {
             font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .btn-primary { background: #238636; color: white; }
+        .btn-share { background: #1f6feb; color: white; }
+
+        .settings-menu .hint {
+            font-size: 10px;
+            color: #6e7681;
+            line-height: 1.4;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #30363d;
+        }
+
+        .loading { color: #484f58; }
+
+        .setup-prompt {
+            padding: 15px;
             color: #8b949e;
-            margin-bottom: 10px;
         }
 
         .toast {
@@ -279,12 +237,6 @@
             85% { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
         }
-
-        .setup-prompt {
-            padding: 15px;
-            color: #8b949e;
-            text-align: center;
-        }
     </style>
 </head>
 <body>
@@ -300,6 +252,7 @@
             <div class="header-buttons">
                 <button class="icon-btn" onclick="toggleSort()" title="Сортировка">⇅</button>
                 <button class="icon-btn" onclick="toggleEdit()" id="editBtn" title="Редактировать">✎</button>
+                <button class="icon-btn" onclick="toggleSettings()" id="settingsBtn" title="Настройки">⚙</button>
             </div>
         </header>
 
@@ -321,7 +274,8 @@
             <div class="counter" id="counter"></div>
         </div>
 
-        <div class="sort-menu hidden" id="sortMenu">
+        <!-- Меню сортировки -->
+        <div class="dropdown-menu sort-menu hidden" id="sortMenu">
             <div class="sort-option" data-sort="manual" onclick="setSort('manual')">Вручную</div>
             <div class="sort-option" data-sort="newest" onclick="setSort('newest')">По дате ↓</div>
             <div class="sort-option" data-sort="oldest" onclick="setSort('oldest')">По дате ↑</div>
@@ -330,35 +284,21 @@
             <div class="sort-option" data-sort="year-desc" onclick="setSort('year-desc')">По году ↓</div>
             <div class="sort-option" data-sort="year-asc" onclick="setSort('year-asc')">По году ↑</div>
         </div>
-    </div>
 
-    <!-- Модалка первоначальной настройки -->
-    <div class="modal-overlay hidden" id="setupModal">
-        <div class="modal">
-            <h2>⚙️ Настройка</h2>
-            
+        <!-- Меню настроек -->
+        <div class="dropdown-menu settings-menu hidden" id="settingsMenu">
             <label>Gist ID:</label>
             <input type="text" id="inputGistId" placeholder="abc123def456...">
             
             <label>GitHub Token:</label>
             <input type="password" id="inputToken" placeholder="ghp_...">
             
-            <div class="modal-buttons">
-                <button class="btn-primary" onclick="saveSettings()">Сохранить</button>
-            </div>
-            
-            <div class="share-section hidden" id="shareSection">
-                <p>📤 Поделитесь этой ссылкой — другим не придётся ничего вводить:</p>
-                <button class="btn-link" onclick="copyShareLink()" style="width:100%">
-                    📋 Скопировать ссылку
-                </button>
-            </div>
+            <button class="btn-primary" onclick="saveSettings()">Сохранить</button>
+            <button class="btn-share" onclick="copyShareLink()" id="shareBtn">📋 Скопировать ссылку</button>
             
             <div class="hint">
-                <b>Как получить:</b><br>
-                1. Token: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)<br>
-                2. Права: только <b>gist</b><br>
-                3. Gist: создайте на gist.github.com файл contents.json с текстом {"users":{}}
+                Token: GitHub → Settings → Developer settings → Personal access tokens (classic)<br>
+                Права: только <b>gist</b>
             </div>
         </div>
     </div>
@@ -382,7 +322,6 @@
             
             if (setup) {
                 try {
-                    // Декодируем base64
                     const decoded = atob(setup);
                     const [gist, token] = decoded.split(':');
                     
@@ -408,11 +347,17 @@
         // ===== INIT =====
         async function init() {
             checkUrlParams();
+            updateSettingsIcon();
             
             userInput.value = currentUser === 'noname' ? '' : currentUser;
             
             if (!GIST_ID || !TOKEN) {
-                showSetupModal();
+                document.getElementById('viewMode').innerHTML = `
+                    <div class="setup-prompt">
+                        Нажмите ⚙ для настройки
+                    </div>
+                `;
+                document.getElementById('counter').textContent = '';
                 return;
             }
             
@@ -420,29 +365,19 @@
             render();
         }
 
-        // ===== SETUP MODAL =====
-        function showSetupModal() {
-            document.getElementById('viewMode').innerHTML = `
-                <div class="setup-prompt">Требуется настройка...</div>
-            `;
-            document.getElementById('counter').textContent = '';
-            document.getElementById('inputGistId').value = GIST_ID;
-            document.getElementById('inputToken').value = TOKEN;
-            updateShareSection();
-            document.getElementById('setupModal').classList.remove('hidden');
-        }
-
-        function hideSetupModal() {
-            document.getElementById('setupModal').classList.add('hidden');
-        }
-
-        function updateShareSection() {
-            const section = document.getElementById('shareSection');
-            if (GIST_ID && TOKEN) {
-                section.classList.remove('hidden');
-            } else {
-                section.classList.add('hidden');
+        // ===== SETTINGS =====
+        function toggleSettings() {
+            closeAllMenus('settingsMenu');
+            const menu = document.getElementById('settingsMenu');
+            const isHidden = menu.classList.contains('hidden');
+            
+            if (isHidden) {
+                document.getElementById('inputGistId').value = GIST_ID;
+                document.getElementById('inputToken').value = TOKEN;
+                updateShareButton();
             }
+            
+            menu.classList.toggle('hidden');
         }
 
         function saveSettings() {
@@ -460,15 +395,26 @@
             GIST_ID = gistId;
             TOKEN = token;
             
-            updateShareSection();
-            hideSetupModal();
+            document.getElementById('settingsMenu').classList.add('hidden');
+            updateSettingsIcon();
+            updateShareButton();
+            showToast('✓ Сохранено');
             init();
+        }
+
+        function updateSettingsIcon() {
+            const btn = document.getElementById('settingsBtn');
+            btn.classList.toggle('active', GIST_ID && TOKEN);
+        }
+
+        function updateShareButton() {
+            const btn = document.getElementById('shareBtn');
+            btn.style.display = (GIST_ID && TOKEN) ? 'block' : 'none';
         }
 
         // ===== SHARE LINK =====
         function generateShareLink() {
             if (!GIST_ID || !TOKEN) return '';
-            
             const data = btoa(`${GIST_ID}:${TOKEN}`);
             const baseUrl = window.location.origin + window.location.pathname;
             return `${baseUrl}?s=${data}`;
@@ -482,7 +428,6 @@
                     showToast('✓ Ссылка скопирована');
                 });
             } else {
-                // Fallback для старых браузеров
                 const textarea = document.createElement('textarea');
                 textarea.value = link;
                 document.body.appendChild(textarea);
@@ -555,10 +500,7 @@
                 console.error(e);
                 document.getElementById('viewMode').innerHTML = `
                     <div class="setup-prompt" style="color:#f85149">
-                        Ошибка подключения<br><br>
-                        <button onclick="showSetupModal()" style="background:#30363d;color:#c9d1d9;border:none;padding:10px 20px;border-radius:6px;cursor:pointer">
-                            Проверить настройки
-                        </button>
+                        Ошибка подключения. Проверьте настройки ⚙
                     </div>
                 `;
                 data = { users: {} };
@@ -566,10 +508,7 @@
         }
 
         async function saveData() {
-            if (!TOKEN || !GIST_ID) {
-                showSetupModal();
-                return;
-            }
+            if (!TOKEN || !GIST_ID) return;
             
             try {
                 const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
@@ -597,7 +536,7 @@
         // ===== EDIT =====
         function toggleEdit() {
             if (!TOKEN || !GIST_ID) {
-                showSetupModal();
+                toggleSettings();
                 return;
             }
             isEditing ? cancelEdit() : startEdit();
@@ -637,6 +576,7 @@
 
         // ===== SORT =====
         function toggleSort() {
+            closeAllMenus('sortMenu');
             const menu = document.getElementById('sortMenu');
             menu.classList.toggle('hidden');
             document.querySelectorAll('.sort-option').forEach(el => {
@@ -678,9 +618,19 @@
             document.getElementById('counter').textContent = items.length + ' записей';
         }
 
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.sort-menu') && !e.target.closest('.icon-btn')) {
+        // ===== CLOSE MENUS =====
+        function closeAllMenus(except) {
+            if (except !== 'sortMenu') {
                 document.getElementById('sortMenu').classList.add('hidden');
+            }
+            if (except !== 'settingsMenu') {
+                document.getElementById('settingsMenu').classList.add('hidden');
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown-menu') && !e.target.closest('.icon-btn')) {
+                closeAllMenus();
             }
         });
 
