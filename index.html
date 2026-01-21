@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contents</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .user-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid transparent;
+            color: #c9d1d9;
+            font-size: 18px;
+            padding: 5px 0;
+            width: 150px;
+            transition: border-color 0.2s;
+        }
+
+        .user-input:hover { border-bottom-color: #30363d; }
+        .user-input:focus { 
+            outline: none; 
+            border-bottom-color: #58a6ff;
+        }
+        .user-input::placeholder { color: #6e7681; }
+
+        .header-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: #6e7681;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .icon-btn:hover { color: #c9d1d9; }
+
+        .content-area {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            min-height: 400px;
+            position: relative;
+        }
+
+        .content-list {
+            padding: 15px;
+            white-space: pre-line;
+            line-height: 1.8;
+            min-height: 400px;
+        }
+
+        .content-list:empty::before {
+            content: 'Список пуст';
+            color: #484f58;
+        }
+
+        .content-edit {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            background: #0d1117;
+            border: none;
+            border-radius: 8px;
+            color: #c9d1d9;
+            padding: 15px;
+            font-size: 14px;
+            font-family: inherit;
+            line-height: 1.8;
+            resize: vertical;
+        }
+
+        .content-edit:focus { outline: none; }
+        .content-edit::placeholder { color: #484f58; }
+
+        .hidden { display: none; }
+
+        .counter {
+            text-align: right;
+            padding: 10px 15px;
+            color: #484f58;
+            font-size: 12px;
+            border-top: 1px solid #30363d;
+        }
+
+        .edit-panel {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 10px 15px;
+            border-top: 1px solid #30363d;
+        }
+
+        .edit-panel button {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .edit-panel .cancel { background: #30363d; }
+
+        .sort-menu {
+            position: absolute;
+            right: 20px;
+            top: 60px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 5px 0;
+            z-index: 50;
+        }
+
+        .sort-option {
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .sort-option:hover { background: #21262d; }
+        .sort-option.active { color: #58a6ff; }
+        .sort-option.active::before { content: '✓ '; }
+
+        .loading {
+            padding: 15px;
+            color: #484f58;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <input 
+                type="text" 
+                class="user-input" 
+                id="userName" 
+                placeholder="noname"
+                spellcheck="false"
+            >
+            <div class="header-buttons">
+                <button class="icon-btn" onclick="toggleSort()" title="Сортировка">⇅</button>
+                <button class="icon-btn" onclick="toggleEdit()" id="editBtn" title="Редактировать">✎</button>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="content-list" id="viewMode"><span class="loading">Загрузка...</span></div>
+            
+            <div class="hidden" id="editMode">
+                <textarea 
+                    class="content-edit" 
+                    id="editor" 
+                    placeholder="Каждая строка — отдельная запись"
+                ></textarea>
+                <div class="edit-panel">
+                    <button class="cancel" onclick="cancelEdit()">Отмена</button>
+                    <button onclick="saveEdit()">Сохранить</button>
+                </div>
+            </div>
+            
+            <div class="counter" id="counter"></div>
+        </div>
+
+        <div class="sort-menu hidden" id="sortMenu">
+            <div class="sort-option" data-sort="manual" onclick="setSort('manual')">Вручную</div>
+            <div class="sort-option" data-sort="newest" onclick="setSort('newest')">По дате ↓</div>
+            <div class="sort-option" data-sort="oldest" onclick="setSort('oldest')">По дате ↑</div>
+            <div class="sort-option" data-sort="az" onclick="setSort('az')">А → Я</div>
+            <div class="sort-option" data-sort="za" onclick="setSort('za')">Я → А</div>
+            <div class="sort-option" data-sort="year-desc" onclick="setSort('year-desc')">По году ↓</div>
+            <div class="sort-option" data-sort="year-asc" onclick="setSort('year-asc')">По году ↑</div>
+        </div>
+    </div>
+
+    <script>
+        const GIST_ID = '27e1539c9077caea8cef99bbf1139067';
+        const TOKEN = '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';
+
+        let currentUser = localStorage.getItem('current_user') || 'noname';
+        let currentSort = localStorage.getItem('sort_mode') || 'manual';
+        let data = { users: {} };
+        let isEditing = false;
+
+        const userInput = document.getElementById('userName');
+
+        // ===== INIT =====
+        async function init() {
+            userInput.value = currentUser === 'noname' ? '' : currentUser;
+            await loadData();
+            render();
+        }
+
+        // ===== USER INPUT =====
+        let switchTimeout;
+        userInput.addEventListener('input', () => {
+            clearTimeout(switchTimeout);
+            switchTimeout = setTimeout(switchUser, 600);
+        });
+
+        userInput.addEventListener('blur', switchUser);
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                userInput.blur();
+            }
+        });
+
+        async function switchUser() {
+            clearTimeout(switchTimeout);
+            const name = userInput.value.trim() || 'noname';
+            
+            if (name === currentUser) return;
+            
+            currentUser = name;
+            localStorage.setItem('current_user', name);
+            
+            if (!data.users[name]) {
+                data.users[name] = { items: [], modified: new Date().toISOString() };
+                await saveData();
+            }
+            
+            render();
+        }
+
+        // ===== API =====
+        async function loadData() {
+            try {
+                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    headers: { 'Authorization': `token ${TOKEN}` }
+                });
+                const gist = await res.json();
+                data = JSON.parse(gist.files['contents.json'].content);
+            } catch (e) {
+                console.error(e);
+                data = { users: {} };
+            }
+        }
+
+        async function saveData() {
+            try {
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `token ${TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'contents.json': {
+                                content: JSON.stringify(data, null, 2)
+                            }
+                        }
+                    })
+                });
+            } catch (e) {
+                alert('Ошибка сохранения');
+            }
+        }
+
+        // ===== EDIT =====
+        function toggleEdit() {
+            isEditing ? cancelEdit() : startEdit();
+        }
+
+        function startEdit() {
+            isEditing = true;
+            const items = data.users[currentUser]?.items || [];
+            document.getElementById('editor').value = items.join('\n');
+            document.getElementById('viewMode').classList.add('hidden');
+            document.getElementById('editMode').classList.remove('hidden');
+            document.getElementById('editBtn').textContent = '✕';
+            document.getElementById('editor').focus();
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            document.getElementById('viewMode').classList.remove('hidden');
+            document.getElementById('editMode').classList.add('hidden');
+            document.getElementById('editBtn').textContent = '✎';
+        }
+
+        async function saveEdit() {
+            const text = document.getElementById('editor').value;
+            const items = text.split('\n').map(s => s.trim()).filter(s => s);
+            
+            data.users[currentUser] = {
+                items: items,
+                modified: new Date().toISOString()
+            };
+            
+            await saveData();
+            cancelEdit();
+            render();
+        }
+
+        // ===== SORT =====
+        function toggleSort() {
+            const menu = document.getElementById('sortMenu');
+            menu.classList.toggle('hidden');
+            document.querySelectorAll('.sort-option').forEach(el => {
+                el.classList.toggle('active', el.dataset.sort === currentSort);
+            });
+        }
+
+        function setSort(mode) {
+            currentSort = mode;
+            localStorage.setItem('sort_mode', mode);
+            document.getElementById('sortMenu').classList.add('hidden');
+            render();
+        }
+
+        function getSortedItems(items) {
+            if (!items || currentSort === 'manual') return items;
+            const sorted = [...items];
+            
+            switch (currentSort) {
+                case 'az': sorted.sort((a, b) => a.localeCompare(b, 'ru')); break;
+                case 'za': sorted.sort((a, b) => b.localeCompare(a, 'ru')); break;
+                case 'year-desc':
+                case 'year-asc':
+                    sorted.sort((a, b) => {
+                        const yA = (a.match(/\((\d{4})\)/) || [, 0])[1];
+                        const yB = (b.match(/\((\d{4})\)/) || [, 0])[1];
+                        return currentSort === 'year-desc' ? yB - yA : yA - yB;
+                    });
+                    break;
+                case 'newest': sorted.reverse(); break;
+            }
+            return sorted;
+        }
+
+        // ===== RENDER =====
+        function render() {
+            const items = data.users[currentUser]?.items || [];
+            document.getElementById('viewMode').textContent = getSortedItems(items).join('\n');
+            document.getElementById('counter').textContent = items.length + ' записей';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.sort-menu') && !e.target.closest('.icon-btn')) {
+                document.getElementById('sortMenu').classList.add('hidden');
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
