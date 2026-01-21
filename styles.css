@@ -141,6 +141,39 @@ header{
 .filter-clear:hover{ color:var(--text); background:var(--panel2); }
 .filter-clear.hidden{ display:none; }
 
+/* Mobile: search button instead of full input */
+.search-toggle-btn{
+  display:none;
+  width:40px;
+  height:40px;
+  border-radius:var(--r10);
+  background:var(--panel);
+  border:1px solid var(--border);
+  color:var(--muted);
+  cursor:pointer;
+  place-items:center;
+  -webkit-tap-highlight-color:var(--tap);
+  flex:0 0 auto;
+}
+.search-toggle-btn:hover{ color:var(--text); border-color:var(--blue); }
+.search-toggle-btn.on{ color:var(--blue); }
+
+@media (max-width: 600px) {
+  .section-btn{ min-width:auto; max-width:140px; }
+  .filter-wrap{ display:none; }
+  .search-toggle-btn{ display:grid; }
+  
+  .filter-wrap.mobile-open{
+    display:flex;
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    margin-top:8px;
+    z-index:110;
+  }
+}
+
 .header-buttons{
   display:flex;
   align-items:center;
@@ -199,7 +232,6 @@ header{
   align-items:center;
   gap:8px;
 
-  /* ВАЖНО: базовые отступы как раньше */
   padding:6px 8px;
   margin:0 -8px 8px;
   border-radius:var(--r10);
@@ -218,12 +250,10 @@ header{
 .item-line.selected{
   background:var(--border2);
   box-shadow:inset 0 0 0 1px var(--border);
-
-  /* при выборе сдвигаем содержимое вправо, освобождая место под кнопку удаления */
   padding-left:44px;
 }
 
-/* Кнопка удаления позиции (слева), появляется только у выбранной */
+/* Кнопка удаления позиции (слева) */
 .item-del{
   position:absolute;
   left:8px;
@@ -255,7 +285,6 @@ header{
   border-color:var(--border);
 }
 
-/* "взведено" (первый клик по удалению) */
 .item-line.del-armed .item-del{
   color:var(--red);
   background:#1a0f12;
@@ -420,7 +449,7 @@ header{
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
 .dropdown-menu.settings-menu{ padding:14px; width:260px; min-width:260px; }
 .dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
-.dropdown-menu.tag-editor-menu{ padding:10px; width:260px; min-width:260px; }
+.dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; }
 
 .menu-option{
   padding:8px 14px;
@@ -608,21 +637,25 @@ header{
 .tag-pill{
   display:flex;
   align-items:center;
-  justify-content:space-between;
   gap:8px;
 
   border:1px solid var(--border);
   background:var(--panel2);
   border-radius:999px;
-  padding:4px 6px 4px 10px;
+  padding:4px 6px 4px 12px;
 }
 .tag-pill-text{
+  flex:1;
+  min-width:0;
   font-size:13px;
   color:var(--text);
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  background:transparent;
+  border:none;
+  outline:none;
+  padding:0;
+}
+.tag-pill-text:focus{
+  color:var(--blue);
 }
 
 .tag-empty{

@@ -16,13 +16,13 @@
   <div class="container" id="container">
     <header>
       <div class="header-row">
-        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
-          <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
-        </button>
-
         <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
           <span id="currentSectionName">Все</span>
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
+        </button>
+
+        <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
+          <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
         </button>
 
         <!-- toggle only for "Все": include/exclude viewed sections -->
@@ -34,7 +34,12 @@
           <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-tag"></use></svg>
         </button>
 
-        <div class="filter-wrap" title="Фильтр">
+        <!-- Mobile: search toggle button -->
+        <button class="search-toggle-btn" id="searchToggleBtn" onclick="toggleMobileSearch()" title="Поиск">
+          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-search"></use></svg>
+        </button>
+
+        <div class="filter-wrap" id="filterWrap" title="Фильтр">
           <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
           <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
             <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
