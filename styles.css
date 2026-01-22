@@ -856,8 +856,12 @@ header{
   overflow-y:auto;
 }
 
-/* Info/description button on item */
+/* Info/description button on item — only for selected with desc */
 .desc-action{
+  display:none;
+}
+.item-line.selected .desc-action.has-desc{
+  display:grid;
   width:30px;
   height:30px;
   border-radius:10px;
@@ -865,30 +869,15 @@ header{
   background:transparent;
   color:var(--muted);
   cursor:pointer;
-  display:grid;
   place-items:center;
   flex:0 0 auto;
   -webkit-tap-highlight-color:var(--tap);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .12s, background .12s, border-color .12s, color .12s;
+  transition:background .12s, border-color .12s, color .12s;
 }
-.item-line.selected .desc-action{
-  opacity:1;
-  pointer-events:auto;
-}
-.desc-action:hover{
+.item-line.selected .desc-action.has-desc:hover{
   color:var(--text);
   background:#0b0f15;
   border-color:var(--border);
-}
-/* Always show if has description */
-.desc-action.has-desc{
-  opacity:0.6;
-  pointer-events:auto;
-}
-.item-line.selected .desc-action.has-desc{
-  opacity:1;
 }
 
 /* ===== Undo bar ===== */

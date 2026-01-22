@@ -476,7 +476,33 @@ function openDescMenu(secKey, idx, anchor) {
   const item = sec.items[idx];
   if (!item.desc) return;
   $("descContent").textContent = item.desc;
-  openMenu("descMenu", anchor, "right");
+  
+  // Position menu under the item line, aligned to right edge
+  const line = anchor.closest(".item-line");
+  if (line) {
+    openMenuUnderElement("descMenu", line);
+  } else {
+    openMenu("descMenu", anchor, "right");
+  }
+}
+
+function openMenuUnderElement(menuId, element) {
+  closeAllMenus(menuId);
+  const menu = $(menuId), cont = $("container");
+  menu.classList.remove("hidden");
+  menu.style.visibility = "hidden";
+  
+  const cR = cont.getBoundingClientRect();
+  const eR = element.getBoundingClientRect();
+  const mR = menu.getBoundingClientRect();
+  
+  const top = eR.bottom - cR.top + 4;
+  let left = eR.right - cR.left - mR.width;
+  left = Math.max(0, Math.min(left, cR.width - mR.width));
+  
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
+  menu.style.visibility = "visible";
 }
 
 function closeDescMenu() { $("descMenu").classList.add("hidden"); }
@@ -889,9 +915,10 @@ function render() {
     const tags = displayTags(x.item).sort((a, b) => a.localeCompare(b, "ru"));
     const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
 
+    // Description button: only render if has description (will be shown only when selected via CSS)
     const descBtn = hasDesc
-      ? `<button class="desc-action has-desc" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-info"></use></svg></button>`
-      : `<button class="desc-action" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-info"></use></svg></button>`;
+      ? `<button class="desc-action has-desc" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
+      : "";
 
     let viewedBtn;
     if (viewed) {
@@ -906,7 +933,7 @@ function render() {
         <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
         ${secTag}
         <div class="item-main"><span class="item-text">${esc(x.text)}</span>${tagsHtml}</div>
-        ${hasDesc ? descBtn : ""}
+        ${descBtn}
         <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
         ${viewedBtn}
       </div>`;
