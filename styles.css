@@ -330,6 +330,7 @@ body.editing .scroll-slack{ display:none; }
 
 /* Top row inside item (keeps buttons spacing stable; desc block is separate row) */
 .item-row{
+  position:relative;
   display:flex;
   align-items:center;
   gap:8px;
@@ -350,7 +351,8 @@ body.editing .scroll-slack{ display:none; }
 .item-del{
   position:absolute;
   left:6px;
-  top:6px;
+  top:50%;
+  transform:translateY(-50%);
 
   width:30px;
   height:30px;
@@ -397,8 +399,9 @@ body.editing .scroll-slack{ display:none; }
   background:var(--border);
   color:#8b949e;
   font-size:10px;
-  padding:1px 6px;
-  border-radius:6px;
+  height:30px;
+  padding:0 10px;
+  border-radius:10px;
   white-space:nowrap;
   flex-shrink:0;
 
@@ -406,7 +409,7 @@ body.editing .scroll-slack{ display:none; }
   align-items:center;
   gap:6px;
 
-  /* Center-align with the first row text (same baseline center as other row content) */
+  /* Centered in the top row (like before) */
   align-self:center;
 
   user-select:none;

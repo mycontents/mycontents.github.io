@@ -1392,8 +1392,8 @@ function render() {
 
     return `
       <div class="item-line ${sel ? "selected" : ""} ${isExpanded ? "expanded" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}" data-key="${esc(key)}" data-sec="${esc(x.secKey)}" data-idx="${x.idx}">
-        <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
         <div class="item-row">
+          <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
           ${secTag}
           <div class="item-main"><span class="item-text">${esc(x.text)}</span>${tagsHtml}</div>
           ${descBtn}
