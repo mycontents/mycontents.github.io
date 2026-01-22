@@ -140,10 +140,9 @@ async function loadTmdbGenres() {
   if (tmdbGenres) return tmdbGenres;
   if (!TMDB_KEY) return null;
   try {
-    const headers = { Authorization: `Bearer ${TMDB_KEY}` };
     const [movieRes, tvRes] = await Promise.all([
-      fetch(`${TMDB_BASE}/genre/movie/list?language=ru`, { headers }),
-      fetch(`${TMDB_BASE}/genre/tv/list?language=ru`, { headers })
+      fetch(`${TMDB_BASE}/genre/movie/list?api_key=${TMDB_KEY}&language=ru`),
+      fetch(`${TMDB_BASE}/genre/tv/list?api_key=${TMDB_KEY}&language=ru`)
     ]);
     const movieData = await movieRes.json();
     const tvData = await tvRes.json();
@@ -172,13 +171,12 @@ function parseTitleForSearch(text) {
 
 async function searchTmdb(query, year, type) {
   if (!TMDB_KEY) return null;
-  const headers = { Authorization: `Bearer ${TMDB_KEY}` };
-  const params = new URLSearchParams({ query, language: "ru" });
+  const params = new URLSearchParams({ api_key: TMDB_KEY, query, language: "ru" });
   if (year) {
     params.set(type === "movie" ? "year" : "first_air_date_year", year);
   }
   try {
-    const res = await fetch(`${TMDB_BASE}/search/${type}?${params}`, { headers });
+    const res = await fetch(`${TMDB_BASE}/search/${type}?${params}`);
     const data = await res.json();
     return data.results?.[0] || null;
   } catch { return null; }
