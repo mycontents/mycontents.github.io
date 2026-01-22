@@ -331,12 +331,11 @@ header{
   padding-left:44px;
 }
 
-/* Кнопка удаления позиции (слева) — остаётся на уровне наименования */
+/* Кнопка удаления позиции (слева) — абсолютная, не влияет на layout */
 .item-del{
   position:absolute;
   left:8px;
-  top:18px;
-  transform:translateY(-50%);
+  top:6px;
 
   width:30px;
   height:30px;
@@ -900,9 +899,7 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  margin-left:-36px;
-  padding:12px 0 40px;
-  padding-left:36px;
+  padding:12px 8px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -920,20 +917,20 @@ header{
 .item-desc-content{
   flex:1;
   min-width:0;
+  padding-right:38px;
 }
 
 .item-desc-text{
   font-size:14px;
   line-height:1.55;
   color:var(--text);
-  margin-bottom:10px;
 }
 
-/* Description delete button — bottom right corner, outside content flow */
+/* Description delete button — bottom right, same offset as viewed button */
 .desc-del-btn{
   position:absolute;
-  right:0;
-  bottom:0;
+  right:8px;
+  bottom:6px;
   width:30px;
   height:30px;
   border-radius:10px;

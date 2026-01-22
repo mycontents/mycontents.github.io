@@ -171,8 +171,19 @@ async function searchTmdb(query, year, type) {
   }
   try {
     const res = await fetch(`${TMDB_BASE}/search/${type}?${params}`);
-    const data = await res.json();
-    return data.results?.[0] || null;
+    const json = await res.json();
+    const result = json.results?.[0];
+    if (!result) return null;
+    
+    // Получаем детали для страны производства
+    try {
+      const detailsRes = await fetch(`${TMDB_BASE}/${type}/${result.id}?api_key=${TMDB_KEY}&language=ru`);
+      const details = await detailsRes.json();
+      result.production_countries = details.production_countries || [];
+      result.origin_country = details.origin_country || [];
+    } catch {}
+    
+    return result;
   } catch { return null; }
 }
 
@@ -198,8 +209,24 @@ async function fetchTmdbDataForItem(text) {
     const releaseDate = isMovie ? result.release_date : result.first_air_date;
     const resultYear = releaseDate ? releaseDate.substring(0, 4) : null;
     
+    // Извлекаем страну производства
+    let country = null;
+    if (result.production_countries?.length) {
+      country = result.production_countries[0].name?.toLowerCase();
+    } else if (result.origin_country?.length) {
+      // origin_country содержит коды стран (US, KR и т.д.), конвертируем в названия
+      const countryMap = { US: "сша", GB: "великобритания", KR: "южная корея", JP: "япония", FR: "франция", DE: "германия", IT: "италия", ES: "испания", CN: "китай", IN: "индия", RU: "россия", CA: "канада", AU: "австралия", BR: "бразилия", MX: "мексика", SE: "швеция", DK: "дания", NO: "норвегия", FI: "финляндия", NL: "нидерланды", BE: "бельгия", AT: "австрия", CH: "швейцария", PL: "польша", CZ: "чехия", TR: "турция", TH: "таиланд", PH: "филиппины", ID: "индонезия", MY: "малайзия", SG: "сингапур", HK: "гонконг", TW: "тайвань", NZ: "новая зеландия", AR: "аргентина", CL: "чили", CO: "колумбия", ZA: "юар", EG: "египет", IL: "израиль", AE: "оаэ", SA: "саудовская аравия", UA: "украина", BY: "беларусь", KZ: "казахстан" };
+      const code = result.origin_country[0];
+      country = countryMap[code] || code?.toLowerCase();
+    }
+    
+    const genreList = result.genre_ids.map(id => genres.get(id)).filter(Boolean);
+    if (country && !genreList.includes(country)) {
+      genreList.push(country);
+    }
+    
     return {
-      genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
+      genres: genreList,
       overview: result.overview || null,
       poster: result.poster_path ? TMDB_IMG + result.poster_path : null,
       originalTitle: origTitle || null,
