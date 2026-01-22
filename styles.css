@@ -368,8 +368,9 @@ header{
 .item-line.expanded{ }
 
 /* Сдвиг только верхней строки (row), чтобы освободить место под кнопку удаления */
+/* left gap = 6px (как у .item-del от левого края) */
 .item-line.selected .item-row{
-  padding-left:36px;
+  padding-left:42px; /* 6 (gap) + 30 (button) + 6 (gap) */
 }
 
 /* Описание не сдвигаем вообще */
@@ -926,7 +927,7 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  padding:8px;
+  padding:12px; /* +50% (was 8px) */
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
