@@ -180,43 +180,46 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
 
 async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return { genres: [], overview: null, poster: null };
+  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null };
   
   const { names, year } = parseTitleForSearch(text);
   
   const trySearch = async (name, y) => {
     let result = await searchTmdb(name, y, "movie");
-    if (result?.genre_ids?.length) return result;
+    if (result?.genre_ids?.length) return { ...result, mediaType: "movie" };
     result = await searchTmdb(name, y, "tv");
-    if (result?.genre_ids?.length) return result;
+    if (result?.genre_ids?.length) return { ...result, mediaType: "tv" };
     return null;
+  };
+  
+  const extractData = (result) => {
+    const isMovie = result.mediaType === "movie";
+    const origTitle = isMovie ? result.original_title : result.original_name;
+    const releaseDate = isMovie ? result.release_date : result.first_air_date;
+    const resultYear = releaseDate ? releaseDate.substring(0, 4) : null;
+    
+    return {
+      genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
+      overview: result.overview || null,
+      poster: result.poster_path ? TMDB_IMG + result.poster_path : null,
+      originalTitle: origTitle || null,
+      year: resultYear
+    };
   };
   
   for (const name of names) {
     const result = await trySearch(name, year);
-    if (result) {
-      return {
-        genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
-        overview: result.overview || null,
-        poster: result.poster_path ? TMDB_IMG + result.poster_path : null
-      };
-    }
+    if (result) return extractData(result);
   }
   
   if (year) {
     for (const name of names) {
       const result = await trySearch(name, null);
-      if (result) {
-        return {
-          genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
-          overview: result.overview || null,
-          poster: result.poster_path ? TMDB_IMG + result.poster_path : null
-        };
-      }
+      if (result) return extractData(result);
     }
   }
   
-  return { genres: [], overview: null, poster: null };
+  return { genres: [], overview: null, poster: null, originalTitle: null, year: null };
 }
 
 async function fetchTmdbTags() {
@@ -229,8 +232,15 @@ async function fetchTmdbTags() {
   btn.classList.remove("success", "error");
   
   try {
-    const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
+    const { genres, overview, poster, originalTitle, year } = await fetchTmdbDataForItem(item.text);
     let updated = false;
+    
+    // Дополняем наименование оригинальным названием и годом если их нет
+    const textUpdates = buildTitleAdditions(item.text, originalTitle, year);
+    if (textUpdates) {
+      item.text = item.text + textUpdates;
+      updated = true;
+    }
     
     if (genres.length) {
       const existing = new Set(item.tags.map(normTag));
@@ -268,6 +278,31 @@ async function fetchTmdbTags() {
   }
 }
 
+// Формирует дополнение к названию (оригинальное название / год) если их нет
+function buildTitleAdditions(text, originalTitle, year) {
+  const hasYear = /\(\d{4}\)/.test(text);
+  const hasSlash = text.includes("/");
+  
+  let additions = "";
+  
+  // Добавляем оригинальное название если его нет (проверяем через /)
+  if (originalTitle && !hasSlash) {
+    // Проверяем что оригинальное название отличается от текущего (не кириллица)
+    const isLatin = /^[a-zA-Z]/.test(originalTitle);
+    const textIsLatin = /^[a-zA-Z]/.test(text.trim());
+    if (isLatin && !textIsLatin && originalTitle.toLowerCase() !== text.trim().toLowerCase()) {
+      additions += " / " + originalTitle;
+    }
+  }
+  
+  // Добавляем год если его нет
+  if (year && !hasYear) {
+    additions += ` (${year})`;
+  }
+  
+  return additions || null;
+}
+
 function updateTmdbBtnVisibility() {
   const btn = $("tmdbBtn");
   if (btn) btn.style.display = TMDB_KEY ? "grid" : "none";
@@ -278,7 +313,8 @@ function cycleTmdbMode() {
     alert("TMDB API Key не задан. Добавьте его в настройках подключения.");
     return;
   }
-  tmdbMode = tmdbMode === "new" ? "all" : tmdbMode === "all" ? "off" : "new";
+  // Порядок: new → all → clear → off → new
+  tmdbMode = tmdbMode === "new" ? "all" : tmdbMode === "all" ? "clear" : tmdbMode === "clear" ? "off" : "new";
   localStorage.setItem("tmdb_mode", tmdbMode);
   updateTmdbModeBtn();
 }
@@ -286,7 +322,7 @@ function cycleTmdbMode() {
 function updateTmdbModeBtn() {
   const btn = $("tmdbModeBtn");
   if (!btn) return;
-  btn.classList.remove("mode-off", "mode-new", "mode-all");
+  btn.classList.remove("mode-off", "mode-new", "mode-all", "mode-clear");
   if (!TMDB_KEY) {
     btn.style.display = "none";
     return;
@@ -294,6 +330,7 @@ function updateTmdbModeBtn() {
   btn.style.display = "grid";
   if (tmdbMode === "new") btn.classList.add("mode-new");
   else if (tmdbMode === "all") btn.classList.add("mode-all");
+  else if (tmdbMode === "clear") btn.classList.add("mode-clear");
   else btn.classList.add("mode-off");
 }
 
@@ -952,8 +989,38 @@ async function saveEdit() {
     renderSectionList();
     render();
 
-    // Определяем позиции для автозагрузки TMDB
-    if (savedTmdbMode !== "off" && TMDB_KEY) {
+    // Режим "clear" — удаляем описание и постер для видимых позиций
+    if (savedTmdbMode === "clear") {
+      const editedSections = savedEditCtx.mode === "section" 
+        ? [savedEditCtx.secKey] 
+        : Object.keys(savedEditCtx.masks);
+      
+      let cleared = 0;
+      for (const secKey of editedSections) {
+        const items = data.sections[secKey]?.items || [];
+        const mask = savedEditCtx.mode === "section" ? savedEditCtx.mask : (savedEditCtx.masks[secKey] || []);
+        
+        items.forEach((item, idx) => {
+          const wasVisible = mask[idx] === true;
+          if (wasVisible && (item.desc || item.poster)) {
+            item.desc = null;
+            item.poster = null;
+            cleared++;
+          }
+        });
+        
+        if (cleared) data.sections[secKey].modified = new Date().toISOString();
+      }
+      
+      if (cleared) {
+        showProgress(`Удалено описаний: ${cleared}`, 80);
+        await saveData();
+        render();
+      }
+    }
+    
+    // Определяем позиции для автозагрузки TMDB (режимы new и all)
+    if ((savedTmdbMode === "new" || savedTmdbMode === "all") && TMDB_KEY) {
       const itemsToFetch = [];
       
       // Собираем ВСЕ новые позиции (для режимов new и all)
@@ -1010,8 +1077,15 @@ async function saveEdit() {
           showProgress(`Загрузка ${i + 1}/${total}...`, percent);
           
           try {
-            const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
+            const { genres, overview, poster, originalTitle, year } = await fetchTmdbDataForItem(item.text);
             let updated = false;
+            
+            // Дополняем наименование оригинальным названием и годом
+            const textUpdates = buildTitleAdditions(item.text, originalTitle, year);
+            if (textUpdates) {
+              item.text = item.text + textUpdates;
+              updated = true;
+            }
             
             if (genres.length) {
               const existing = new Set(item.tags.map(normTag));

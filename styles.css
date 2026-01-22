@@ -575,6 +575,10 @@ header{
   color:white;
   background:var(--blue);
 }
+.btn-tmdb-mode.mode-clear{
+  color:white;
+  background:var(--red);
+}
 
 
 
@@ -896,7 +900,9 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  padding:12px 0 8px;
+  margin-left:-36px;
+  padding:12px 0 40px;
+  padding-left:36px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -923,11 +929,11 @@ header{
   margin-bottom:10px;
 }
 
-/* Description delete button — bottom right corner */
+/* Description delete button — bottom right corner, outside content flow */
 .desc-del-btn{
   position:absolute;
-  right:8px;
-  bottom:8px;
+  right:0;
+  bottom:0;
   width:30px;
   height:30px;
   border-radius:10px;
