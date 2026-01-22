@@ -306,10 +306,6 @@ header{
 
 .item-line{
   position:relative;
-  display:flex;
-  align-items:center;
-  gap:8px;
-
   padding:6px 8px;
   margin:0 -8px 8px;
   border-radius:var(--r10);
@@ -322,6 +318,14 @@ header{
   -webkit-user-select:text;
 }
 .item-line:last-child{ margin-bottom:0; }
+
+/* Top row inside item (keeps buttons spacing stable; desc block is separate row) */
+.item-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
 
 .item-line:hover{ background:var(--panel2); }
 
@@ -359,17 +363,15 @@ header{
   pointer-events:auto;
 }
 
-/* Сдвиг контента при выделении, чтобы освободить место под кнопку удаления */
-.item-line.selected .item-section-tag,
-.item-line.selected .item-main{
-  margin-left:36px;
+/* Keep delete button above expanded description */
+.item-line.expanded{ padding-bottom:0; }
+
+/* Сдвиг только верхней строки (row), чтобы освободить место под кнопку удаления */
+.item-line.selected .item-row{
+  padding-left:36px;
 }
 
-/* Описание не должно сдвигаться — компенсируем через отрицательный margin */
-.item-line.selected .item-desc-block{
-  margin-left:-36px;
-  width:calc(100% + 36px);
-}
+/* Описание не сдвигаем вообще */
 .item-del:hover{
   color:var(--text);
   background:#0b0f15;
@@ -399,6 +401,8 @@ header{
   -webkit-user-select:none;
 }
 
+.item-row .item-section-tag{ flex:0 0 auto; }
+
 /* name + tags wrapper */
 .item-main{
   flex:1;
@@ -408,6 +412,8 @@ header{
   align-items:center;
   gap:8px;
 }
+
+.item-row .item-main{ flex:1 1 auto; }
 
 .item-text{
   min-width:0;
