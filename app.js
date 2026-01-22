@@ -475,7 +475,13 @@ function renderTagFilterMenu() {
       for (const t of displayTags(it)) counts.set(t, (counts.get(t) || 0) + 1);
     }
   }
-  const tags = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ru"));
+  const tags = [...counts.keys()].sort((a, b) => {
+    const aC = isCountryTag(a), bC = isCountryTag(b);
+    if (aC !== bC) return aC ? 1 : -1; // страны внизу
+    const aN = isCountryTag(a) ? countryDisplayName(a) : a;
+    const bN = isCountryTag(b) ? countryDisplayName(b) : b;
+    return aN.localeCompare(bN, "ru");
+  });
   if (!tags.length) { list.innerHTML = `<div class="tag-empty">Тегов нет</div>`; hint.textContent = ""; return; }
 
   list.innerHTML = tags.map(t => {
@@ -534,14 +540,23 @@ function getEditorItem() {
 function renderTagEditorList() {
   const list = $("tagEditorList"), item = getEditorItem();
   if (!item) { list.innerHTML = ""; return; }
-  const tags = displayTags(item).sort((a, b) => a.localeCompare(b, "ru"));
+  const tags = displayTags(item).sort((a, b) => {
+    const aC = isCountryTag(a), bC = isCountryTag(b);
+    if (aC !== bC) return aC ? 1 : -1; // страны внизу
+    const aN = isCountryTag(a) ? countryDisplayName(a) : a;
+    const bN = isCountryTag(b) ? countryDisplayName(b) : b;
+    return aN.localeCompare(bN, "ru");
+  });
   if (!tags.length) { list.innerHTML = `<div class="tag-empty">Нет тегов</div>`; return; }
 
-  list.innerHTML = tags.map(t => `
+  list.innerHTML = tags.map(t => {
+    const displayName = isCountryTag(t) ? countryDisplayName(t) : t;
+    return `
     <div class="tag-pill">
-      <input type="text" class="tag-pill-text" value="${esc(t)}" data-tag="${esc(t)}" />
+      <input type="text" class="tag-pill-text" value="${esc(displayName)}" data-tag="${esc(t)}" />
       <button class="mini-btn danger" data-rm="${esc(t)}">×</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   list.querySelectorAll(".tag-pill-text").forEach(inp => {
     inp.onblur = () => renameTag(inp);
@@ -554,6 +569,8 @@ function renderTagEditorList() {
 
 function renameTag(inp) {
   const oldT = normTag(inp.dataset.tag), newT = normTag(inp.value);
+  // При отображении стран используем русское имя, но храним код. Редактирование страны запрещаем.
+  if (isCountryTag(oldT)) { inp.value = countryDisplayName(oldT); return; }
   if (!oldT || !newT || oldT === newT || oldT === VIEWED_TAG || newT === VIEWED_TAG) { inp.value = oldT; return; }
   const item = getEditorItem();
   if (!item || !tagEditorCtx) return;
@@ -1216,11 +1233,11 @@ function render() {
     const isExpanded = expandedDescKey === key;
     const secTag = currentSection === "__all__" ? `<span class="item-section-tag">${esc(x.secKey)}</span>` : "";
     const rawTags = displayTags(x.item);
-    // Разделяем на страны и обычные теги, страны первыми
-    const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
+    // Разделяем на обычные теги и страны; страны отображаем последними
     const otherTags = rawTags.filter(t => !isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
+    const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
     const tagsHtml = (countryTags.length || otherTags.length) 
-      ? `<span class="item-tags">${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` 
+      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}</span>` 
       : "";
 
     const descBtn = hasDesc

@@ -339,7 +339,7 @@ header{
 /* Кнопка удаления позиции (слева) — абсолютная, не влияет на layout */
 .item-del{
   position:absolute;
-  left:8px;
+  left:6px;
   top:6px;
 
   width:30px;
@@ -925,7 +925,7 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  padding:12px 0;
+  padding:12px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -943,7 +943,7 @@ header{
 .item-desc-content{
   flex:1;
   min-width:0;
-  padding-right:40px;
+  padding-right:52px;
 }
 
 .item-desc-text{
@@ -955,8 +955,8 @@ header{
 /* Description delete button — same position as viewed button */
 .desc-del-btn{
   position:absolute;
-  right:0;
-  bottom:0;
+  right:12px;
+  bottom:12px;
   width:30px;
   height:30px;
   border-radius:10px;
