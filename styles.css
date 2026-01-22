@@ -331,11 +331,11 @@ header{
   padding-left:44px;
 }
 
-/* Кнопка удаления позиции (слева) */
+/* Кнопка удаления позиции (слева) — остаётся на уровне наименования */
 .item-del{
   position:absolute;
   left:8px;
-  top:50%;
+  top:18px;
   transform:translateY(-50%);
 
   width:30px;
@@ -881,9 +881,9 @@ header{
   border-color:var(--border);
 }
 
-/* Description button highlighted when expanded */
+/* Description button highlighted when expanded — same style as tag button hover */
 .item-line.selected .desc-action.has-desc.open{
-  color:var(--blue);
+  color:var(--text);
   background:#0b0f15;
   border-color:var(--border);
 }
@@ -893,9 +893,10 @@ header{
   flex-wrap:wrap;
 }
 .item-desc-block{
+  position:relative;
   width:100%;
   margin-top:12px;
-  padding-top:12px;
+  padding:12px 0 8px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -922,9 +923,27 @@ header{
   margin-bottom:10px;
 }
 
-.item-desc-actions{
-  display:flex;
-  gap:8px;
+/* Description delete button — bottom right corner */
+.desc-del-btn{
+  position:absolute;
+  right:8px;
+  bottom:8px;
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  -webkit-tap-highlight-color:var(--tap);
+  transition:color .12s, background .12s, border-color .12s;
+}
+.desc-del-btn:hover{
+  color:var(--red);
+  background:#1a0f12;
+  border-color:#3d1f22;
 }
 
 /* Mobile: poster on top */

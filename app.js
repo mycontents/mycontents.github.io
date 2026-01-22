@@ -1117,12 +1117,10 @@ function render() {
           ${posterHtml}
           <div class="item-desc-content">
             <div class="item-desc-text">${esc(x.item.desc)}</div>
-            <div class="item-desc-actions">
-              <button class="mini-btn danger" data-action="clear-desc" title="Удалить описание">
-                <svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-trash"></use></svg>
-              </button>
-            </div>
           </div>
+          <button class="desc-del-btn" data-action="clear-desc" title="Удалить описание">
+            <svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-trash"></use></svg>
+          </button>
         </div>`;
     }
 
