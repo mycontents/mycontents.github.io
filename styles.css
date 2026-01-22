@@ -373,12 +373,6 @@ body.editing .scroll-slack{ display:none; }
   pointer-events:auto;
 }
 
-/* Keep delete button above expanded description */
-.item-line.expanded{
-  margin-top:12px;      /* double spacing above (12 base + 12) */
-  margin-bottom:24px;   /* double spacing below (was 12) */
-}
-.item-line.expanded:last-child{ margin-bottom:0; }
 
 /* Сдвиг только верхней строки (row), чтобы освободить место под кнопку удаления */
 /* left gap = 6px (как у .item-del от левого края) */
@@ -412,8 +406,8 @@ body.editing .scroll-slack{ display:none; }
   align-items:center;
   gap:6px;
 
-  /* Align to top like the delete cross (top padding of .item-row) */
-  align-self:flex-start;
+  /* Center-align with the first row text (same baseline center as other row content) */
+  align-self:center;
 
   user-select:none;
   -webkit-user-select:none;
