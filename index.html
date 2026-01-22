@@ -16,33 +16,37 @@
   <div class="container" id="container">
     <header>
       <div class="header-row">
-        <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
-          <span id="currentSectionName">Все</span>
-          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
-        </button>
+        <!-- Left group: section + viewed toggle -->
+        <div class="header-left">
+          <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
+            <span id="currentSectionName">Все</span>
+            <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
+          </button>
 
-        <!-- toggle only for "Все": include/exclude viewed sections -->
-        <button class="all-toggle hidden" id="viewedToggleBtn" onclick="toggleShowViewed()" title="Показывать/скрывать просмотренное">
-          <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="icons.svg#i-eye-off"></use></svg>
-        </button>
-
-        <button class="icon-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu()" title="Фильтр по тегам">
-          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-tag"></use></svg>
-        </button>
-
-        <!-- Mobile: search toggle button -->
-        <button class="search-toggle-btn" id="searchToggleBtn" onclick="toggleMobileSearch()" title="Поиск">
-          <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-search"></use></svg>
-        </button>
-
-        <div class="filter-wrap" id="filterWrap" title="Фильтр">
-          <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
-          <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
-            <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+          <!-- Viewed filter: 3 states (hide / show / only) -->
+          <button class="view-toggle" id="viewedToggleBtn" onclick="cycleViewedFilter()" title="Фильтр просмотренного">
+            <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="icons.svg#i-eye-off"></use></svg>
           </button>
         </div>
 
-        <div class="header-buttons">
+        <!-- Right group: all other controls -->
+        <div class="header-right">
+          <button class="icon-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu()" title="Фильтр по тегам">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-tag"></use></svg>
+          </button>
+
+          <!-- Mobile: search toggle button -->
+          <button class="search-toggle-btn" id="searchToggleBtn" onclick="toggleMobileSearch()" title="Поиск">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-search"></use></svg>
+          </button>
+
+          <div class="filter-wrap" id="filterWrap" title="Фильтр">
+            <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
+            <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
+              <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+            </button>
+          </div>
+
           <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-sort"></use></svg>
           </button>
@@ -68,7 +72,7 @@
       <div class="content-list" id="viewMode"></div>
 
       <div class="hidden" id="editMode">
-        <div class="edit-hint hidden" id="editHint">[Раздел] Текст (для просмотренного: [~Раздел] Текст)</div>
+        <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
         <textarea class="content-edit" id="editor" placeholder="..."></textarea>
         <div class="edit-panel">
           <button class="btn-cancel" onclick="cancelEdit()" title="Отмена">

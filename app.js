@@ -1,16 +1,15 @@
 // Contents app (GitHub Pages + Gist)
-// CSS -> styles.css, icons -> icons.svg
+// Viewed status stored as special tag "__viewed__"
 
-// ===== CONFIG =====
 const ICONS = "icons.svg";
-const VIEWED_KEY_PREFIX = "__viewed__:";
+const VIEWED_TAG = "__viewed__";
 
 const SECTION_UNDO_MS = 10000;
 const ITEM_UNDO_MS = 10000;
-const MOVE_UNDO_MS = 10000;
 const TAG_UNDO_MS = 10000;
 
 const TAG_FILTER_LS_KEY = "tag_filter";
+const VIEWED_FILTER_LS_KEY = "viewed_filter";
 
 let GIST_ID = localStorage.getItem("gist_id") || "";
 let TOKEN = localStorage.getItem("github_token") || "";
@@ -20,7 +19,8 @@ let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "ma
 
 let filterQuery = localStorage.getItem("filter_query") || "";
 
-let showViewedInAll = (localStorage.getItem("show_viewed_all") ?? "0") === "1";
+// Viewed filter: "hide" | "show" | "only"
+let viewedFilter = localStorage.getItem(VIEWED_FILTER_LS_KEY) || "hide";
 
 let data = { sections: {} };
 let isEditing = false;
@@ -28,7 +28,6 @@ let isEditing = false;
 const defaultSections = ["Фильмы", "Сериалы", "Аниме"];
 
 let selectedKey = null;
-
 let pointer = { down: false, startX: 0, startY: 0, moved: false, startedAt: 0 };
 
 let deleteArmSection = null;
@@ -138,6 +137,17 @@ function normalizeDataModel() {
   if (!data || typeof data !== "object") data = { sections: {} };
   if (!data.sections || typeof data.sections !== "object") data.sections = {};
 
+  // Remove old __viewed__:* sections if any (migrate to tag)
+  const keysToDelete = [];
+  for (const sectionKey of Object.keys(data.sections)) {
+    if (sectionKey.startsWith("__viewed__:")) {
+      keysToDelete.push(sectionKey);
+    }
+  }
+  for (const key of keysToDelete) {
+    delete data.sections[key];
+  }
+
   for (const sectionKey of Object.keys(data.sections)) {
     let sec = data.sections[sectionKey];
     if (!sec || typeof sec !== "object") sec = { items: [], modified: new Date().toISOString() };
@@ -150,36 +160,28 @@ function normalizeDataModel() {
   }
 }
 
-// ===== Viewed helpers =====
-function isViewedSection(name) {
-  return typeof name === "string" && name.startsWith(VIEWED_KEY_PREFIX);
+// ===== Viewed helpers (now tag-based) =====
+function isItemViewed(item) {
+  if (!item || !Array.isArray(item.tags)) return false;
+  return item.tags.some(t => normalizeTag(t) === VIEWED_TAG);
 }
 
-function baseSectionName(name) {
-  if (typeof name !== "string") return "";
-  if (name.startsWith(VIEWED_KEY_PREFIX)) return name.slice(VIEWED_KEY_PREFIX.length);
-  return name;
+function setItemViewed(item, viewed) {
+  if (!item) return;
+  item.tags = uniqueNormalizedTags(item.tags || []);
+  const hasViewed = item.tags.includes(VIEWED_TAG);
+
+  if (viewed && !hasViewed) {
+    item.tags.unshift(VIEWED_TAG);
+  } else if (!viewed && hasViewed) {
+    item.tags = item.tags.filter(t => t !== VIEWED_TAG);
+  }
 }
 
-function viewedSectionKeyFor(sourceSectionName) {
-  return VIEWED_KEY_PREFIX + baseSectionName(sourceSectionName);
-}
-
-function editorLabelForSectionKey(sectionKey) {
-  return isViewedSection(sectionKey) ? `~${baseSectionName(sectionKey)}` : baseSectionName(sectionKey);
-}
-
-function sectionKeyFromEditorLabel(label) {
-  const t = String(label || "").trim();
-  if (t.startsWith(VIEWED_KEY_PREFIX)) return t;
-  if (t.startsWith("~")) return VIEWED_KEY_PREFIX + t.slice(1).trim();
-  return t;
-}
-
-function labelHTMLForSection(sectionKey) {
-  const base = escapeHtml(baseSectionName(sectionKey));
-  if (!isViewedSection(sectionKey)) return `<span class="sec-label">${base}</span>`;
-  return `<span class="sec-label"><svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>${base}</span>`;
+function getDisplayTags(item) {
+  // Return tags excluding __viewed__ for display in tag chips
+  if (!item || !Array.isArray(item.tags)) return [];
+  return item.tags.filter(t => normalizeTag(t) !== VIEWED_TAG);
 }
 
 // ===== Mobile search toggle =====
@@ -200,7 +202,6 @@ function toggleMobileSearch() {
 
 // ===== Filter (text) =====
 function setupFilterUI() {
-  // Desktop filter
   const input = document.getElementById("filterInput");
   const clear = document.getElementById("filterClear");
 
@@ -215,7 +216,6 @@ function setupFilterUI() {
     }
   };
 
-  // Mobile filter
   const mobileInput = document.getElementById("mobileFilterInput");
   const mobileClear = document.getElementById("mobileFilterClear");
 
@@ -238,7 +238,6 @@ function handleFilterInput(value) {
   filterQuery = value || "";
   localStorage.setItem("filter_query", filterQuery);
 
-  // Sync both inputs
   document.getElementById("filterInput").value = filterQuery;
   document.getElementById("filterClear").classList.toggle("hidden", !filterQuery);
 
@@ -299,14 +298,15 @@ function loadTagFilter() {
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.map(normalizeTag).filter(Boolean));
+    return new Set(arr.map(normalizeTag).filter(t => t && t !== VIEWED_TAG));
   } catch {
     return new Set();
   }
 }
 
 function saveTagFilter() {
-  localStorage.setItem(TAG_FILTER_LS_KEY, JSON.stringify([...tagFilter]));
+  const arr = [...tagFilter].filter(t => t !== VIEWED_TAG);
+  localStorage.setItem(TAG_FILTER_LS_KEY, JSON.stringify(arr));
 }
 
 function updateTagFilterBtnUI() {
@@ -329,7 +329,7 @@ function toggleTagFilterMenu() {
   }
 
   renderTagFilterMenu();
-  openMenu("tagFilterMenu", btn, "left");
+  openMenu("tagFilterMenu", btn, "right");
 }
 
 function getScopeItems() {
@@ -337,7 +337,6 @@ function getScopeItems() {
 
   if (currentSection === "__all__") {
     for (const sectionKey of Object.keys(data.sections)) {
-      if (!shouldIncludeSectionInAll(sectionKey)) continue;
       const sec = data.sections[sectionKey];
       const arr = sec?.items || [];
       for (let i = 0; i < arr.length; i++) {
@@ -362,7 +361,7 @@ function getScopeItems() {
 function buildTagCounts() {
   const counts = new Map();
   for (const { item } of getScopeItems()) {
-    const tags = uniqueNormalizedTags(item.tags);
+    const tags = getDisplayTags(item); // Exclude __viewed__
     for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
   }
   return counts;
@@ -398,7 +397,6 @@ function renderTagFilterMenu() {
     })
     .join("");
 
-  // Attach click handlers via event delegation (menu stays open)
   list.querySelectorAll(".tag-option").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -413,7 +411,7 @@ function renderTagFilterMenu() {
 function toggleTagFilterInternal(tag) {
   if (isEditing) return;
   const t = normalizeTag(tag);
-  if (!t) return;
+  if (!t || t === VIEWED_TAG) return;
 
   if (tagFilter.has(t)) tagFilter.delete(t);
   else tagFilter.add(t);
@@ -424,7 +422,6 @@ function toggleTagFilterInternal(tag) {
   disarmItemDelete();
   closeTagEditor();
 
-  // Re-render menu without closing
   renderTagFilterMenu();
   render();
 }
@@ -498,7 +495,8 @@ function renderTagEditorList() {
     return;
   }
 
-  const tags = uniqueNormalizedTags(item.tags).sort((a, b) => a.localeCompare(b, "ru"));
+  // Exclude __viewed__ from editor
+  const tags = getDisplayTags(item).sort((a, b) => a.localeCompare(b, "ru"));
   if (!tags.length) {
     list.innerHTML = `<div class="tag-empty">Нет тегов</div>`;
     return;
@@ -515,7 +513,6 @@ function renderTagEditorList() {
     })
     .join("");
 
-  // Attach handlers
   list.querySelectorAll(".tag-pill-text").forEach((input) => {
     input.addEventListener("blur", () => handleTagRename(input));
     input.addEventListener("keydown", (e) => {
@@ -542,7 +539,7 @@ function handleTagRename(input) {
   const oldTag = normalizeTag(input.dataset.tag);
   const newTag = normalizeTag(input.value);
 
-  if (!oldTag || !newTag || oldTag === newTag) {
+  if (!oldTag || !newTag || oldTag === newTag || oldTag === VIEWED_TAG || newTag === VIEWED_TAG) {
     input.value = oldTag;
     return;
   }
@@ -554,7 +551,6 @@ function handleTagRename(input) {
   const idx = tags.indexOf(oldTag);
   if (idx === -1) return;
 
-  // Check duplicate
   if (tags.includes(newTag)) {
     tags.splice(idx, 1);
   } else {
@@ -586,7 +582,7 @@ function addTagFromInput() {
   const input = document.getElementById("tagAddInput");
   if (!input) return;
   const t = normalizeTag(input.value);
-  if (!t) return;
+  if (!t || t === VIEWED_TAG) return;
   input.value = "";
   addTagToCurrentItem(t);
 }
@@ -596,7 +592,7 @@ function addTagToCurrentItem(tag) {
   if (!item || !tagEditorCtx) return;
 
   const t = normalizeTag(tag);
-  if (!t) return;
+  if (!t || t === VIEWED_TAG) return;
 
   item.tags = uniqueNormalizedTags([...(item.tags || []), t]);
 
@@ -615,7 +611,7 @@ function removeTagFromCurrentItemWithUndo(tag) {
   if (!item || !tagEditorCtx) return;
 
   const t = normalizeTag(tag);
-  if (!t) return;
+  if (!t || t === VIEWED_TAG) return;
 
   const oldTags = [...item.tags];
   item.tags = uniqueNormalizedTags((item.tags || []).filter((x) => normalizeTag(x) !== t));
@@ -650,8 +646,10 @@ function clearTagsForCurrentItem() {
   const item = getCurrentTagEditorItem();
   if (!item || !tagEditorCtx) return;
 
+  // Keep __viewed__ tag, clear only user tags
+  const wasViewed = isItemViewed(item);
   const oldTags = [...item.tags];
-  item.tags = [];
+  item.tags = wasViewed ? [VIEWED_TAG] : [];
 
   const { sectionKey, index } = tagEditorCtx;
   data.sections[sectionKey].items[index] = item;
@@ -662,7 +660,7 @@ function clearTagsForCurrentItem() {
   renderTagEditorList();
   renderTagFilterMenu();
 
-  if (oldTags.length) {
+  if (oldTags.filter(t => t !== VIEWED_TAG).length) {
     startUndo(
       {
         type: "tagClear",
@@ -676,20 +674,32 @@ function clearTagsForCurrentItem() {
   }
 }
 
-// ===== Viewed toggle =====
+// ===== Viewed toggle (3 states: hide / show / only) =====
 function updateViewedToggleUI() {
   const btn = document.getElementById("viewedToggleBtn");
   const use = document.getElementById("viewedToggleUse");
 
-  btn.classList.toggle("hidden", currentSection !== "__all__");
-  btn.classList.toggle("on", showViewedInAll);
-  use.setAttribute("href", showViewedInAll ? `${ICONS}#i-eye` : `${ICONS}#i-eye-off`);
+  btn.classList.remove("state-show", "state-only");
+
+  if (viewedFilter === "hide") {
+    use.setAttribute("href", `${ICONS}#i-eye-off`);
+  } else if (viewedFilter === "show") {
+    btn.classList.add("state-show");
+    use.setAttribute("href", `${ICONS}#i-eye`);
+  } else if (viewedFilter === "only") {
+    btn.classList.add("state-only");
+    use.setAttribute("href", `${ICONS}#i-eye`);
+  }
 }
 
-function toggleShowViewed() {
+function cycleViewedFilter() {
   if (isEditing) return;
-  showViewedInAll = !showViewedInAll;
-  localStorage.setItem("show_viewed_all", showViewedInAll ? "1" : "0");
+
+  if (viewedFilter === "hide") viewedFilter = "show";
+  else if (viewedFilter === "show") viewedFilter = "only";
+  else viewedFilter = "hide";
+
+  localStorage.setItem(VIEWED_FILTER_LS_KEY, viewedFilter);
   selectedKey = null;
   disarmItemDelete();
   closeTagEditor();
@@ -810,7 +820,7 @@ function renderSectionList() {
       return `
         <div class="menu-option ${currentSection === sectionKey ? "active" : ""} ${armed ? "armed" : ""}"
              onclick="selectSection('${escapeQuotes(sectionKey)}')">
-          <span>${labelHTMLForSection(sectionKey)}</span>
+          <span>${escapeHtml(sectionKey)}</span>
 
           <span class="menu-actions" onclick="event.stopPropagation()">
             <button class="mini-btn danger" title="Удалить" onclick="handleSectionDelete('${escapeQuotes(sectionKey)}')">×</button>
@@ -829,7 +839,6 @@ function selectSection(sectionKey) {
   closeTagEditor();
   disarmSectionDelete();
   updateSectionButton();
-  updateViewedToggleUI();
   document.getElementById("sectionMenu").classList.add("hidden");
   document.getElementById("settingsPanel").classList.add("hidden");
   render();
@@ -837,11 +846,7 @@ function selectSection(sectionKey) {
 
 function updateSectionButton() {
   const el = document.getElementById("currentSectionName");
-  if (currentSection === "__all__") {
-    el.textContent = "Все";
-    return;
-  }
-  el.innerHTML = labelHTMLForSection(currentSection);
+  el.textContent = currentSection === "__all__" ? "Все" : currentSection;
 }
 
 function showNewSectionInput() {
@@ -885,7 +890,6 @@ function handleSectionDelete(sectionKey) {
       currentSection = "__all__";
       localStorage.setItem("current_section", "__all__");
       updateSectionButton();
-      updateViewedToggleUI();
     }
 
     selectedKey = null;
@@ -897,7 +901,7 @@ function handleSectionDelete(sectionKey) {
     renderSectionList();
     render();
 
-    startUndo(payload, SECTION_UNDO_MS, `Раздел удалён: ${baseSectionName(sectionKey)}`);
+    startUndo(payload, SECTION_UNDO_MS, `Раздел удалён: ${sectionKey}`);
     return;
   }
 
@@ -1072,11 +1076,6 @@ function hideUndo() {
   document.getElementById("undoBar").classList.add("hidden");
 }
 
-function findItemIndexByCreated(arr, created) {
-  if (!Array.isArray(arr) || !created) return -1;
-  return arr.findIndex((x) => isItemObject(x) && x.created === created);
-}
-
 document.getElementById("undoBtn").addEventListener("click", () => {
   if (!undoPayload) return;
 
@@ -1095,7 +1094,6 @@ document.getElementById("undoBtn").addEventListener("click", () => {
       currentSection = restoreKey;
       localStorage.setItem("current_section", restoreKey);
       updateSectionButton();
-      updateViewedToggleUI();
     }
 
     saveData();
@@ -1122,52 +1120,15 @@ document.getElementById("undoBtn").addEventListener("click", () => {
     render();
   }
 
-  if (undoPayload.type === "move") {
-    const { fromSectionKey, fromIndex, toSectionKey, toIndex, item } = undoPayload;
-
-    if (!data.sections[toSectionKey]) data.sections[toSectionKey] = { items: [], modified: new Date().toISOString() };
-    if (!data.sections[fromSectionKey]) data.sections[fromSectionKey] = { items: [], modified: new Date().toISOString() };
-
-    normalizeDataModel();
-
-    const toArr = data.sections[toSectionKey].items;
-    let removedIdx = -1;
-
-    if (Number.isFinite(toIndex) && toIndex >= 0 && toIndex < toArr.length) {
-      const candidate = toArr[toIndex];
-      if (isItemObject(candidate) && isItemObject(item) && candidate.created === item.created) {
-        removedIdx = toIndex;
-      }
+  if (undoPayload.type === "viewed") {
+    const { sectionKey, index, wasViewed } = undoPayload;
+    const item = data.sections?.[sectionKey]?.items?.[index];
+    if (item) {
+      setItemViewed(item, wasViewed);
+      data.sections[sectionKey].modified = new Date().toISOString();
+      saveData();
+      render();
     }
-
-    if (removedIdx === -1) {
-      removedIdx = findItemIndexByCreated(toArr, item?.created);
-    }
-
-    if (removedIdx === -1) {
-      const t = String(item?.text ?? "");
-      removedIdx = toArr.findIndex((x) => isItemObject(x) && x.text === t);
-    }
-
-    let movedItem = ensureItemObject(item);
-    if (removedIdx !== -1) {
-      movedItem = ensureItemObject(toArr.splice(removedIdx, 1)[0]);
-    }
-
-    data.sections[toSectionKey].modified = new Date().toISOString();
-
-    const fromArr = data.sections[fromSectionKey].items;
-    const idx = Math.max(0, Math.min(Number(fromIndex), fromArr.length));
-    fromArr.splice(idx, 0, movedItem);
-    data.sections[fromSectionKey].modified = new Date().toISOString();
-
-    selectedKey = null;
-    disarmItemDelete();
-    closeTagEditor();
-
-    saveData();
-    renderSectionList();
-    render();
   }
 
   if (undoPayload.type === "tag") {
@@ -1203,95 +1164,36 @@ document.getElementById("undoBtn").addEventListener("click", () => {
 });
 
 // ===== ITEM actions =====
-function moveItemToViewed(sectionKey, index) {
-  if (!data.sections[sectionKey]) return;
-  if (isViewedSection(sectionKey)) return;
+function toggleItemViewed(sectionKey, index) {
+  const sec = data.sections[sectionKey];
+  if (!sec) return;
 
-  normalizeDataModel();
-
-  const srcItems = data.sections[sectionKey].items || [];
   const idx = Number(index);
-  if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
+  if (!Number.isFinite(idx) || idx < 0 || idx >= sec.items.length) return;
 
-  const item = ensureItemObject(srcItems[idx]);
-  const payloadItem = JSON.parse(JSON.stringify(item));
+  const item = ensureItemObject(sec.items[idx]);
+  sec.items[idx] = item;
 
-  srcItems.splice(idx, 1);
-  data.sections[sectionKey].modified = new Date().toISOString();
-
-  const destKey = viewedSectionKeyFor(sectionKey);
-  if (!data.sections[destKey]) data.sections[destKey] = { items: [], modified: new Date().toISOString() };
-  normalizeDataModel();
-
-  const toIndex = data.sections[destKey].items.length;
-  data.sections[destKey].items.push(item);
-  data.sections[destKey].modified = new Date().toISOString();
+  const wasViewed = isItemViewed(item);
+  setItemViewed(item, !wasViewed);
+  sec.modified = new Date().toISOString();
 
   selectedKey = null;
   disarmItemDelete();
   closeTagEditor();
 
   saveData();
-  renderSectionList();
   render();
 
   startUndo(
     {
-      type: "move",
-      fromSectionKey: sectionKey,
-      fromIndex: idx,
-      toSectionKey: destKey,
-      toIndex,
-      item: payloadItem,
+      type: "viewed",
+      sectionKey,
+      index: idx,
+      wasViewed,
     },
-    MOVE_UNDO_MS,
-    "Перемещено в просмотренное"
-  );
-}
-
-function returnItemFromViewed(viewedSectionKey, index) {
-  if (!data.sections[viewedSectionKey]) return;
-  if (!isViewedSection(viewedSectionKey)) return;
-
-  normalizeDataModel();
-
-  const srcItems = data.sections[viewedSectionKey].items || [];
-  const idx = Number(index);
-  if (!Number.isFinite(idx) || idx < 0 || idx >= srcItems.length) return;
-
-  const item = ensureItemObject(srcItems[idx]);
-  const payloadItem = JSON.parse(JSON.stringify(item));
-
-  srcItems.splice(idx, 1);
-  data.sections[viewedSectionKey].modified = new Date().toISOString();
-
-  const baseKey = baseSectionName(viewedSectionKey);
-  if (!data.sections[baseKey]) data.sections[baseKey] = { items: [], modified: new Date().toISOString() };
-  normalizeDataModel();
-
-  const toIndex = data.sections[baseKey].items.length;
-  data.sections[baseKey].items.push(item);
-  data.sections[baseKey].modified = new Date().toISOString();
-
-  selectedKey = null;
-  disarmItemDelete();
-  closeTagEditor();
-
-  saveData();
-  renderSectionList();
-  render();
-
-  startUndo(
-    {
-      type: "move",
-      fromSectionKey: viewedSectionKey,
-      fromIndex: idx,
-      toSectionKey: baseKey,
-      toIndex,
-      item: payloadItem,
-    },
-    MOVE_UNDO_MS,
-    "Возвращено из просмотренного"
+    TAG_UNDO_MS,
+    wasViewed ? "Снято: просмотрено" : "Отмечено просмотренным"
   );
 }
 
@@ -1357,8 +1259,15 @@ function matchesTextFilter(item, filterLower) {
 
 function matchesTagFilter(item, tagSet) {
   if (!tagSet || tagSet.size === 0) return true;
-  const tags = uniqueNormalizedTags(item?.tags);
+  const tags = getDisplayTags(item);
   return tags.some((t) => tagSet.has(t));
+}
+
+function matchesViewedFilter(item) {
+  const viewed = isItemViewed(item);
+  if (viewedFilter === "hide") return !viewed;
+  if (viewedFilter === "only") return viewed;
+  return true; // "show"
 }
 
 function startEdit() {
@@ -1383,27 +1292,25 @@ function startEdit() {
     const lines = [];
 
     for (const sectionKey of Object.keys(data.sections)) {
-      if (!showViewedInAll && isViewedSection(sectionKey)) continue;
-
       const sec = data.sections[sectionKey];
       const items = sec?.items || [];
 
       const mask = items.map((it, i) => {
         const item = ensureItemObject(it);
         sec.items[i] = item;
-        return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet);
+        return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet) && matchesViewedFilter(item);
       });
 
       if (mask.some(Boolean)) masksBySection[sectionKey] = mask;
 
       for (let i = 0; i < items.length; i++) {
-        if (mask[i]) lines.push(`[${editorLabelForSectionKey(sectionKey)}] ${getItemText(sec.items[i])}`);
+        if (mask[i]) lines.push(`[${sectionKey}] ${getItemText(sec.items[i])}`);
       }
     }
 
     editor.value = lines.join("\n");
     hint.classList.remove("hidden");
-    editCtx = { mode: "all", filterLower, showViewedInAll, tagFilterArr: [...tagSet], masksBySection };
+    editCtx = { mode: "all", filterLower, viewedFilter, tagFilterArr: [...tagSet], masksBySection };
   } else {
     const sectionKey = currentSection;
     const sec = data.sections[sectionKey];
@@ -1412,14 +1319,14 @@ function startEdit() {
     const mask = orig.map((it, i) => {
       const item = ensureItemObject(it);
       sec.items[i] = item;
-      return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet);
+      return matchesTextFilter(item, filterLower) && matchesTagFilter(item, tagSet) && matchesViewedFilter(item);
     });
 
     const lines = sec.items.filter((_, i) => mask[i]).map((x) => x.text);
 
     editor.value = lines.join("\n");
     hint.classList.add("hidden");
-    editCtx = { mode: "section", sectionKey, filterLower, tagFilterArr: [...tagSet], mask };
+    editCtx = { mode: "section", sectionKey, filterLower, viewedFilter, tagFilterArr: [...tagSet], mask };
   }
 
   document.getElementById("viewMode").classList.add("hidden");
@@ -1470,8 +1377,7 @@ function parseAllEditorLines(lines) {
   for (const line of lines) {
     const m = line.match(/^\[([^\]]+)\]\s*(.*)$/);
     if (m) {
-      const label = m[1].trim();
-      const sectionKey = sectionKeyFromEditorLabel(label);
+      const sectionKey = m[1].trim();
       const item = (m[2] || "").trim();
 
       if (!sectionKey) continue;
@@ -1532,24 +1438,22 @@ async function saveEdit() {
 }
 
 // ===== RENDER =====
-function shouldIncludeSectionInAll(sectionKey) {
-  if (currentSection !== "__all__") return true;
-  if (showViewedInAll) return true;
-  return !isViewedSection(sectionKey);
-}
-
 function applyTextFilter(items) {
   const q = (filterQuery || "").trim().toLowerCase();
   if (!q) return items;
   return items.filter((it) => String(it.text || "").toLowerCase().includes(q));
 }
 
-function applyTagFilter(items) {
+function applyTagFilterToItems(items) {
   if (!tagFilter || tagFilter.size === 0) return items;
   return items.filter((it) => {
-    const tags = uniqueNormalizedTags(it.item?.tags);
+    const tags = getDisplayTags(it.item);
     return tags.some((t) => tagFilter.has(t));
   });
+}
+
+function applyViewedFilterToItems(items) {
+  return items.filter((it) => matchesViewedFilter(it.item));
 }
 
 function buildItemsForView() {
@@ -1558,7 +1462,6 @@ function buildItemsForView() {
   let items = [];
   if (currentSection === "__all__") {
     for (const sectionKey of Object.keys(data.sections)) {
-      if (!shouldIncludeSectionInAll(sectionKey)) continue;
       const sec = data.sections[sectionKey];
       const arr = sec?.items || [];
       for (let i = 0; i < arr.length; i++) {
@@ -1578,7 +1481,8 @@ function buildItemsForView() {
   }
 
   items = applyTextFilter(items);
-  items = applyTagFilter(items);
+  items = applyTagFilterToItems(items);
+  items = applyViewedFilterToItems(items);
   items = getSortedItems(items);
   return items;
 }
@@ -1606,29 +1510,27 @@ function render() {
     .map((it) => {
       const key = `${it.sectionKey}|${it.index}`;
       const selected = selectedKey === key;
+      const viewed = isItemViewed(it.item);
 
       const showSecTag = currentSection === "__all__";
-      const viewed = isViewedSection(it.sectionKey);
-
       const secTag = showSecTag
-        ? `<span class="item-section-tag">
-             ${viewed ? `<svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>` : ``}
-             ${escapeHtml(baseSectionName(it.sectionKey))}
-           </span>`
+        ? `<span class="item-section-tag">${escapeHtml(it.sectionKey)}</span>`
         : "";
 
-      const tags = uniqueNormalizedTags(it.item?.tags).sort((a, b) => a.localeCompare(b, "ru"));
+      // Viewed tag (special display)
+      const viewedTagHtml = viewed
+        ? `<span class="tag-viewed"><svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg></span>`
+        : "";
+
+      // Regular tags (excluding __viewed__)
+      const tags = getDisplayTags(it.item).sort((a, b) => a.localeCompare(b, "ru"));
       const tagsHtml = tags.length
         ? `<span class="item-tags">${tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</span>`
         : "";
 
-      const rightAction = viewed
-        ? `<button class="right-action" data-action="back" title="Вернуть из просмотренного">
-             <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-undo"></use></svg>
-           </button>`
-        : `<button class="right-action" data-action="mark" title="Переместить в просмотренное">
-             <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>
-           </button>`;
+      const rightAction = `<button class="right-action" data-action="toggle-viewed" title="${viewed ? "Снять отметку" : "Отметить просмотренным"}">
+           <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#${viewed ? "i-eye-off" : "i-eye"}"></use></svg>
+         </button>`;
 
       return `
         <div class="item-line ${selected ? "selected" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}"
@@ -1643,6 +1545,7 @@ function render() {
 
           <div class="item-main">
             <span class="item-text">${escapeHtml(it.text)}</span>
+            ${viewedTagHtml}
             ${tagsHtml}
           </div>
 
@@ -1695,12 +1598,8 @@ viewModeEl.addEventListener("click", (e) => {
     const index = line.dataset.index;
     const key = line.dataset.key;
 
-    if (action === "mark") {
-      moveItemToViewed(sectionKey, index);
-      return;
-    }
-    if (action === "back") {
-      returnItemFromViewed(sectionKey, index);
+    if (action === "toggle-viewed") {
+      toggleItemViewed(sectionKey, index);
       return;
     }
     if (action === "tags") {
@@ -1766,7 +1665,7 @@ document.addEventListener("click", (e) => {
     !e.target.closest(".dropdown-menu") &&
     !e.target.closest(".icon-btn") &&
     !e.target.closest(".section-btn") &&
-    !e.target.closest(".all-toggle") &&
+    !e.target.closest(".view-toggle") &&
     !e.target.closest(".search-toggle-btn")
   ) {
     closeAllMenus();
@@ -1809,7 +1708,7 @@ function truncate(str, max) {
 // Expose functions
 Object.assign(window, {
   toggleSectionMenu,
-  toggleShowViewed,
+  cycleViewedFilter,
   clearFilter,
   toggleSort,
   setSortKey,

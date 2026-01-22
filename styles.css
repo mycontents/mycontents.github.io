@@ -46,6 +46,23 @@ header{
   gap:10px;
 }
 
+/* Left group: section + viewed toggle (stays left) */
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:0 0 auto;
+}
+
+/* Right group: all other controls (pushed to right) */
+.header-right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1 1 auto;
+  justify-content:flex-end;
+}
+
 .section-btn{
   height:40px;
   min-width:170px;
@@ -81,8 +98,8 @@ header{
   flex:0 0 auto;
 }
 
-/* All-toggle button (only in "Все") */
-.all-toggle{
+/* Viewed toggle button (3 states) */
+.view-toggle{
   width:40px;
   height:40px;
   border-radius:var(--r10);
@@ -96,14 +113,15 @@ header{
   -webkit-tap-highlight-color:var(--tap);
   flex:0 0 auto;
 }
-.all-toggle:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
-.all-toggle.on{ color:var(--blue); }
-.all-toggle.hidden{ display:none; }
+.view-toggle:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
+.view-toggle.state-show{ color:var(--text); }
+.view-toggle.state-only{ color:var(--blue); background:var(--panel); border-color:var(--border); }
 
 /* ===== Filter ===== */
 .filter-wrap{
   flex:1 1 auto;
   min-width:0;
+  max-width:300px;
   height:40px;
   display:flex;
   align-items:center;
@@ -164,6 +182,7 @@ header{
 }
 .mobile-search-row .filter-wrap{
   width:100%;
+  max-width:none;
 }
 .mobile-search-row.hidden{
   display:none;
@@ -173,13 +192,6 @@ header{
   .section-btn{ min-width:auto; max-width:140px; }
   .filter-wrap:not(.mobile-filter){ display:none; }
   .search-toggle-btn{ display:grid; }
-}
-
-.header-buttons{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:0 0 auto;
 }
 
 .icon-btn{
@@ -194,6 +206,7 @@ header{
   place-items:center;
   transition:color .15s, background .15s, border-color .15s;
   -webkit-tap-highlight-color:var(--tap);
+  flex:0 0 auto;
 }
 .icon-btn:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .icon-btn:active{ transform:translateY(.5px); }
@@ -345,6 +358,27 @@ header{
   user-select:none;
   -webkit-user-select:none;
   white-space:nowrap;
+}
+
+/* Viewed tag (special) */
+.tag-viewed{
+  font-size:10px;
+  line-height:1.2;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid rgba(88,166,255,.4);
+  background:rgba(88,166,255,.1);
+  color:var(--blue);
+  user-select:none;
+  -webkit-user-select:none;
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+.tag-viewed .inline-icon{
+  width:10px;
+  height:10px;
 }
 
 /* Right actions */
