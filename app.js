@@ -23,11 +23,10 @@ let pointer = { down: false, startX: 0, startY: 0, moved: false, startedAt: 0 };
 let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
-let savingEdit = false;
-let descMenuCtx = null; // { secKey, idx } for description menu
-let tmdbMode = localStorage.getItem("tmdb_mode") || "new"; // "new" | "all" | "off"
+let savingInProgress = false; // Фоновое сохранение в процессе
+let descMenuCtx = null;
+let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
-// TMDB genre cache
 let tmdbGenres = null;
 
 const $ = (id) => document.getElementById(id);
@@ -274,13 +273,11 @@ function updateTmdbBtnVisibility() {
   if (btn) btn.style.display = TMDB_KEY ? "grid" : "none";
 }
 
-// TMDB mode for auto-fetch on save
 function cycleTmdbMode() {
   if (!TMDB_KEY) {
     alert("TMDB API Key не задан. Добавьте его в настройках подключения.");
     return;
   }
-  // Порядок: new → all → off → new
   tmdbMode = tmdbMode === "new" ? "all" : tmdbMode === "all" ? "off" : "new";
   localStorage.setItem("tmdb_mode", tmdbMode);
   updateTmdbModeBtn();
@@ -300,41 +297,17 @@ function updateTmdbModeBtn() {
   else btn.classList.add("mode-off");
 }
 
-async function autoFetchTmdbForItems(items) {
-  if (!TMDB_KEY) return;
-  
-  for (const { secKey, idx } of items) {
-    const item = data.sections?.[secKey]?.items?.[idx];
-    if (!item) continue;
-    
-    try {
-      const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
-      let updated = false;
-      
-      if (genres.length) {
-        const existing = new Set(item.tags.map(normTag));
-        const newTags = genres.filter(g => !existing.has(normTag(g)));
-        if (newTags.length) {
-          item.tags = uniqueTags([...item.tags, ...newTags]);
-          updated = true;
-        }
-      }
-      
-      if (overview && !item.desc) {
-        item.desc = overview;
-        updated = true;
-      }
-      
-      if (poster && !item.poster) {
-        item.poster = poster;
-        updated = true;
-      }
-      
-      if (updated) {
-        data.sections[secKey].modified = new Date().toISOString();
-      }
-    } catch {}
-  }
+// ===== Progress bar =====
+function showProgress(text, percent) {
+  const bar = $("progressBar"), fill = $("progressFill"), txt = $("progressText");
+  bar.classList.remove("hidden");
+  fill.style.width = percent + "%";
+  txt.textContent = text;
+}
+
+function hideProgress() {
+  $("progressBar").classList.add("hidden");
+  $("progressFill").style.width = "0%";
 }
 
 // ===== Filter (text) =====
@@ -550,10 +523,8 @@ function openDescMenu(secKey, idx, anchor) {
   const item = sec.items[idx];
   if (!item.desc) return;
   
-  // Save context for delete action
   descMenuCtx = { secKey, idx };
   
-  // Set poster
   const posterEl = $("descPoster");
   if (item.poster) {
     posterEl.src = item.poster;
@@ -565,7 +536,6 @@ function openDescMenu(secKey, idx, anchor) {
   
   $("descContent").textContent = item.desc;
   
-  // Position menu under the item line, aligned to right edge
   const line = anchor.closest(".item-line");
   if (line) {
     openMenuUnderElement("descMenu", line);
@@ -600,10 +570,9 @@ function closeDescMenu() {
 
 function toggleDescMenu(secKey, idx, anchor) {
   const menu = $("descMenu");
-  // If menu is open for the same item, close it
   if (!menu.classList.contains("hidden") && descMenuCtx?.secKey === secKey && descMenuCtx?.idx === idx) {
     closeDescMenu();
-    render(); // re-render to update button state
+    render();
     return;
   }
   openDescMenu(secKey, idx, anchor);
@@ -885,7 +854,7 @@ function deleteItemNow(secKey, idx) {
 // ===== Edit =====
 function toggleEdit() {
   if (!TOKEN || !GIST_ID) { toggleSectionMenu(); return; }
-  if (savingEdit) return;
+  if (savingInProgress) return;
   isEditing ? cancelEdit() : startEdit();
 }
 
@@ -941,7 +910,7 @@ function startEdit() {
 }
 
 function cancelEdit() {
-  if (savingEdit) return;
+  if (savingInProgress) return;
   if (window.visualViewport) {
     window.visualViewport.removeEventListener("resize", adjustEditHeight);
     window.visualViewport.removeEventListener("scroll", adjustEditHeight);
@@ -974,32 +943,48 @@ function parseAllLines(lines) {
 }
 
 async function saveEdit() {
-  if (savingEdit) return;
+  if (savingInProgress) return;
   if (!editCtx || !isEditing) return;
-  savingEdit = true;
-
-  const btns = document.querySelectorAll("#editMode .edit-panel button");
-  btns.forEach(b => (b.disabled = true));
-
+  
+  // Сразу закрываем режим редактирования
+  const lines = $("editor").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const savedEditCtx = { ...editCtx };
+  const savedTmdbMode = tmdbMode;
+  
+  // Закрываем UI редактирования
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener("resize", adjustEditHeight);
+    window.visualViewport.removeEventListener("scroll", adjustEditHeight);
+  }
+  document.body.style.height = "";
+  isEditing = false; editCtx = null; setFilterLock(false);
+  document.body.classList.remove("editing");
+  $("viewMode").classList.remove("hidden"); $("editMode").classList.add("hidden"); $("editHint").classList.add("hidden");
+  $("editUse").setAttribute("href", `${ICONS}#i-pencil`);
+  
+  // Начинаем фоновое сохранение
+  savingInProgress = true;
+  showProgress("Сохранение...", 10);
+  
   try {
-    const lines = $("editor").value.split("\n").map(s => s.trim()).filter(Boolean);
     normalizeDataModel();
 
     // Собираем старые позиции для определения новых
-    const oldItems = new Map();
+    const oldItemsSet = new Set();
     for (const key of Object.keys(data.sections)) {
       const items = data.sections[key]?.items || [];
-      items.forEach((it, i) => oldItems.set(`${key}|${it.text}|${it.created}`, true));
+      items.forEach(it => oldItemsSet.add(`${key}|${it.text}|${it.created}`));
     }
 
-    if (editCtx.mode === "section") {
-      const orig = data.sections[editCtx.secKey]?.items || [];
-      data.sections[editCtx.secKey] = { items: mergeByMask(orig, editCtx.mask, lines), modified: new Date().toISOString() };
+    // Применяем изменения
+    if (savedEditCtx.mode === "section") {
+      const orig = data.sections[savedEditCtx.secKey]?.items || [];
+      data.sections[savedEditCtx.secKey] = { items: mergeByMask(orig, savedEditCtx.mask, lines), modified: new Date().toISOString() };
     } else {
       const newBy = parseAllLines(lines);
       for (const key of new Set([...Object.keys(data.sections), ...Object.keys(newBy)])) {
         const orig = data.sections[key]?.items || [];
-        const mask = editCtx.masks[key] || new Array(orig.length).fill(false);
+        const mask = savedEditCtx.masks[key] || new Array(orig.length).fill(false);
         const merged = mergeByMask(orig, mask, newBy[key] || []);
         if (!data.sections[key]) data.sections[key] = { items: [], modified: new Date().toISOString() };
         data.sections[key].items = merged;
@@ -1007,45 +992,115 @@ async function saveEdit() {
       }
     }
 
-    // Определяем позиции для автозагрузки TMDB (только из видимого списка редактирования)
-    if (tmdbMode !== "off" && TMDB_KEY) {
+    showProgress("Сохранение...", 30);
+    
+    // Сохраняем в Gist
+    await saveData();
+    
+    showProgress("Сохранено", 50);
+    renderSectionList();
+    render();
+
+    // Определяем позиции для автозагрузки TMDB
+    if (savedTmdbMode !== "off" && TMDB_KEY) {
       const itemsToFetch = [];
       
-      // Определяем какие разделы и позиции были в редактировании
-      const editedSections = editCtx.mode === "section" 
-        ? [editCtx.secKey] 
-        : Object.keys(editCtx.masks);
-      
-      for (const secKey of editedSections) {
+      // Собираем ВСЕ новые позиции (для режимов new и all)
+      const allNewItems = [];
+      for (const secKey of Object.keys(data.sections)) {
         const items = data.sections[secKey]?.items || [];
-        const mask = editCtx.mode === "section" ? editCtx.mask : (editCtx.masks[secKey] || []);
-        
         items.forEach((item, idx) => {
-          // Проверяем, была ли эта позиция видима в редактировании
-          const wasVisible = mask[idx] === true;
-          const isOld = oldItems.has(`${secKey}|${item.text}|${item.created}`);
+          const isNew = !oldItemsSet.has(`${secKey}|${item.text}|${item.created}`);
           const hasData = item.desc || item.poster;
-          
-          if (tmdbMode === "all" && wasVisible && !hasData) {
-            itemsToFetch.push({ secKey, idx });
-          } else if (tmdbMode === "new" && !isOld && !hasData) {
-            itemsToFetch.push({ secKey, idx });
+          if (isNew && !hasData) {
+            allNewItems.push({ secKey, idx });
           }
         });
       }
       
+      if (savedTmdbMode === "new") {
+        // Только новые позиции
+        itemsToFetch.push(...allNewItems);
+      } else if (savedTmdbMode === "all") {
+        // Новые позиции + видимые в редактировании без данных
+        itemsToFetch.push(...allNewItems);
+        
+        // Добавляем видимые позиции без данных (но не дублируем новые)
+        const newItemsSet = new Set(allNewItems.map(x => `${x.secKey}|${x.idx}`));
+        
+        const editedSections = savedEditCtx.mode === "section" 
+          ? [savedEditCtx.secKey] 
+          : Object.keys(savedEditCtx.masks);
+        
+        for (const secKey of editedSections) {
+          const items = data.sections[secKey]?.items || [];
+          const mask = savedEditCtx.mode === "section" ? savedEditCtx.mask : (savedEditCtx.masks[secKey] || []);
+          
+          items.forEach((item, idx) => {
+            const wasVisible = mask[idx] === true;
+            const hasData = item.desc || item.poster;
+            const alreadyAdded = newItemsSet.has(`${secKey}|${idx}`);
+            
+            if (wasVisible && !hasData && !alreadyAdded) {
+              itemsToFetch.push({ secKey, idx });
+            }
+          });
+        }
+      }
+      
       if (itemsToFetch.length) {
-        await autoFetchTmdbForItems(itemsToFetch);
+        const total = itemsToFetch.length;
+        for (let i = 0; i < itemsToFetch.length; i++) {
+          const { secKey, idx } = itemsToFetch[i];
+          const item = data.sections?.[secKey]?.items?.[idx];
+          if (!item) continue;
+          
+          const percent = 50 + Math.round((i / total) * 45);
+          showProgress(`Загрузка ${i + 1}/${total}...`, percent);
+          
+          try {
+            const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
+            let updated = false;
+            
+            if (genres.length) {
+              const existing = new Set(item.tags.map(normTag));
+              const newTags = genres.filter(g => !existing.has(normTag(g)));
+              if (newTags.length) {
+                item.tags = uniqueTags([...item.tags, ...newTags]);
+                updated = true;
+              }
+            }
+            
+            if (overview && !item.desc) {
+              item.desc = overview;
+              updated = true;
+            }
+            
+            if (poster && !item.poster) {
+              item.poster = poster;
+              updated = true;
+            }
+            
+            if (updated) {
+              data.sections[secKey].modified = new Date().toISOString();
+            }
+          } catch {}
+        }
+        
+        showProgress("Сохранение данных...", 98);
+        await saveData();
+        render();
       }
     }
-
-    await saveData();
-    renderSectionList();
+    
+    showProgress("Готово", 100);
+    setTimeout(hideProgress, 500);
+    
+  } catch (err) {
+    showProgress("Ошибка", 100);
+    setTimeout(hideProgress, 2000);
   } finally {
-    btns.forEach(b => (b.disabled = false));
-    savingEdit = false;
-    cancelEdit();
-    render();
+    savingInProgress = false;
   }
 }
 
@@ -1086,8 +1141,6 @@ function render() {
     const tags = displayTags(x.item).sort((a, b) => a.localeCompare(b, "ru"));
     const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
 
-    // Description button: only render if has description (will be shown only when selected via CSS)
-    // Add "open" class if desc menu is open for this item
     const descMenuOpen = descMenuCtx?.secKey === x.secKey && descMenuCtx?.idx === x.idx;
     const descBtn = hasDesc
       ? `<button class="desc-action has-desc ${descMenuOpen ? "open" : ""}" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
