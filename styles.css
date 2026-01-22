@@ -306,7 +306,7 @@ header{
 
 .item-line{
   position:relative;
-  padding:6px 8px;
+  padding:0;
   margin:0 -8px 8px;
   border-radius:var(--r10);
 
@@ -325,6 +325,7 @@ header{
   align-items:center;
   gap:8px;
   min-width:0;
+  padding:6px 8px;
 }
 
 .item-line:hover{ background:var(--panel2); }
@@ -364,7 +365,7 @@ header{
 }
 
 /* Keep delete button above expanded description */
-.item-line.expanded{ padding-bottom:0; }
+.item-line.expanded{ }
 
 /* Сдвиг только верхней строки (row), чтобы освободить место под кнопку удаления */
 .item-line.selected .item-row{
@@ -925,7 +926,7 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  padding:12px;
+  padding:8px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -943,7 +944,7 @@ header{
 .item-desc-content{
   flex:1;
   min-width:0;
-  padding-right:52px;
+  padding-right:44px;
 }
 
 .item-desc-text{
@@ -955,8 +956,8 @@ header{
 /* Description delete button — same position as viewed button */
 .desc-del-btn{
   position:absolute;
-  right:12px;
-  bottom:12px;
+  right:8px;
+  bottom:8px;
   width:30px;
   height:30px;
   border-radius:10px;
