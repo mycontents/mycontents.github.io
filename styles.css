@@ -330,24 +330,7 @@ header{
   box-shadow:inset 0 0 0 1px var(--border);
 }
 
-/* Смещение контента для кнопки удаления — только для основной строки, не для описания */
-.item-line.selected > .item-section-tag,
-.item-line.selected > .item-main,
-.item-line.selected > .desc-action,
-.item-line.selected > .tag-action,
-.item-line.selected > .viewed-action{
-  margin-left:36px;
-}
-.item-line.selected > .item-section-tag{
-  margin-left:36px;
-}
-.item-line.selected > .item-section-tag:first-of-type{
-  margin-left:36px;
-}
-/* Первый элемент после item-del получает отступ */
-.item-line.selected > .item-del + *{
-  margin-left:36px;
-}
+
 
 /* Кнопка удаления позиции (слева) — абсолютная, не влияет на layout */
 .item-del{
@@ -364,6 +347,7 @@ header{
   cursor:pointer;
   display:grid;
   place-items:center;
+  flex-shrink:0;
 
   opacity:0;
   pointer-events:none;
@@ -373,6 +357,18 @@ header{
 .item-line.selected .item-del{
   opacity:1;
   pointer-events:auto;
+}
+
+/* Сдвиг контента при выделении, чтобы освободить место под кнопку удаления */
+.item-line.selected .item-section-tag,
+.item-line.selected .item-main{
+  margin-left:36px;
+}
+
+/* Описание не должно сдвигаться — компенсируем через отрицательный margin */
+.item-line.selected .item-desc-block{
+  margin-left:-36px;
+  width:calc(100% + 36px);
 }
 .item-del:hover{
   color:var(--text);
@@ -924,7 +920,6 @@ header{
   width:100%;
   margin-top:12px;
   padding:12px 0;
-  padding-bottom:44px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -942,6 +937,7 @@ header{
 .item-desc-content{
   flex:1;
   min-width:0;
+  padding-right:40px;
 }
 
 .item-desc-text{
@@ -950,11 +946,11 @@ header{
   color:var(--text);
 }
 
-/* Description delete button — bottom right corner of desc block */
+/* Description delete button — same position as viewed button */
 .desc-del-btn{
   position:absolute;
   right:0;
-  bottom:8px;
+  bottom:0;
   width:30px;
   height:30px;
   border-radius:10px;
