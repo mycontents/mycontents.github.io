@@ -88,6 +88,8 @@
         <input type="text" id="inputGistId" placeholder="abc123..." />
         <label>Token</label>
         <input type="password" id="inputToken" placeholder="ghp_..." />
+        <label>TMDB API Key</label>
+        <input type="text" id="inputTmdbKey" placeholder="eyJhbG..." />
         <div class="settings-buttons">
           <button class="settings-btn btn-primary" onclick="saveSettings()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
@@ -122,6 +124,9 @@
     <!-- Tag editor menu -->
     <div class="dropdown-menu tag-editor-menu hidden" id="tagEditorMenu">
       <div class="tag-menu-head">
+        <button class="mini-btn tmdb-btn" id="tmdbBtn" onclick="fetchTmdbTags()" title="Загрузить жанры из TMDB">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-download"></use></svg>
+        </button>
         <div class="tag-menu-title" id="tagEditorTitle">Теги</div>
         <button class="mini-btn" onclick="clearTagsForCurrentItem()" title="Очистить все">
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-trash"></use></svg>

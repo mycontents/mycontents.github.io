@@ -711,11 +711,24 @@ header{
   margin-bottom:10px;
 }
 .tag-menu-title{
+  flex:1;
   font-size:11px;
   color:#8b949e;
   text-transform:uppercase;
   letter-spacing:.08em;
 }
+
+/* TMDB button */
+.tmdb-btn{
+  transition:color .15s, background .15s, border-color .15s;
+}
+.tmdb-btn:hover{ color:var(--blue); }
+.tmdb-btn.loading{
+  opacity:.5;
+  pointer-events:none;
+}
+.tmdb-btn.success{ color:var(--green); }
+.tmdb-btn.error{ color:var(--red); }
 .tag-menu-list{
   display:flex;
   flex-direction:column;

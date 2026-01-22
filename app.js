@@ -1,10 +1,11 @@
-// Contents app — GitHub Pages + Gist
+// Contents app — GitHub Pages + Gist + TMDB
 const ICONS = "icons.svg";
 const VIEWED_TAG = "__viewed__";
 const UNDO_MS = 10000;
 
 let GIST_ID = localStorage.getItem("gist_id") || "";
 let TOKEN = localStorage.getItem("github_token") || "";
+let TMDB_KEY = localStorage.getItem("tmdb_key") || "";
 let currentSection = localStorage.getItem("current_section") || "__all__";
 let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "manual", dir: "desc" };
 let filterQuery = localStorage.getItem("filter_query") || "";
@@ -24,6 +25,9 @@ let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingEdit = false;
 
+// TMDB genre cache
+let tmdbGenres = null;
+
 const $ = (id) => document.getElementById(id);
 
 // ===== Init =====
@@ -34,6 +38,7 @@ async function init() {
   updateTagFilterBtnUI();
   updateSearchBtnUI();
   updateShareButton();
+  updateTmdbBtnVisibility();
 
   if (!GIST_ID || !TOKEN) {
     $("viewMode").innerHTML = `<div class="setup-prompt">Откройте меню → Подключение</div>`;
@@ -55,11 +60,13 @@ function applyUrlSetup() {
   const setup = new URLSearchParams(location.search).get("s");
   if (!setup) return;
   try {
-    const [gist, token] = atob(setup).split(":");
+    const parts = atob(setup).split(":");
+    const [gist, token, tmdb] = parts;
     if (gist && token) {
       localStorage.setItem("gist_id", gist);
       localStorage.setItem("github_token", token);
       GIST_ID = gist; TOKEN = token;
+      if (tmdb) { localStorage.setItem("tmdb_key", tmdb); TMDB_KEY = tmdb; }
       history.replaceState({}, "", location.pathname);
     }
   } catch {}
@@ -124,6 +131,127 @@ async function saveData() {
       body: JSON.stringify({ files: { "contents.json": { content: JSON.stringify(data, null, 2) } } })
     });
   } catch {}
+}
+
+// ===== TMDB API =====
+const TMDB_BASE = "https://api.themoviedb.org/3";
+
+async function loadTmdbGenres() {
+  if (tmdbGenres) return tmdbGenres;
+  if (!TMDB_KEY) return null;
+  try {
+    const headers = { Authorization: `Bearer ${TMDB_KEY}` };
+    const [movieRes, tvRes] = await Promise.all([
+      fetch(`${TMDB_BASE}/genre/movie/list?language=ru`, { headers }),
+      fetch(`${TMDB_BASE}/genre/tv/list?language=ru`, { headers })
+    ]);
+    const movieData = await movieRes.json();
+    const tvData = await tvRes.json();
+    tmdbGenres = new Map();
+    for (const g of [...(movieData.genres || []), ...(tvData.genres || [])]) {
+      tmdbGenres.set(g.id, g.name.toLowerCase());
+    }
+    return tmdbGenres;
+  } catch { return null; }
+}
+
+function parseTitleForSearch(text) {
+  // Примеры: "Название (2023)", "Название / Name (2023)", "Name / Название"
+  // Извлекаем год если есть
+  const yearMatch = text.match(/\((\d{4})\)/);
+  const year = yearMatch ? yearMatch[1] : null;
+  
+  // Убираем год из текста для парсинга названий
+  let clean = text.replace(/\(\d{4}\)/, "").trim();
+  
+  // Разделяем по " / " для получения разных вариантов названия
+  const parts = clean.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
+  
+  return { names: parts.length ? parts : [clean], year };
+}
+
+async function searchTmdb(query, year, type) {
+  if (!TMDB_KEY) return null;
+  const headers = { Authorization: `Bearer ${TMDB_KEY}` };
+  const params = new URLSearchParams({ query, language: "ru" });
+  if (year) {
+    params.set(type === "movie" ? "year" : "first_air_date_year", year);
+  }
+  try {
+    const res = await fetch(`${TMDB_BASE}/search/${type}?${params}`, { headers });
+    const data = await res.json();
+    return data.results?.[0] || null;
+  } catch { return null; }
+}
+
+async function fetchGenresForItem(text) {
+  const genres = await loadTmdbGenres();
+  if (!genres) return [];
+  
+  const { names, year } = parseTitleForSearch(text);
+  
+  // Стратегия поиска:
+  // 1. Для каждого названия пробуем movie, потом tv
+  // 2. Если не нашли с годом — пробуем без года
+  const trySearch = async (name, y) => {
+    let result = await searchTmdb(name, y, "movie");
+    if (result?.genre_ids?.length) return result.genre_ids;
+    result = await searchTmdb(name, y, "tv");
+    if (result?.genre_ids?.length) return result.genre_ids;
+    return null;
+  };
+  
+  // Пробуем каждое название с годом
+  for (const name of names) {
+    const ids = await trySearch(name, year);
+    if (ids) return ids.map(id => genres.get(id)).filter(Boolean);
+  }
+  
+  // Если есть год и не нашли — пробуем без года
+  if (year) {
+    for (const name of names) {
+      const ids = await trySearch(name, null);
+      if (ids) return ids.map(id => genres.get(id)).filter(Boolean);
+    }
+  }
+  
+  return [];
+}
+
+async function fetchTmdbTags() {
+  const item = getEditorItem();
+  if (!item || !tagEditorCtx) return;
+  if (!TMDB_KEY) { alert("TMDB API Key не задан. Добавьте его в настройках подключения."); return; }
+  
+  const btn = $("tmdbBtn");
+  btn.classList.add("loading");
+  btn.classList.remove("success", "error");
+  
+  try {
+    const genres = await fetchGenresForItem(item.text);
+    if (genres.length) {
+      const existing = new Set(item.tags.map(normTag));
+      const newTags = genres.filter(g => !existing.has(normTag(g)));
+      if (newTags.length) {
+        item.tags = uniqueTags([...item.tags, ...newTags]);
+        data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
+        saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
+      }
+      btn.classList.add("success");
+    } else {
+      btn.classList.add("error");
+    }
+  } catch {
+    btn.classList.add("error");
+  } finally {
+    btn.classList.remove("loading");
+    setTimeout(() => btn.classList.remove("success", "error"), 2000);
+  }
+}
+
+function updateTmdbBtnVisibility() {
+  const btn = $("tmdbBtn");
+  if (btn) btn.style.display = TMDB_KEY ? "grid" : "none";
 }
 
 // ===== Filter (text) =====
@@ -247,6 +375,7 @@ function openTagEditor(secKey, idx, anchor) {
   tagEditorCtx = { secKey, idx };
   $("tagEditorTitle").textContent = `Теги`;
   $("tagAddInput").value = "";
+  updateTmdbBtnVisibility();
   renderTagEditorList();
   openMenu("tagEditorMenu", anchor, "right");
   $("tagAddInput").focus();
@@ -370,23 +499,33 @@ function closeAllMenus(except) {
 function toggleSettingsPanel() {
   const p = $("settingsPanel"), show = p.classList.contains("hidden");
   p.classList.toggle("hidden", !show);
-  if (show) { $("inputGistId").value = GIST_ID; $("inputToken").value = TOKEN; updateShareButton(); }
+  if (show) {
+    $("inputGistId").value = GIST_ID;
+    $("inputToken").value = TOKEN;
+    $("inputTmdbKey").value = TMDB_KEY;
+    updateShareButton();
+  }
 }
 
 function saveSettings() {
   const g = $("inputGistId").value.trim(), t = $("inputToken").value.trim();
+  const tmdb = $("inputTmdbKey").value.trim();
   if (!g || !t) return;
-  localStorage.setItem("gist_id", g); localStorage.setItem("github_token", t);
-  GIST_ID = g; TOKEN = t;
+  localStorage.setItem("gist_id", g);
+  localStorage.setItem("github_token", t);
+  localStorage.setItem("tmdb_key", tmdb);
+  GIST_ID = g; TOKEN = t; TMDB_KEY = tmdb;
+  tmdbGenres = null; // reset cache
   $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
-  updateShareButton(); init();
+  updateShareButton(); updateTmdbBtnVisibility(); init();
 }
 
 function updateShareButton() { $("shareBtn").style.display = GIST_ID && TOKEN ? "grid" : "none"; }
 
 function copyShareLink() {
   if (!GIST_ID || !TOKEN) return;
-  const link = `${location.origin}${location.pathname}?s=${btoa(`${GIST_ID}:${TOKEN}`)}`;
+  const payload = TMDB_KEY ? `${GIST_ID}:${TOKEN}:${TMDB_KEY}` : `${GIST_ID}:${TOKEN}`;
+  const link = `${location.origin}${location.pathname}?s=${btoa(payload)}`;
   navigator.clipboard?.writeText(link);
 }
 
@@ -687,7 +826,6 @@ async function saveEdit() {
   } finally {
     btns.forEach(b => (b.disabled = false));
     savingEdit = false;
-    // Now safe to close edit mode
     cancelEdit();
     render();
   }
@@ -800,6 +938,6 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags });
 
 init();
