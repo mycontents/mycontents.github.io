@@ -430,13 +430,7 @@ function handleNewSection(e) {
 }
 
 function handleSectionDelete(key) {
-  const keys = Object.keys(data.sections);
-  if (keys.length <= 1 || !data.sections[key]) {
-    // If only one section left, do not arm delete at all.
-    disarmSectionDelete();
-    renderSectionList();
-    return;
-  }
+  if (!data.sections[key]) return;
   if (deleteArmSection === key) {
     const payload = { type: "section", key, secData: JSON.parse(JSON.stringify(data.sections[key])), prev: currentSection };
     delete data.sections[key];
@@ -690,14 +684,13 @@ async function saveEdit() {
     }
 
     await saveData();
-
-    // Ensure we leave edit mode exactly once.
-    cancelEdit();
     renderSectionList();
-    render();
   } finally {
     btns.forEach(b => (b.disabled = false));
     savingEdit = false;
+    // Now safe to close edit mode
+    cancelEdit();
+    render();
   }
 }
 
