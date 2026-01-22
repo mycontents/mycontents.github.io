@@ -63,6 +63,9 @@
           <button class="btn-cancel" onclick="cancelEdit()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
           </button>
+          <button class="btn-tmdb-mode" id="tmdbModeBtn" onclick="cycleTmdbMode()" title="Автозагрузка TMDB">
+            <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-doc"></use></svg>
+          </button>
           <button class="btn-save" onclick="saveEdit()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
           </button>
@@ -145,8 +148,8 @@
     <div class="dropdown-menu desc-menu hidden" id="descMenu">
       <div class="desc-menu-head">
         <div class="desc-menu-title">Описание</div>
-        <button class="mini-btn" onclick="closeDescMenu()" title="Закрыть">
-          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+        <button class="mini-btn danger" onclick="clearDescForCurrentItem()" title="Удалить описание">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-trash"></use></svg>
         </button>
       </div>
       <img class="desc-poster hidden" id="descPoster" alt="" />

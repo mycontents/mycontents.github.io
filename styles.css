@@ -548,6 +548,30 @@ header{
 .btn-cancel{ background:var(--border); }
 .btn-save{ background:var(--green); }
 
+/* TMDB mode button in edit panel */
+.btn-tmdb-mode{
+  width:42px;
+  height:42px;
+  border:none;
+  border-radius:var(--r10);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  background:var(--border);
+  color:var(--muted);
+  margin-right:auto;
+  -webkit-tap-highlight-color:var(--tap);
+  transition:color .15s, background .15s;
+}
+.btn-tmdb-mode.mode-new{
+  color:var(--text);
+  background:var(--border);
+}
+.btn-tmdb-mode.mode-all{
+  color:white;
+  background:var(--blue);
+}
+
 
 
 /* ===== Dropdowns ===== */
@@ -849,8 +873,8 @@ header{
   letter-spacing:.08em;
 }
 .desc-menu-content{
-  font-size:14px;
-  line-height:1.55;
+  font-size:15px;
+  line-height:1.6;
   color:var(--text);
   max-height:300px;
   overflow-y:auto;
@@ -859,7 +883,7 @@ header{
 /* Poster in description menu */
 .desc-poster{
   width:100%;
-  max-width:200px;
+  max-width:100%;
   border-radius:8px;
   margin-bottom:12px;
   display:block;

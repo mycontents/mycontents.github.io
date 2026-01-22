@@ -24,6 +24,8 @@ let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingEdit = false;
+let descMenuCtx = null; // { secKey, idx } for description menu
+let tmdbMode = "new"; // "off" | "new" | "all"
 
 // TMDB genre cache
 let tmdbGenres = null;
@@ -272,6 +274,69 @@ function updateTmdbBtnVisibility() {
   if (btn) btn.style.display = TMDB_KEY ? "grid" : "none";
 }
 
+// TMDB mode for auto-fetch on save
+function cycleTmdbMode() {
+  if (!TMDB_KEY) {
+    alert("TMDB API Key не задан. Добавьте его в настройках подключения.");
+    return;
+  }
+  tmdbMode = tmdbMode === "off" ? "new" : tmdbMode === "new" ? "all" : "off";
+  updateTmdbModeBtn();
+}
+
+function updateTmdbModeBtn() {
+  const btn = $("tmdbModeBtn");
+  if (!btn) return;
+  btn.classList.remove("mode-new", "mode-all");
+  if (!TMDB_KEY) {
+    btn.style.display = "none";
+    return;
+  }
+  btn.style.display = "grid";
+  if (tmdbMode === "new") btn.classList.add("mode-new");
+  else if (tmdbMode === "all") btn.classList.add("mode-all");
+}
+
+async function autoFetchTmdbForItems(items, mode) {
+  if (!TMDB_KEY || mode === "off") return;
+  
+  for (const { secKey, idx } of items) {
+    const item = data.sections?.[secKey]?.items?.[idx];
+    if (!item) continue;
+    
+    // Skip if already has desc/poster (unless mode is "all")
+    if (mode === "new" && (item.desc || item.poster)) continue;
+    
+    try {
+      const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
+      let updated = false;
+      
+      if (genres.length) {
+        const existing = new Set(item.tags.map(normTag));
+        const newTags = genres.filter(g => !existing.has(normTag(g)));
+        if (newTags.length) {
+          item.tags = uniqueTags([...item.tags, ...newTags]);
+          updated = true;
+        }
+      }
+      
+      if (overview && !item.desc) {
+        item.desc = overview;
+        updated = true;
+      }
+      
+      if (poster && !item.poster) {
+        item.poster = poster;
+        updated = true;
+      }
+      
+      if (updated) {
+        data.sections[secKey].modified = new Date().toISOString();
+      }
+    } catch {}
+  }
+}
+
 // ===== Filter (text) =====
 function setupFilterUI() {
   const input = $("filterInput"), clear = $("filterClear");
@@ -485,6 +550,9 @@ function openDescMenu(secKey, idx, anchor) {
   const item = sec.items[idx];
   if (!item.desc) return;
   
+  // Save context for delete action
+  descMenuCtx = { secKey, idx };
+  
   // Set poster
   const posterEl = $("descPoster");
   if (item.poster) {
@@ -525,7 +593,41 @@ function openMenuUnderElement(menuId, element) {
   menu.style.visibility = "visible";
 }
 
-function closeDescMenu() { $("descMenu").classList.add("hidden"); }
+function closeDescMenu() { 
+  $("descMenu").classList.add("hidden"); 
+  descMenuCtx = null;
+}
+
+function toggleDescMenu(secKey, idx, anchor) {
+  const menu = $("descMenu");
+  // If menu is open for the same item, close it
+  if (!menu.classList.contains("hidden") && descMenuCtx?.secKey === secKey && descMenuCtx?.idx === idx) {
+    closeDescMenu();
+    return;
+  }
+  openDescMenu(secKey, idx, anchor);
+}
+
+function clearDescForCurrentItem() {
+  if (!descMenuCtx) return;
+  const { secKey, idx } = descMenuCtx;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  if (!item) return;
+  
+  const oldDesc = item.desc;
+  const oldPoster = item.poster;
+  if (!oldDesc && !oldPoster) return;
+  
+  item.desc = null;
+  item.poster = null;
+  data.sections[secKey].modified = new Date().toISOString();
+  
+  closeDescMenu();
+  saveData();
+  render();
+  
+  startUndo({ type: "desc", secKey, idx, oldDesc, oldPoster }, "Описание удалено");
+}
 
 // ===== Viewed toggle =====
 function updateViewedToggleUI() {
@@ -729,6 +831,14 @@ $("undoBtn").onclick = () => {
   } else if (p.type === "tag" || p.type === "tagClear") {
     const item = data.sections?.[p.secKey]?.items?.[p.idx];
     if (item) { item.tags = uniqueTags(p.oldTags); data.sections[p.secKey].modified = new Date().toISOString(); saveData(); render(); renderTagEditorList(); renderTagFilterMenu(); }
+  } else if (p.type === "desc") {
+    const item = data.sections?.[p.secKey]?.items?.[p.idx];
+    if (item) { 
+      item.desc = p.oldDesc; 
+      item.poster = p.oldPoster; 
+      data.sections[p.secKey].modified = new Date().toISOString(); 
+      saveData(); render(); 
+    }
   }
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = null; undoPayload = null; hideUndo();
@@ -981,7 +1091,7 @@ $("viewMode").addEventListener("click", e => {
     e.stopPropagation();
     const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
-    if (a === "desc") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); render(); } openDescMenu(sec, idx, act); return; }
+    if (a === "desc") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); render(); } toggleDescMenu(sec, idx, act); return; }
     if (a === "tags") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeDescMenu(); render(); } openTagEditor(sec, idx, act); return; }
     if (a === "del") {
       if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render(); armItemDelete(key); return; }
