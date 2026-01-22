@@ -401,12 +401,11 @@ function toggleSectionMenu() {
 
 function renderSectionList() {
   const keys = Object.keys(data.sections);
-  const canDelete = keys.length > 1;
   $("sectionList").innerHTML = keys.map(key => `
     <div class="menu-option ${currentSection === key ? "active" : ""} ${deleteArmSection === key ? "armed" : ""}" onclick="selectSection('${escQ(key)}')">
       <span>${esc(key)}</span>
       <span class="menu-actions" onclick="event.stopPropagation()">
-        ${canDelete ? `<button class="mini-btn danger" onclick="event.stopPropagation(); handleSectionDelete('${escQ(key)}')">×</button>` : ``}
+        <button class="mini-btn danger" onclick="event.stopPropagation(); handleSectionDelete('${escQ(key)}')">×</button>
       </span>
     </div>`).join("");
 }
