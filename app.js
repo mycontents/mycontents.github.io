@@ -1306,14 +1306,32 @@ $("viewMode").addEventListener("click", e => {
     e.stopPropagation();
     const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
-    if (a === "desc") { 
-      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); } 
-      toggleDescExpand(sec, idx); 
-      return; 
+    if (a === "desc") {
+      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); }
+      // При открытии описания скрываем всплывающее меню тегов
+      closeTagEditor();
+      toggleDescExpand(sec, idx);
+      return;
     }
     if (a === "clear-desc") { clearDescForItem(sec, idx); return; }
-    if (a === "tags") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeDescMenu(); render(); } openTagEditor(sec, idx, act); return; }
-    if (a === "del") {
+    if (a === "tags") {
+      // Повторное нажатие по кнопке тегов закрывает меню
+      const menu = $("tagEditorMenu");
+      const same = tagEditorCtx && tagEditorCtx.secKey === sec && tagEditorCtx.idx === idx;
+      if (same && menu && !menu.classList.contains("hidden")) { closeTagEditor(); return; }
+
+      if (selectedKey !== key) {
+        selectedKey = key;
+        disarmItemDelete();
+        // выделяем строку без полного ререндера (чтобы якорь меню был валиден)
+        document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
+        line.classList.add("selected");
+      }
+
+      openTagEditor(sec, idx, act);
+      return;
+    }
+    if (a === "del") { 
       if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render(); armItemDelete(key); return; }
       if (deleteArmItemKey === key) { deleteItemNow(sec, idx); return; }
       armItemDelete(key); return;
