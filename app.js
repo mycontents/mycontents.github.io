@@ -25,10 +25,16 @@ let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingInProgress = false; // Фоновое сохранение в процессе
-let expandedDescKey = null; // "secKey|idx" для раскрытого описания
+let expandedDescKey = localStorage.getItem("expanded_desc_key") || null; // "secKey|idx" для раскрытого описания
 let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
 let tmdbGenres = null;
+
+// Prevent browser auto scroll restoration fighting with our saved scroll
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+// Do not overwrite saved UI state during initial load
+let restoringUI = true;
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,30 +63,51 @@ async function init() {
   updateSectionButton();
   render();
 
-  // Restore UI state (scroll, selection, open menus)
+  // Restore UI state (expanded description, selection, scroll, open menus)
+  // IMPORTANT: description is rendered by render(), so we must set/validate keys BEFORE restoring scroll.
   requestAnimationFrame(() => {
-    if (document.body.classList.contains("editing")) return;
+    requestAnimationFrame(() => {
+      if (document.body.classList.contains("editing")) return;
 
-    // restore scroll only when not editing
-    const y = Number(localStorage.getItem("scroll_y") || "0");
-    if (Number.isFinite(y) && y > 0) {
-      window.scrollTo({ top: y, left: 0, behavior: "instant" });
-    }
+      const existingKeys = new Set(Array.from(document.querySelectorAll("#viewMode .item-line")).map(el => el.dataset.key));
 
-    // restore selected item (if still exists after render)
-    if (selectedKey) {
-      let found = false;
-      document.querySelectorAll("#viewMode .item-line").forEach(el => {
-        if (el.dataset.key === selectedKey) { el.classList.add("selected"); found = true; }
+      // Validate expanded description key
+      if (expandedDescKey && !existingKeys.has(expandedDescKey)) {
+        expandedDescKey = null;
+        localStorage.removeItem("expanded_desc_key");
+      }
+
+      // Validate selected key
+      if (selectedKey && !existingKeys.has(selectedKey)) {
+        selectedKey = null;
+        localStorage.removeItem("selected_key");
+      }
+
+      // Re-render once if expandedDescKey exists to ensure DOM contains expanded block
+      if (expandedDescKey) render();
+
+      // Apply selected class without forcing re-render
+      if (selectedKey) {
+        document.querySelectorAll("#viewMode .item-line").forEach(el => {
+          if (el.dataset.key === selectedKey) el.classList.add("selected");
+        });
+      }
+
+      // Restore scroll ONLY after final DOM height is settled
+      requestAnimationFrame(() => {
+        const y = Number(localStorage.getItem("scroll_y") || "0");
+        if (Number.isFinite(y) && y > 0) {
+          window.scrollTo({ top: y, left: 0, behavior: "instant" });
+        }
+        restoringUI = false;
       });
-      if (!found) selectedKey = null;
-    }
 
-    // restore sort menu open state
-    if (sortMenuOpen && !isEditing) {
-      updateSortMenuUI();
-      openMenu("sortMenu", $("sortBtn"), "right");
-    }
+      // restore sort menu open state
+      if (sortMenuOpen && !isEditing) {
+        updateSortMenuUI();
+        openMenu("sortMenu", $("sortBtn"), "right");
+      }
+    });
   });
 }
 
@@ -650,16 +677,15 @@ function clearTagsForCurrentItem() {
 // ===== Description inline expand =====
 function toggleDescExpand(secKey, idx) {
   const key = `${secKey}|${idx}`;
-  if (expandedDescKey === key) {
-    expandedDescKey = null;
-  } else {
-    expandedDescKey = key;
-  }
+  expandedDescKey = (expandedDescKey === key) ? null : key;
+  if (expandedDescKey) localStorage.setItem("expanded_desc_key", expandedDescKey);
+  else localStorage.removeItem("expanded_desc_key");
   render();
 }
 
 function closeDescMenu() { 
   expandedDescKey = null;
+  localStorage.removeItem("expanded_desc_key");
 }
 
 function clearDescForItem(secKey, idx) {
@@ -772,8 +798,14 @@ function renderSectionList() {
 
 function selectSection(key) {
   currentSection = key; localStorage.setItem("current_section", key);
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); disarmSectionDelete();
-  updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden"); render();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
+  // при смене раздела раскрытое описание обычно становится нерелевантным
+  expandedDescKey = null; localStorage.removeItem("expanded_desc_key");
+  updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
+  // сбрасываем scroll, чтобы не сохранялось старое положение другого раздела
+  localStorage.setItem("scroll_y", "0");
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  render();
 }
 
 function updateSectionButton() { $("currentSectionName").textContent = currentSection === "__all__" ? "Все" : currentSection; }
@@ -829,7 +861,8 @@ function setSortKey(key) {
   else sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
   localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
   selectedKey = null; localStorage.removeItem("selected_key");
-  disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  disarmItemDelete(); closeTagEditor();
+  // описание можно оставить раскрытым
   updateSortMenuUI();
   $("sortMenu").classList.add("hidden");
   sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
@@ -1381,9 +1414,24 @@ $("viewMode").addEventListener("click", e => {
   selectedKey = selectedKey === key ? null : key;
   if (selectedKey) localStorage.setItem("selected_key", selectedKey);
   else localStorage.removeItem("selected_key");
-  disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  disarmItemDelete(); closeTagEditor();
+  // ВАЖНО: описание не закрываем при снятии выделения — оно может оставаться раскрытым
   document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
   if (selectedKey) line.classList.add("selected");
+});
+
+// Persist scroll position (normal mode only)
+window.addEventListener("scroll", () => {
+  if (document.body.classList.contains("editing")) return;
+  if (restoringUI) return; // don't overwrite while restoring
+  localStorage.setItem("scroll_y", String(window.scrollY || 0));
+}, { passive: true });
+
+// Also persist scroll on unload (more reliable on mobile)
+window.addEventListener("beforeunload", () => {
+  if (!document.body.classList.contains("editing")) {
+    localStorage.setItem("scroll_y", String(window.scrollY || 0));
+  }
 });
 
 document.addEventListener("click", e => {
