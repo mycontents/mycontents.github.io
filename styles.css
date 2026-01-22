@@ -28,30 +28,48 @@ body{
   padding:12px 16px 0;
 }
 
-/* Editing mode: no page scroll, fixed height */
+/* Editing mode: fixed layout, no page scroll */
 body.editing{
-  height:100vh;
-  height:100dvh;
   overflow:hidden;
+  position:fixed;
+  inset:0;
+  width:100%;
 }
 body.editing .container{
   display:flex;
   flex-direction:column;
-  height:calc(100dvh - 24px);
+  height:100%;
+  max-height:100%;
+  padding:12px 16px 0;
+  overflow:hidden;
+}
+body.editing header{
+  flex:0 0 auto;
+  position:relative;
 }
 body.editing .content-area{
-  flex:1;
+  flex:1 1 auto;
   display:flex;
   flex-direction:column;
   min-height:0;
   overflow:hidden;
 }
 body.editing #editMode{
-  flex:1;
+  flex:1 1 auto;
   display:flex;
   flex-direction:column;
   min-height:0;
   overflow:hidden;
+}
+body.editing .content-edit{
+  flex:1 1 auto;
+  min-height:80px;
+}
+body.editing .edit-panel{
+  flex:0 0 auto;
+}
+body.editing .counter{
+  display:none;
 }
 
 .container{ max-width:800px; margin:0 auto; position:relative; }

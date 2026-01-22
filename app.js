@@ -563,9 +563,20 @@ function matchFilters(item) {
   return true;
 }
 
+function adjustEditHeight() {
+  if (!isEditing) return;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.body.style.height = vh + "px";
+}
+
 function startEdit() {
   isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); setFilterLock(true);
   document.body.classList.add("editing");
+  adjustEditHeight();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", adjustEditHeight);
+    window.visualViewport.addEventListener("scroll", adjustEditHeight);
+  }
   const editor = $("editor"), hint = $("editHint");
   $("editUse").setAttribute("href", `${ICONS}#i-x`);
   normalizeDataModel();
@@ -593,6 +604,11 @@ function startEdit() {
 }
 
 function cancelEdit() {
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener("resize", adjustEditHeight);
+    window.visualViewport.removeEventListener("scroll", adjustEditHeight);
+  }
+  document.body.style.height = "";
   isEditing = false; editCtx = null; setFilterLock(false);
   document.body.classList.remove("editing");
   $("viewMode").classList.remove("hidden"); $("editMode").classList.add("hidden"); $("editHint").classList.add("hidden");
