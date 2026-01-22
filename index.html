@@ -89,10 +89,10 @@
 
     <!-- Sections (with settings inside) -->
     <div class="dropdown-menu section-menu hidden" id="sectionMenu">
-      <div class="menu-option all-sections" onclick="selectSection('__all__')">Все</div>
-      <div id="sectionList"></div>
-      <div class="menu-divider"></div>
-      <div class="menu-option add-new" onclick="showNewSectionInput()">+ Новый раздел</div>
+      <div class="menu-option all-sections-row">
+        <span onclick="selectSection('__all__')">Все</span>
+        <button class="add-section-btn" onclick="showNewSectionInput()" title="Новый раздел">+</button>
+      </div>
       <input
         type="text"
         class="new-section-input hidden"
@@ -100,6 +100,7 @@
         placeholder="Название..."
         onkeydown="handleNewSection(event)"
       />
+      <div id="sectionList"></div>
 
       <div class="menu-divider"></div>
       <div class="menu-option" onclick="toggleSettingsPanel()">

@@ -54,13 +54,12 @@ header{
   flex:0 0 auto;
 }
 
-/* Right group: all other controls (pushed to right) */
+/* Right group: all other controls (pushed to right, but filter expands) */
 .header-right{
   display:flex;
   align-items:center;
   gap:10px;
   flex:1 1 auto;
-  justify-content:flex-end;
 }
 
 .section-btn{
@@ -121,7 +120,6 @@ header{
 .filter-wrap{
   flex:1 1 auto;
   min-width:0;
-  max-width:300px;
   height:40px;
   display:flex;
   align-items:center;
@@ -360,28 +358,7 @@ header{
   white-space:nowrap;
 }
 
-/* Viewed tag (special) */
-.tag-viewed{
-  font-size:10px;
-  line-height:1.2;
-  padding:2px 7px;
-  border-radius:999px;
-  border:1px solid rgba(88,166,255,.4);
-  background:rgba(88,166,255,.1);
-  color:var(--blue);
-  user-select:none;
-  -webkit-user-select:none;
-  white-space:nowrap;
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-}
-.tag-viewed .inline-icon{
-  width:10px;
-  height:10px;
-}
-
-/* Right actions */
+/* Right actions (tag + viewed) */
 .right-action,
 .tag-action{
   width:30px;
@@ -410,6 +387,49 @@ header{
   color:var(--text);
   background:#0b0f15;
   border-color:var(--border);
+}
+
+/* Viewed button: always visible for viewed items */
+.viewed-action{
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:transparent;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  -webkit-tap-highlight-color:var(--tap);
+  transition:opacity .12s, background .12s, border-color .12s, color .12s;
+}
+
+/* Not viewed: hidden unless selected */
+.viewed-action.not-viewed{
+  color:var(--muted);
+  opacity:0;
+  pointer-events:none;
+}
+.item-line.selected .viewed-action.not-viewed{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* Viewed: always visible, lighter color */
+.viewed-action.is-viewed{
+  color:var(--text);
+  opacity:0.7;
+  pointer-events:auto;
+}
+.item-line.selected .viewed-action.is-viewed{
+  opacity:1;
+}
+
+.viewed-action:hover{
+  color:var(--text);
+  background:#0b0f15;
+  border-color:var(--border);
+  opacity:1;
 }
 
 /* ===== Edit ===== */
@@ -473,7 +493,7 @@ header{
 .dropdown-menu{
   position:absolute;
   background:var(--panel);
-  border:1px solid var(--border);
+  border:1px solid var(--blue);
   border-radius:var(--r10);
   z-index:120;
   overflow:hidden;
@@ -498,14 +518,44 @@ header{
 .menu-option:hover{ background:var(--border2); }
 .menu-option.active{ color:var(--blue); }
 
-.menu-option.all-sections{
+/* All sections row with + button */
+.menu-option.all-sections-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
   border-bottom:1px solid var(--border);
   margin-bottom:6px;
   padding-bottom:10px;
 }
+.menu-option.all-sections-row > span{
+  cursor:pointer;
+  flex:1;
+}
+.menu-option.all-sections-row > span:hover{
+  color:var(--blue);
+}
+
+.add-section-btn{
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  border:none;
+  background:transparent;
+  color:var(--text);
+  font-size:20px;
+  font-weight:bold;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  -webkit-tap-highlight-color:var(--tap);
+  transition:background .12s, color .12s;
+}
+.add-section-btn:hover{
+  background:var(--border2);
+  color:var(--blue);
+}
 
 .menu-divider{ border-top:1px solid var(--border); margin:6px 0; }
-.menu-option.add-new{ color:var(--blue); }
 
 .menu-actions{
   margin-left:auto;
@@ -537,7 +587,7 @@ header{
 
 .new-section-input{
   width:calc(100% - 28px);
-  margin:8px 14px;
+  margin:0 14px 8px;
   background:var(--bg);
   border:1px solid var(--border);
   border-radius:var(--r10);

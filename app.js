@@ -137,17 +137,6 @@ function normalizeDataModel() {
   if (!data || typeof data !== "object") data = { sections: {} };
   if (!data.sections || typeof data.sections !== "object") data.sections = {};
 
-  // Remove old __viewed__:* sections if any (migrate to tag)
-  const keysToDelete = [];
-  for (const sectionKey of Object.keys(data.sections)) {
-    if (sectionKey.startsWith("__viewed__:")) {
-      keysToDelete.push(sectionKey);
-    }
-  }
-  for (const key of keysToDelete) {
-    delete data.sections[key];
-  }
-
   for (const sectionKey of Object.keys(data.sections)) {
     let sec = data.sections[sectionKey];
     if (!sec || typeof sec !== "object") sec = { items: [], modified: new Date().toISOString() };
@@ -160,7 +149,7 @@ function normalizeDataModel() {
   }
 }
 
-// ===== Viewed helpers (now tag-based) =====
+// ===== Viewed helpers (tag-based) =====
 function isItemViewed(item) {
   if (!item || !Array.isArray(item.tags)) return false;
   return item.tags.some(t => normalizeTag(t) === VIEWED_TAG);
@@ -179,7 +168,6 @@ function setItemViewed(item, viewed) {
 }
 
 function getDisplayTags(item) {
-  // Return tags excluding __viewed__ for display in tag chips
   if (!item || !Array.isArray(item.tags)) return [];
   return item.tags.filter(t => normalizeTag(t) !== VIEWED_TAG);
 }
@@ -361,7 +349,7 @@ function getScopeItems() {
 function buildTagCounts() {
   const counts = new Map();
   for (const { item } of getScopeItems()) {
-    const tags = getDisplayTags(item); // Exclude __viewed__
+    const tags = getDisplayTags(item);
     for (const t of tags) counts.set(t, (counts.get(t) || 0) + 1);
   }
   return counts;
@@ -495,7 +483,6 @@ function renderTagEditorList() {
     return;
   }
 
-  // Exclude __viewed__ from editor
   const tags = getDisplayTags(item).sort((a, b) => a.localeCompare(b, "ru"));
   if (!tags.length) {
     list.innerHTML = `<div class="tag-empty">Нет тегов</div>`;
@@ -646,7 +633,6 @@ function clearTagsForCurrentItem() {
   const item = getCurrentTagEditorItem();
   if (!item || !tagEditorCtx) return;
 
-  // Keep __viewed__ tag, clear only user tags
   const wasViewed = isItemViewed(item);
   const oldTags = [...item.tags];
   item.tags = wasViewed ? [VIEWED_TAG] : [];
@@ -1517,20 +1503,27 @@ function render() {
         ? `<span class="item-section-tag">${escapeHtml(it.sectionKey)}</span>`
         : "";
 
-      // Viewed tag (special display)
-      const viewedTagHtml = viewed
-        ? `<span class="tag-viewed"><svg class="inline-icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg></span>`
-        : "";
-
       // Regular tags (excluding __viewed__)
       const tags = getDisplayTags(it.item).sort((a, b) => a.localeCompare(b, "ru"));
       const tagsHtml = tags.length
         ? `<span class="item-tags">${tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</span>`
         : "";
 
-      const rightAction = `<button class="right-action" data-action="toggle-viewed" title="${viewed ? "Снять отметку" : "Отметить просмотренным"}">
-           <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#${viewed ? "i-eye-off" : "i-eye"}"></use></svg>
+      // Viewed button: different states
+      // For viewed items: always visible (light color), shows eye icon
+      // When selected: shows crossed eye (to unmark)
+      // For not viewed: only visible when selected, shows eye icon (to mark)
+      let viewedBtnHtml;
+      if (viewed) {
+        const iconId = selected ? "i-eye-off" : "i-eye";
+        viewedBtnHtml = `<button class="viewed-action is-viewed" data-action="toggle-viewed" title="Снять отметку">
+           <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#${iconId}"></use></svg>
          </button>`;
+      } else {
+        viewedBtnHtml = `<button class="viewed-action not-viewed" data-action="toggle-viewed" title="Отметить просмотренным">
+           <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg>
+         </button>`;
+      }
 
       return `
         <div class="item-line ${selected ? "selected" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}"
@@ -1545,7 +1538,6 @@ function render() {
 
           <div class="item-main">
             <span class="item-text">${escapeHtml(it.text)}</span>
-            ${viewedTagHtml}
             ${tagsHtml}
           </div>
 
@@ -1553,7 +1545,7 @@ function render() {
             <svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg>
           </button>
 
-          ${rightAction}
+          ${viewedBtnHtml}
         </div>
       `;
     })
