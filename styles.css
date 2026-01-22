@@ -295,6 +295,14 @@ header{
   line-height:1.5;
 }
 
+/* Extra scroll slack (non-edit mode): allow scrolling so first/last items can reach ~center */
+.content-list:not(:empty)::before,
+.content-list:not(:empty)::after{
+  content:"";
+  display:block;
+  height:clamp(80px, 40vh, 360px);
+}
+
 .content-list:empty::before{
   content:"—";
   color:var(--muted2);
