@@ -175,9 +175,11 @@ async function searchTmdb(query, year, type) {
   } catch { return null; }
 }
 
+const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
+
 async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return { genres: [], overview: null };
+  if (!genres) return { genres: [], overview: null, poster: null };
   
   const { names, year } = parseTitleForSearch(text);
   
@@ -194,7 +196,8 @@ async function fetchTmdbDataForItem(text) {
     if (result) {
       return {
         genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
-        overview: result.overview || null
+        overview: result.overview || null,
+        poster: result.poster_path ? TMDB_IMG + result.poster_path : null
       };
     }
   }
@@ -205,13 +208,14 @@ async function fetchTmdbDataForItem(text) {
       if (result) {
         return {
           genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
-          overview: result.overview || null
+          overview: result.overview || null,
+          poster: result.poster_path ? TMDB_IMG + result.poster_path : null
         };
       }
     }
   }
   
-  return { genres: [], overview: null };
+  return { genres: [], overview: null, poster: null };
 }
 
 async function fetchTmdbTags() {
@@ -224,7 +228,7 @@ async function fetchTmdbTags() {
   btn.classList.remove("success", "error");
   
   try {
-    const { genres, overview } = await fetchTmdbDataForItem(item.text);
+    const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
     let updated = false;
     
     if (genres.length) {
@@ -241,11 +245,16 @@ async function fetchTmdbTags() {
       updated = true;
     }
     
+    if (poster && !item.poster) {
+      item.poster = poster;
+      updated = true;
+    }
+    
     if (updated) {
       data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
       saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
       btn.classList.add("success");
-    } else if (genres.length || overview) {
+    } else if (genres.length || overview || poster) {
       btn.classList.add("success");
     } else {
       btn.classList.add("error");
@@ -475,6 +484,17 @@ function openDescMenu(secKey, idx, anchor) {
   if (!sec?.items?.[idx]) return;
   const item = sec.items[idx];
   if (!item.desc) return;
+  
+  // Set poster
+  const posterEl = $("descPoster");
+  if (item.poster) {
+    posterEl.src = item.poster;
+    posterEl.classList.remove("hidden");
+  } else {
+    posterEl.src = "";
+    posterEl.classList.add("hidden");
+  }
+  
   $("descContent").textContent = item.desc;
   
   // Position menu under the item line, aligned to right edge

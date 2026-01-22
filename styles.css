@@ -849,11 +849,23 @@ header{
   letter-spacing:.08em;
 }
 .desc-menu-content{
-  font-size:13px;
-  line-height:1.5;
+  font-size:14px;
+  line-height:1.55;
   color:var(--text);
   max-height:300px;
   overflow-y:auto;
+}
+
+/* Poster in description menu */
+.desc-poster{
+  width:100%;
+  max-width:200px;
+  border-radius:8px;
+  margin-bottom:12px;
+  display:block;
+}
+.desc-poster.hidden{
+  display:none;
 }
 
 /* Info/description button on item — only for selected with desc */
