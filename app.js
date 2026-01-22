@@ -751,6 +751,26 @@ function openMenu(menuId, anchor, align = "left") {
   menu.classList.remove("hidden");
   menu.style.visibility = "hidden";
 
+  // Tag editor should move with content → position:absolute relative to .container
+  if (menuId === "tagEditorMenu") {
+    const container = $("container");
+    const cR = container.getBoundingClientRect();
+    const aR = anchor.getBoundingClientRect();
+    const mR = menu.getBoundingClientRect();
+
+    const top = (aR.bottom - cR.top) + 8;
+    let left = align === "right" ? (aR.right - cR.left - mR.width) : (aR.left - cR.left);
+
+    // clamp inside container width
+    left = Math.max(8, Math.min(left, cR.width - mR.width - 8));
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.visibility = "visible";
+    return;
+  }
+
+  // Other menus are fixed to viewport
   const aR = anchor.getBoundingClientRect();
   const mR = menu.getBoundingClientRect();
 

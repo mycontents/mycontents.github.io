@@ -374,7 +374,11 @@ body.editing .scroll-slack{ display:none; }
 }
 
 /* Keep delete button above expanded description */
-.item-line.expanded{ }
+.item-line.expanded{
+  margin-top:12px;      /* double spacing above (12 base + 12) */
+  margin-bottom:24px;   /* double spacing below (was 12) */
+}
+.item-line.expanded:last-child{ margin-bottom:0; }
 
 /* Сдвиг только верхней строки (row), чтобы освободить место под кнопку удаления */
 /* left gap = 6px (как у .item-del от левого края) */
@@ -407,6 +411,9 @@ body.editing .scroll-slack{ display:none; }
   display:inline-flex;
   align-items:center;
   gap:6px;
+
+  /* Align to top like the delete cross (top padding of .item-row) */
+  align-self:flex-start;
 
   user-select:none;
   -webkit-user-select:none;
@@ -454,7 +461,7 @@ body.editing .scroll-slack{ display:none; }
   white-space:nowrap;
 }
 
-/* Country tags — brighter, displayed first */
+/* Country tags — brighter (render order controlled in JS) */
 .tag-chip.country{
   color:var(--text);
   border-color:var(--border);
@@ -632,7 +639,7 @@ body.editing .scroll-slack{ display:none; }
 .dropdown-menu.section-menu{ padding:8px 0; min-width:260px; }
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
 .dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
-.dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; }
+.dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; position:absolute; }
 
 .menu-option{
   padding:8px 14px;
