@@ -104,6 +104,23 @@ function uniqueTags(tags) {
 
 function normTag(t) { return String(t || "").trim().replace(/\s+/g, " ").toLowerCase(); }
 function isViewed(item) { return item?.tags?.includes(VIEWED_TAG); }
+
+// Country codes mapping
+const COUNTRY_CODES = {
+  US: "США", GB: "Великобритания", KR: "Южная Корея", JP: "Япония", FR: "Франция", 
+  DE: "Германия", IT: "Италия", ES: "Испания", CN: "Китай", IN: "Индия", RU: "Россия", 
+  CA: "Канада", AU: "Австралия", BR: "Бразилия", MX: "Мексика", SE: "Швеция", 
+  DK: "Дания", NO: "Норвегия", FI: "Финляндия", NL: "Нидерланды", BE: "Бельгия", 
+  AT: "Австрия", CH: "Швейцария", PL: "Польша", CZ: "Чехия", TR: "Турция", 
+  TH: "Таиланд", PH: "Филиппины", ID: "Индонезия", MY: "Малайзия", SG: "Сингапур", 
+  HK: "Гонконг", TW: "Тайвань", NZ: "Новая Зеландия", AR: "Аргентина", CL: "Чили", 
+  CO: "Колумбия", ZA: "ЮАР", EG: "Египет", IL: "Израиль", AE: "ОАЭ", 
+  SA: "Саудовская Аравия", UA: "Украина", BY: "Беларусь", KZ: "Казахстан"
+};
+const COUNTRY_CODES_SET = new Set(Object.keys(COUNTRY_CODES).map(c => c.toLowerCase()));
+
+function isCountryTag(tag) { return COUNTRY_CODES_SET.has(normTag(tag)); }
+function countryDisplayName(code) { return COUNTRY_CODES[code.toUpperCase()] || code.toUpperCase(); }
 function setViewed(item, v) {
   item.tags = uniqueTags(item.tags);
   const has = item.tags.includes(VIEWED_TAG);
@@ -209,20 +226,23 @@ async function fetchTmdbDataForItem(text) {
     const releaseDate = isMovie ? result.release_date : result.first_air_date;
     const resultYear = releaseDate ? releaseDate.substring(0, 4) : null;
     
-    // Извлекаем страну производства
-    let country = null;
-    if (result.production_countries?.length) {
-      country = result.production_countries[0].name?.toLowerCase();
-    } else if (result.origin_country?.length) {
-      // origin_country содержит коды стран (US, KR и т.д.), конвертируем в названия
-      const countryMap = { US: "сша", GB: "великобритания", KR: "южная корея", JP: "япония", FR: "франция", DE: "германия", IT: "италия", ES: "испания", CN: "китай", IN: "индия", RU: "россия", CA: "канада", AU: "австралия", BR: "бразилия", MX: "мексика", SE: "швеция", DK: "дания", NO: "норвегия", FI: "финляндия", NL: "нидерланды", BE: "бельгия", AT: "австрия", CH: "швейцария", PL: "польша", CZ: "чехия", TR: "турция", TH: "таиланд", PH: "филиппины", ID: "индонезия", MY: "малайзия", SG: "сингапур", HK: "гонконг", TW: "тайвань", NZ: "новая зеландия", AR: "аргентина", CL: "чили", CO: "колумбия", ZA: "юар", EG: "египет", IL: "израиль", AE: "оаэ", SA: "саудовская аравия", UA: "украина", BY: "беларусь", KZ: "казахстан" };
-      const code = result.origin_country[0];
-      country = countryMap[code] || code?.toLowerCase();
+    const genreList = result.genre_ids.map(id => genres.get(id)).filter(Boolean);
+    
+    // Извлекаем код страны (US, KR, JP и т.д.) — храним как код
+    let countryCode = null;
+    if (result.origin_country?.length) {
+      countryCode = result.origin_country[0];
+    } else if (result.production_countries?.length) {
+      // Попробуем найти код по названию
+      const countryName = result.production_countries[0].name?.toLowerCase();
+      for (const [code, name] of Object.entries(COUNTRY_CODES)) {
+        if (name.toLowerCase() === countryName) { countryCode = code; break; }
+      }
     }
     
-    const genreList = result.genre_ids.map(id => genres.get(id)).filter(Boolean);
-    if (country && !genreList.includes(country)) {
-      genreList.push(country);
+    // Добавляем код страны в теги (в нижнем регистре)
+    if (countryCode && !genreList.includes(countryCode.toLowerCase())) {
+      genreList.push(countryCode.toLowerCase());
     }
     
     return {
@@ -458,12 +478,15 @@ function renderTagFilterMenu() {
   const tags = [...counts.keys()].sort((a, b) => a.localeCompare(b, "ru"));
   if (!tags.length) { list.innerHTML = `<div class="tag-empty">Тегов нет</div>`; hint.textContent = ""; return; }
 
-  list.innerHTML = tags.map(t => `
+  list.innerHTML = tags.map(t => {
+    const displayName = isCountryTag(t) ? countryDisplayName(t) : t;
+    return `
     <div class="tag-option ${tagFilter.has(t) ? "on" : ""}" data-tag="${esc(t)}">
       <span class="tag-check"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-check"></use></svg></span>
-      <span class="tag-name">${esc(t)}</span>
+      <span class="tag-name">${esc(displayName)}</span>
       <span class="tag-count">${counts.get(t)}</span>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   list.querySelectorAll(".tag-option").forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); toggleTagFilterItem(el.dataset.tag); };
@@ -1192,8 +1215,13 @@ function render() {
     const hasDesc = !!x.item.desc;
     const isExpanded = expandedDescKey === key;
     const secTag = currentSection === "__all__" ? `<span class="item-section-tag">${esc(x.secKey)}</span>` : "";
-    const tags = displayTags(x.item).sort((a, b) => a.localeCompare(b, "ru"));
-    const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
+    const rawTags = displayTags(x.item);
+    // Разделяем на страны и обычные теги, страны первыми
+    const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
+    const otherTags = rawTags.filter(t => !isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
+    const tagsHtml = (countryTags.length || otherTags.length) 
+      ? `<span class="item-tags">${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` 
+      : "";
 
     const descBtn = hasDesc
       ? `<button class="desc-action has-desc ${isExpanded ? "open" : ""}" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`

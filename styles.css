@@ -328,7 +328,25 @@ header{
 .item-line.selected{
   background:var(--border2);
   box-shadow:inset 0 0 0 1px var(--border);
-  padding-left:44px;
+}
+
+/* Смещение контента для кнопки удаления — только для основной строки, не для описания */
+.item-line.selected > .item-section-tag,
+.item-line.selected > .item-main,
+.item-line.selected > .desc-action,
+.item-line.selected > .tag-action,
+.item-line.selected > .viewed-action{
+  margin-left:36px;
+}
+.item-line.selected > .item-section-tag{
+  margin-left:36px;
+}
+.item-line.selected > .item-section-tag:first-of-type{
+  margin-left:36px;
+}
+/* Первый элемент после item-del получает отступ */
+.item-line.selected > .item-del + *{
+  margin-left:36px;
 }
 
 /* Кнопка удаления позиции (слева) — абсолютная, не влияет на layout */
@@ -421,6 +439,12 @@ header{
   user-select:none;
   -webkit-user-select:none;
   white-space:nowrap;
+}
+
+/* Country tags — brighter, displayed first */
+.tag-chip.country{
+  color:var(--text);
+  border-color:var(--border);
 }
 
 /* Right actions (tag + viewed) */
@@ -899,7 +923,8 @@ header{
   position:relative;
   width:100%;
   margin-top:12px;
-  padding:12px 8px;
+  padding:12px 0;
+  padding-bottom:44px;
   border-top:1px solid var(--border);
   display:flex;
   gap:14px;
@@ -917,7 +942,6 @@ header{
 .item-desc-content{
   flex:1;
   min-width:0;
-  padding-right:38px;
 }
 
 .item-desc-text{
@@ -926,11 +950,11 @@ header{
   color:var(--text);
 }
 
-/* Description delete button — bottom right, same offset as viewed button */
+/* Description delete button — bottom right corner of desc block */
 .desc-del-btn{
   position:absolute;
-  right:8px;
-  bottom:6px;
+  right:0;
+  bottom:8px;
   width:30px;
   height:30px;
   border-radius:10px;
