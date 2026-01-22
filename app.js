@@ -14,7 +14,8 @@ let tagFilter = loadTagFilter();
 
 let data = { sections: {} };
 let isEditing = false;
-let selectedKey = null;
+let selectedKey = localStorage.getItem("selected_key") || null;
+let sortMenuOpen = (localStorage.getItem("sort_menu_open") || "0") === "1";
 let editCtx = null;
 let tagEditorCtx = null;
 let mobileSearchOpen = false;
@@ -56,10 +57,30 @@ async function init() {
   updateSectionButton();
   render();
 
-  // Keep initial position like before (content right under header)
+  // Restore UI state (scroll, selection, open menus)
   requestAnimationFrame(() => {
     if (document.body.classList.contains("editing")) return;
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+    // restore scroll only when not editing
+    const y = Number(localStorage.getItem("scroll_y") || "0");
+    if (Number.isFinite(y) && y > 0) {
+      window.scrollTo({ top: y, left: 0, behavior: "instant" });
+    }
+
+    // restore selected item (if still exists after render)
+    if (selectedKey) {
+      let found = false;
+      document.querySelectorAll("#viewMode .item-line").forEach(el => {
+        if (el.dataset.key === selectedKey) { el.classList.add("selected"); found = true; }
+      });
+      if (!found) selectedKey = null;
+    }
+
+    // restore sort menu open state
+    if (sortMenuOpen && !isEditing) {
+      updateSortMenuUI();
+      openMenu("sortMenu", $("sortBtn"), "right");
+    }
   });
 }
 
@@ -794,8 +815,12 @@ function disarmSectionDelete() { deleteArmSection = null; if (deleteArmSectionTi
 function toggleSort() {
   if (isEditing) return;
   const menu = $("sortMenu");
-  if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); return; }
-  openMenu("sortMenu", $("sortBtn"), "right"); updateSortMenuUI();
+  const willOpen = menu.classList.contains("hidden");
+  if (!willOpen) { menu.classList.add("hidden"); sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0"); return; }
+  sortMenuOpen = true;
+  localStorage.setItem("sort_menu_open", "1");
+  openMenu("sortMenu", $("sortBtn"), "right");
+  updateSortMenuUI();
 }
 
 function setSortKey(key) {
@@ -803,8 +828,12 @@ function setSortKey(key) {
   else if (sortState.key === key) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
   else sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
   localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
-  updateSortMenuUI(); $("sortMenu").classList.add("hidden"); render();
+  selectedKey = null; localStorage.removeItem("selected_key");
+  disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  updateSortMenuUI();
+  $("sortMenu").classList.add("hidden");
+  sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
+  render();
 }
 
 function parseSortState(s) { if (!s) return null; const [k, d] = s.split(":"); return k ? { key: k, dir: d === "asc" ? "asc" : "desc" } : null; }
@@ -1313,7 +1342,7 @@ $("viewMode").addEventListener("click", e => {
     const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
     if (a === "desc") {
-      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); }
+      if (selectedKey !== key) { selectedKey = key; localStorage.setItem("selected_key", selectedKey); disarmItemDelete(); }
       // При открытии описания скрываем всплывающее меню тегов
       closeTagEditor();
       toggleDescExpand(sec, idx);
@@ -1328,6 +1357,7 @@ $("viewMode").addEventListener("click", e => {
 
       if (selectedKey !== key) {
         selectedKey = key;
+        localStorage.setItem("selected_key", selectedKey);
         disarmItemDelete();
         // выделяем строку без полного ререндера (чтобы якорь меню был валиден)
         document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
@@ -1349,6 +1379,8 @@ $("viewMode").addEventListener("click", e => {
   if (pointer.moved) return;
   const key = line.dataset.key;
   selectedKey = selectedKey === key ? null : key;
+  if (selectedKey) localStorage.setItem("selected_key", selectedKey);
+  else localStorage.removeItem("selected_key");
   disarmItemDelete(); closeTagEditor(); closeDescMenu();
   document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
   if (selectedKey) line.classList.add("selected");
@@ -1356,7 +1388,10 @@ $("viewMode").addEventListener("click", e => {
 
 document.addEventListener("click", e => {
   if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".view-toggle") && !e.target.closest(".search-toggle-btn")) {
-    closeAllMenus(); disarmSectionDelete(); renderSectionList();
+    closeAllMenus();
+    sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
+    disarmSectionDelete();
+    renderSectionList();
   }
 });
 
