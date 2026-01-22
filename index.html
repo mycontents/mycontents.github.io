@@ -4,64 +4,48 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Contents</title>
-
-  <!-- Tailwind (required) -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
   <link rel="stylesheet" href="styles.css" />
   <script src="app.js" defer></script>
 </head>
-
 <body>
   <div class="container" id="container">
     <header>
       <div class="header-row">
-        <!-- Left group: section + viewed toggle -->
         <div class="header-left">
           <button class="section-btn" id="sectionBtn" onclick="toggleSectionMenu()">
             <span id="currentSectionName">Все</span>
             <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-chevron-down"></use></svg>
           </button>
-
-          <!-- Viewed filter: 3 states (hide / show / only) -->
           <button class="view-toggle" id="viewedToggleBtn" onclick="cycleViewedFilter()" title="Фильтр просмотренного">
             <svg class="icon" viewBox="0 0 16 16"><use id="viewedToggleUse" href="icons.svg#i-eye-off"></use></svg>
           </button>
         </div>
-
-        <!-- Right group: all other controls -->
         <div class="header-right">
           <button class="icon-btn" id="tagFilterBtn" onclick="toggleTagFilterMenu()" title="Фильтр по тегам">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-tag"></use></svg>
           </button>
-
-          <!-- Mobile: search toggle button -->
           <button class="search-toggle-btn" id="searchToggleBtn" onclick="toggleMobileSearch()" title="Поиск">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-search"></use></svg>
           </button>
-
-          <div class="filter-wrap" id="filterWrap" title="Фильтр">
+          <div class="filter-wrap" id="filterWrap">
             <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
-            <button class="filter-clear hidden" id="filterClear" title="Очистить фильтр" onclick="clearFilter()">
+            <button class="filter-clear hidden" id="filterClear" onclick="clearFilter()">
               <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
             </button>
           </div>
-
           <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Сортировка">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-sort"></use></svg>
           </button>
-
           <button class="icon-btn" id="editBtn" onclick="toggleEdit()" title="Редактировать">
             <svg class="icon" viewBox="0 0 16 16"><use id="editUse" href="icons.svg#i-pencil"></use></svg>
           </button>
         </div>
       </div>
-
-      <!-- Mobile: expanded search field (in document flow, pushes content down) -->
       <div class="mobile-search-row hidden" id="mobileSearchRow">
         <div class="filter-wrap mobile-filter">
           <input class="filter-input" id="mobileFilterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
-          <button class="filter-clear hidden" id="mobileFilterClear" title="Очистить фильтр" onclick="clearFilter()">
+          <button class="filter-clear hidden" id="mobileFilterClear" onclick="clearFilter()">
             <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
           </button>
         </div>
@@ -70,80 +54,59 @@
 
     <div class="content-area">
       <div class="content-list" id="viewMode"></div>
-
       <div class="hidden" id="editMode">
         <div class="edit-hint hidden" id="editHint">[Раздел] Текст</div>
         <textarea class="content-edit" id="editor" placeholder="..."></textarea>
         <div class="edit-panel">
-          <button class="btn-cancel" onclick="cancelEdit()" title="Отмена">
+          <button class="btn-cancel" onclick="cancelEdit()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
           </button>
-          <button class="btn-save" onclick="saveEdit()" title="Сохранить">
+          <button class="btn-save" onclick="saveEdit()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
           </button>
         </div>
       </div>
-
       <div class="counter" id="counter"></div>
     </div>
 
-    <!-- Sections (with settings inside) -->
+    <!-- Sections menu -->
     <div class="dropdown-menu section-menu hidden" id="sectionMenu">
       <div class="menu-option all-sections-row">
         <span onclick="selectSection('__all__')">Все</span>
         <button class="add-section-btn" onclick="showNewSectionInput()" title="Новый раздел">+</button>
       </div>
-      <input
-        type="text"
-        class="new-section-input hidden"
-        id="newSectionInput"
-        placeholder="Название..."
-        onkeydown="handleNewSection(event)"
-      />
+      <input type="text" class="new-section-input hidden" id="newSectionInput" placeholder="Название..." onkeydown="handleNewSection(event)" />
       <div id="sectionList"></div>
-
       <div class="menu-divider"></div>
       <div class="menu-option" onclick="toggleSettingsPanel()">
         <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-gear"></use></svg>
         <span>Подключение</span>
       </div>
-
-      <!-- Settings panel (hidden by default) -->
       <div class="settings-panel hidden" id="settingsPanel">
         <label>Gist ID</label>
         <input type="text" id="inputGistId" placeholder="abc123..." />
-
         <label>Token</label>
         <input type="password" id="inputToken" placeholder="ghp_..." />
-
         <div class="settings-buttons">
-          <button class="settings-btn btn-primary" onclick="saveSettings()" title="Применить">
+          <button class="settings-btn btn-primary" onclick="saveSettings()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
           </button>
-          <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn" title="Скопировать ссылку">
+          <button class="settings-btn btn-share" onclick="copyShareLink()" id="shareBtn">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-copy"></use></svg>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Sort -->
+    <!-- Sort menu -->
     <div class="dropdown-menu sort-menu hidden" id="sortMenu">
-      <div class="menu-option" data-key="manual" onclick="setSortKey('manual')">
-        Вручную <span class="sort-dir"></span>
-      </div>
-      <div class="menu-option" data-key="date" onclick="setSortKey('date')">
-        Дата <span class="sort-dir"></span>
-      </div>
-      <div class="menu-option" data-key="alpha" onclick="setSortKey('alpha')">
-        А-Я <span class="sort-dir"></span>
-      </div>
-      <div class="menu-option" data-key="year" onclick="setSortKey('year')">
-        Год <span class="sort-dir"></span>
-      </div>
+      <div class="menu-option" data-key="manual" onclick="setSortKey('manual')">Вручную <span class="sort-dir"></span></div>
+      <div class="menu-option" data-key="date" onclick="setSortKey('date')">Дата <span class="sort-dir"></span></div>
+      <div class="menu-option" data-key="alpha" onclick="setSortKey('alpha')">А-Я <span class="sort-dir"></span></div>
+      <div class="menu-option" data-key="year" onclick="setSortKey('year')">Год <span class="sort-dir"></span></div>
     </div>
 
-    <!-- Tag filter -->
+    <!-- Tag filter menu -->
     <div class="dropdown-menu tag-filter-menu hidden" id="tagFilterMenu">
       <div class="tag-menu-head">
         <div class="tag-menu-title">Теги</div>
@@ -155,33 +118,27 @@
       <div class="tag-menu-hint" id="tagFilterHint"></div>
     </div>
 
-    <!-- Tag editor (for item) -->
+    <!-- Tag editor menu -->
     <div class="dropdown-menu tag-editor-menu hidden" id="tagEditorMenu">
       <div class="tag-menu-head">
         <div class="tag-menu-title" id="tagEditorTitle">Теги</div>
-        <button class="mini-btn" onclick="closeTagEditor()" title="Закрыть">
-          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+        <button class="mini-btn" onclick="clearTagsForCurrentItem()" title="Очистить все">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-trash"></use></svg>
         </button>
       </div>
-
       <div class="tag-add-row">
         <input class="tag-add-input" id="tagAddInput" placeholder="Добавить тег..." autocomplete="off" spellcheck="false" onkeydown="handleTagAdd(event)" />
         <button class="mini-btn" onclick="addTagFromInput()" title="Добавить">
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
         </button>
       </div>
-
       <div class="tag-menu-list" id="tagEditorList"></div>
-
-      <div class="menu-divider"></div>
-      <div class="menu-option" onclick="clearTagsForCurrentItem()">Очистить теги</div>
     </div>
   </div>
 
-  <!-- Undo bar -->
   <div class="undo-bar hidden" id="undoBar">
     <div class="undo-text" id="undoText"></div>
-    <button class="undo-btn" id="undoBtn" title="Отменить">
+    <button class="undo-btn" id="undoBtn">
       <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-undo"></use></svg>
     </button>
   </div>
