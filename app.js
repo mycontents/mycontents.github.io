@@ -565,6 +565,7 @@ function matchFilters(item) {
 
 function startEdit() {
   isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); setFilterLock(true);
+  document.body.classList.add("editing");
   const editor = $("editor"), hint = $("editHint");
   $("editUse").setAttribute("href", `${ICONS}#i-x`);
   normalizeDataModel();
@@ -593,6 +594,7 @@ function startEdit() {
 
 function cancelEdit() {
   isEditing = false; editCtx = null; setFilterLock(false);
+  document.body.classList.remove("editing");
   $("viewMode").classList.remove("hidden"); $("editMode").classList.add("hidden"); $("editHint").classList.add("hidden");
   $("editUse").setAttribute("href", `${ICONS}#i-pencil`);
 }
