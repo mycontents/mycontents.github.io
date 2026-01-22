@@ -829,6 +829,68 @@ header{
   font-size:13px;
 }
 
+/* Description menu */
+.dropdown-menu.desc-menu{
+  padding:12px;
+  width:320px;
+  max-width:90vw;
+}
+.desc-menu-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+.desc-menu-title{
+  font-size:11px;
+  color:#8b949e;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.desc-menu-content{
+  font-size:13px;
+  line-height:1.5;
+  color:var(--text);
+  max-height:300px;
+  overflow-y:auto;
+}
+
+/* Info/description button on item */
+.desc-action{
+  width:30px;
+  height:30px;
+  border-radius:10px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  -webkit-tap-highlight-color:var(--tap);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s, background .12s, border-color .12s, color .12s;
+}
+.item-line.selected .desc-action{
+  opacity:1;
+  pointer-events:auto;
+}
+.desc-action:hover{
+  color:var(--text);
+  background:#0b0f15;
+  border-color:var(--border);
+}
+/* Always show if has description */
+.desc-action.has-desc{
+  opacity:0.6;
+  pointer-events:auto;
+}
+.item-line.selected .desc-action.has-desc{
+  opacity:1;
+}
+
 /* ===== Undo bar ===== */
 .undo-bar{
   position:fixed;

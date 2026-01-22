@@ -86,10 +86,10 @@
       <div class="settings-panel hidden" id="settingsPanel">
         <label>Gist ID</label>
         <input type="text" id="inputGistId" placeholder="abc123..." />
-        <label>Token</label>
+        <label>GitHub Token (classic)</label>
         <input type="password" id="inputToken" placeholder="ghp_..." />
         <label>TMDB API Key</label>
-        <input type="text" id="inputTmdbKey" placeholder="a1b2c3d4..." />
+        <input type="password" id="inputTmdbKey" placeholder="a1b2c3d4..." />
         <div class="settings-buttons">
           <button class="settings-btn btn-primary" onclick="saveSettings()">
             <svg class="icon" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
@@ -139,6 +139,17 @@
         </button>
       </div>
       <div class="tag-menu-list" id="tagEditorList"></div>
+    </div>
+
+    <!-- Description popup -->
+    <div class="dropdown-menu desc-menu hidden" id="descMenu">
+      <div class="desc-menu-head">
+        <div class="desc-menu-title">Описание</div>
+        <button class="mini-btn" onclick="closeDescMenu()" title="Закрыть">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
+        </button>
+      </div>
+      <div class="desc-menu-content" id="descContent"></div>
     </div>
   </div>
 

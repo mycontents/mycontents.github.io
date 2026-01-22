@@ -155,17 +155,10 @@ async function loadTmdbGenres() {
 }
 
 function parseTitleForSearch(text) {
-  // Примеры: "Название (2023)", "Название / Name (2023)", "Name / Название"
-  // Извлекаем год если есть
   const yearMatch = text.match(/\((\d{4})\)/);
   const year = yearMatch ? yearMatch[1] : null;
-  
-  // Убираем год из текста для парсинга названий
   let clean = text.replace(/\(\d{4}\)/, "").trim();
-  
-  // Разделяем по " / " для получения разных вариантов названия
   const parts = clean.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
-  
   return { names: parts.length ? parts : [clean], year };
 }
 
@@ -182,38 +175,43 @@ async function searchTmdb(query, year, type) {
   } catch { return null; }
 }
 
-async function fetchGenresForItem(text) {
+async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return [];
+  if (!genres) return { genres: [], overview: null };
   
   const { names, year } = parseTitleForSearch(text);
   
-  // Стратегия поиска:
-  // 1. Для каждого названия пробуем movie, потом tv
-  // 2. Если не нашли с годом — пробуем без года
   const trySearch = async (name, y) => {
     let result = await searchTmdb(name, y, "movie");
-    if (result?.genre_ids?.length) return result.genre_ids;
+    if (result?.genre_ids?.length) return result;
     result = await searchTmdb(name, y, "tv");
-    if (result?.genre_ids?.length) return result.genre_ids;
+    if (result?.genre_ids?.length) return result;
     return null;
   };
   
-  // Пробуем каждое название с годом
   for (const name of names) {
-    const ids = await trySearch(name, year);
-    if (ids) return ids.map(id => genres.get(id)).filter(Boolean);
-  }
-  
-  // Если есть год и не нашли — пробуем без года
-  if (year) {
-    for (const name of names) {
-      const ids = await trySearch(name, null);
-      if (ids) return ids.map(id => genres.get(id)).filter(Boolean);
+    const result = await trySearch(name, year);
+    if (result) {
+      return {
+        genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
+        overview: result.overview || null
+      };
     }
   }
   
-  return [];
+  if (year) {
+    for (const name of names) {
+      const result = await trySearch(name, null);
+      if (result) {
+        return {
+          genres: result.genre_ids.map(id => genres.get(id)).filter(Boolean),
+          overview: result.overview || null
+        };
+      }
+    }
+  }
+  
+  return { genres: [], overview: null };
 }
 
 async function fetchTmdbTags() {
@@ -226,15 +224,28 @@ async function fetchTmdbTags() {
   btn.classList.remove("success", "error");
   
   try {
-    const genres = await fetchGenresForItem(item.text);
+    const { genres, overview } = await fetchTmdbDataForItem(item.text);
+    let updated = false;
+    
     if (genres.length) {
       const existing = new Set(item.tags.map(normTag));
       const newTags = genres.filter(g => !existing.has(normTag(g)));
       if (newTags.length) {
         item.tags = uniqueTags([...item.tags, ...newTags]);
-        data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
-        saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
+        updated = true;
       }
+    }
+    
+    if (overview && !item.desc) {
+      item.desc = overview;
+      updated = true;
+    }
+    
+    if (updated) {
+      data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
+      saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
+      btn.classList.add("success");
+    } else if (genres.length || overview) {
       btn.classList.add("success");
     } else {
       btn.classList.add("error");
@@ -268,7 +279,7 @@ function setupFilterUI() {
     clear.classList.toggle("hidden", !filterQuery);
     mClear.classList.toggle("hidden", !filterQuery);
     updateSearchBtnUI();
-    selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
+    selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
   };
   input.oninput = () => handle(input.value);
   mInput.oninput = () => handle(mInput.value);
@@ -283,7 +294,7 @@ function clearFilter() {
   $("filterClear").classList.add("hidden");
   $("mobileFilterClear").classList.add("hidden");
   updateSearchBtnUI();
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
 }
 
 function setFilterLock(locked) {
@@ -354,14 +365,14 @@ function toggleTagFilterItem(tag) {
   if (!t || t === VIEWED_TAG) return;
   tagFilter.has(t) ? tagFilter.delete(t) : tagFilter.add(t);
   saveTagFilter(); updateTagFilterBtnUI();
-  selectedKey = null; disarmItemDelete(); closeTagEditor();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   renderTagFilterMenu(); render();
 }
 
 function clearTagFilter() {
   tagFilter = new Set();
   saveTagFilter(); updateTagFilterBtnUI();
-  selectedKey = null; disarmItemDelete(); closeTagEditor();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   renderTagFilterMenu(); render();
 }
 
@@ -458,6 +469,18 @@ function clearTagsForCurrentItem() {
   if (oldTags.filter(t => t !== VIEWED_TAG).length) startUndo({ type: "tagClear", secKey, idx, oldTags }, "Теги очищены");
 }
 
+// ===== Description menu =====
+function openDescMenu(secKey, idx, anchor) {
+  const sec = data.sections[secKey];
+  if (!sec?.items?.[idx]) return;
+  const item = sec.items[idx];
+  if (!item.desc) return;
+  $("descContent").textContent = item.desc;
+  openMenu("descMenu", anchor, "right");
+}
+
+function closeDescMenu() { $("descMenu").classList.add("hidden"); }
+
 // ===== Viewed toggle =====
 function updateViewedToggleUI() {
   const btn = $("viewedToggleBtn"), use = $("viewedToggleUse");
@@ -471,7 +494,7 @@ function cycleViewedFilter() {
   if (isEditing) return;
   viewedFilter = viewedFilter === "hide" ? "show" : viewedFilter === "show" ? "only" : "hide";
   localStorage.setItem("viewed_filter", viewedFilter);
-  selectedKey = null; disarmItemDelete(); closeTagEditor();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   updateViewedToggleUI(); render();
 }
 
@@ -489,7 +512,7 @@ function openMenu(menuId, anchor, align = "left") {
 }
 
 function closeAllMenus(except) {
-  ["sortMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu"].forEach(id => { if (id !== except) $(id)?.classList.add("hidden"); });
+  ["sortMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu", "descMenu"].forEach(id => { if (id !== except) $(id)?.classList.add("hidden"); });
   if (except !== "tagEditorMenu") tagEditorCtx = null;
 }
 
@@ -513,7 +536,7 @@ function saveSettings() {
   localStorage.setItem("github_token", t);
   localStorage.setItem("tmdb_key", tmdb);
   GIST_ID = g; TOKEN = t; TMDB_KEY = tmdb;
-  tmdbGenres = null; // reset cache
+  tmdbGenres = null;
   $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
   updateShareButton(); updateTmdbBtnVisibility(); init();
 }
@@ -549,7 +572,7 @@ function renderSectionList() {
 
 function selectSection(key) {
   currentSection = key; localStorage.setItem("current_section", key);
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); disarmSectionDelete();
   updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden"); render();
 }
 
@@ -575,7 +598,7 @@ function handleSectionDelete(key) {
       localStorage.setItem("current_section", "__all__");
       updateSectionButton();
     }
-    selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
+    selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); disarmSectionDelete();
     saveData(); renderSectionList(); render();
     startUndo(payload, `Раздел удалён: ${key}`);
     return;
@@ -601,7 +624,7 @@ function setSortKey(key) {
   else if (sortState.key === key) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
   else sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
   localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
-  selectedKey = null; disarmItemDelete(); closeTagEditor();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   updateSortMenuUI(); $("sortMenu").classList.add("hidden"); render();
 }
 
@@ -672,7 +695,7 @@ function toggleItemViewed(secKey, idx) {
   const item = sec.items[idx], was = isViewed(item);
   setViewed(item, !was);
   sec.modified = new Date().toISOString();
-  selectedKey = null; disarmItemDelete(); closeTagEditor();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   saveData(); render();
   startUndo({ type: "viewed", secKey, idx, was }, was ? "Снято: просмотрено" : "Отмечено просмотренным");
 }
@@ -697,7 +720,7 @@ function deleteItemNow(secKey, idx) {
   const item = JSON.parse(JSON.stringify(arr[idx]));
   arr.splice(idx, 1);
   data.sections[secKey].modified = new Date().toISOString();
-  disarmItemDelete(); closeTagEditor(); selectedKey = null;
+  disarmItemDelete(); closeTagEditor(); closeDescMenu(); selectedKey = null;
   saveData(); render();
   startUndo({ type: "item", secKey, idx, item }, "Запись удалена");
 }
@@ -726,7 +749,7 @@ function adjustEditHeight() {
 }
 
 function startEdit() {
-  isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); setFilterLock(true);
+  isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); setFilterLock(true);
   document.body.classList.add("editing");
   adjustEditHeight();
   if (window.visualViewport) {
@@ -857,13 +880,18 @@ function render() {
   if (!items.length) { view.innerHTML = ""; updateCounter(0); return; }
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
-  if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
+  if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); }
 
   view.innerHTML = items.map(x => {
     const key = `${x.secKey}|${x.idx}`, sel = selectedKey === key, viewed = isViewed(x.item);
+    const hasDesc = !!x.item.desc;
     const secTag = currentSection === "__all__" ? `<span class="item-section-tag">${esc(x.secKey)}</span>` : "";
     const tags = displayTags(x.item).sort((a, b) => a.localeCompare(b, "ru"));
     const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
+
+    const descBtn = hasDesc
+      ? `<button class="desc-action has-desc" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-info"></use></svg></button>`
+      : `<button class="desc-action" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-info"></use></svg></button>`;
 
     let viewedBtn;
     if (viewed) {
@@ -878,6 +906,7 @@ function render() {
         <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
         ${secTag}
         <div class="item-main"><span class="item-text">${esc(x.text)}</span>${tagsHtml}</div>
+        ${hasDesc ? descBtn : ""}
         <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
         ${viewedBtn}
       </div>`;
@@ -905,9 +934,10 @@ $("viewMode").addEventListener("click", e => {
     e.stopPropagation();
     const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
-    if (a === "tags") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); render(); } openTagEditor(sec, idx, act); return; }
+    if (a === "desc") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); render(); } openDescMenu(sec, idx, act); return; }
+    if (a === "tags") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeDescMenu(); render(); } openTagEditor(sec, idx, act); return; }
     if (a === "del") {
-      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); render(); armItemDelete(key); return; }
+      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render(); armItemDelete(key); return; }
       if (deleteArmItemKey === key) { deleteItemNow(sec, idx); return; }
       armItemDelete(key); return;
     }
@@ -918,7 +948,7 @@ $("viewMode").addEventListener("click", e => {
   if (pointer.moved) return;
   const key = line.dataset.key;
   selectedKey = selectedKey === key ? null : key;
-  disarmItemDelete(); closeTagEditor();
+  disarmItemDelete(); closeTagEditor(); closeDescMenu();
   document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
   if (selectedKey) line.classList.add("selected");
 });
@@ -929,16 +959,11 @@ document.addEventListener("click", e => {
   }
 });
 
-window.addEventListener("scroll", () => {
-  // Не закрываем sectionMenu при скролле (мешает вводу на мобильных с клавиатурой)
-  ["sortMenu", "tagFilterMenu", "tagEditorMenu"].forEach(id => $(id)?.classList.add("hidden"));
-}, { passive: true });
-
 // ===== Utils =====
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, closeDescMenu });
 
 init();
