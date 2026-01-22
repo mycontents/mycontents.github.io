@@ -55,6 +55,12 @@ async function init() {
   renderSectionList();
   updateSectionButton();
   render();
+
+  // Keep initial position like before (content right under header)
+  requestAnimationFrame(() => {
+    if (document.body.classList.contains("editing")) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  });
 }
 
 function applyUrlSetup() {

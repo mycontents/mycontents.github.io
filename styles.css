@@ -295,12 +295,10 @@ header{
   line-height:1.5;
 }
 
-/* Extra scroll slack (non-edit mode): allow scrolling so first/last items can reach ~center */
-.content-list:not(:empty)::before,
-.content-list:not(:empty)::after{
-  content:"";
-  display:block;
+/* Scroll slack blocks (move the whole content area within viewport) */
+.scroll-slack{
   height:clamp(80px, 40vh, 360px);
+  pointer-events:none;
 }
 
 .content-list:empty::before{
@@ -311,6 +309,9 @@ header{
   justify-content:center;
   padding-top:40px;
 }
+
+/* In edit mode we don't need outer slack */
+body.editing .scroll-slack{ display:none; }
 
 .item-line{
   position:relative;
