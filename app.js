@@ -22,6 +22,7 @@ let pointer = { down: false, startX: 0, startY: 0, moved: false, startedAt: 0 };
 let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
+let savingEdit = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -403,7 +404,7 @@ function renderSectionList() {
     <div class="menu-option ${currentSection === key ? "active" : ""} ${deleteArmSection === key ? "armed" : ""}" onclick="selectSection('${escQ(key)}')">
       <span>${esc(key)}</span>
       <span class="menu-actions" onclick="event.stopPropagation()">
-        <button class="mini-btn danger" onclick="handleSectionDelete('${escQ(key)}')">×</button>
+        <button class="mini-btn danger" onclick="event.stopPropagation(); handleSectionDelete('${escQ(key)}')">×</button>
       </span>
     </div>`).join("");
 }
@@ -612,6 +613,7 @@ function startEdit() {
 }
 
 function cancelEdit() {
+  if (savingEdit) return;
   if (window.visualViewport) {
     window.visualViewport.removeEventListener("resize", adjustEditHeight);
     window.visualViewport.removeEventListener("scroll", adjustEditHeight);
@@ -644,25 +646,40 @@ function parseAllLines(lines) {
 }
 
 async function saveEdit() {
-  const lines = $("editor").value.split("\n").map(s => s.trim()).filter(Boolean);
+  if (savingEdit) return;
   if (!editCtx) return;
-  normalizeDataModel();
+  savingEdit = true;
 
-  if (editCtx.mode === "section") {
-    const orig = data.sections[editCtx.secKey]?.items || [];
-    data.sections[editCtx.secKey] = { items: mergeByMask(orig, editCtx.mask, lines), modified: new Date().toISOString() };
-  } else {
-    const newBy = parseAllLines(lines);
-    for (const key of new Set([...Object.keys(data.sections), ...Object.keys(newBy)])) {
-      const orig = data.sections[key]?.items || [];
-      const mask = editCtx.masks[key] || new Array(orig.length).fill(false);
-      const merged = mergeByMask(orig, mask, newBy[key] || []);
-      if (!data.sections[key]) data.sections[key] = { items: [], modified: new Date().toISOString() };
-      data.sections[key].items = merged;
-      data.sections[key].modified = new Date().toISOString();
+  const btns = document.querySelectorAll("#editMode .edit-panel button");
+  btns.forEach(b => (b.disabled = true));
+
+  try {
+    const lines = $("editor").value.split("\n").map(s => s.trim()).filter(Boolean);
+    normalizeDataModel();
+
+    if (editCtx.mode === "section") {
+      const orig = data.sections[editCtx.secKey]?.items || [];
+      data.sections[editCtx.secKey] = { items: mergeByMask(orig, editCtx.mask, lines), modified: new Date().toISOString() };
+    } else {
+      const newBy = parseAllLines(lines);
+      for (const key of new Set([...Object.keys(data.sections), ...Object.keys(newBy)])) {
+        const orig = data.sections[key]?.items || [];
+        const mask = editCtx.masks[key] || new Array(orig.length).fill(false);
+        const merged = mergeByMask(orig, mask, newBy[key] || []);
+        if (!data.sections[key]) data.sections[key] = { items: [], modified: new Date().toISOString() };
+        data.sections[key].items = merged;
+        data.sections[key].modified = new Date().toISOString();
+      }
     }
+
+    await saveData();
+    renderSectionList();
+    cancelEdit();
+    render();
+  } finally {
+    btns.forEach(b => (b.disabled = false));
+    savingEdit = false;
   }
-  await saveData(); renderSectionList(); cancelEdit(); render();
 }
 
 // ===== Render =====
