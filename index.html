@@ -30,6 +30,7 @@
           </button>
           <div class="filter-wrap" id="filterWrap">
             <input class="filter-input" id="filterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
+            <span class="filter-counter" id="filterCounter"></span>
             <button class="filter-clear hidden" id="filterClear" onclick="clearFilter()">
               <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
             </button>
@@ -45,6 +46,7 @@
       <div class="mobile-search-row hidden" id="mobileSearchRow">
         <div class="filter-wrap mobile-filter">
           <input class="filter-input" id="mobileFilterInput" placeholder="Фильтр" autocapitalize="off" autocomplete="off" spellcheck="false" />
+          <span class="filter-counter" id="mobileFilterCounter"></span>
           <button class="filter-clear hidden" id="mobileFilterClear" onclick="clearFilter()">
             <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-x"></use></svg>
           </button>
@@ -66,7 +68,6 @@
           </button>
         </div>
       </div>
-      <div class="counter" id="counter"></div>
     </div>
 
     <!-- Sections menu -->

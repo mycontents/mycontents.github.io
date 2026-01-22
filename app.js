@@ -35,7 +35,7 @@ async function init() {
 
   if (!GIST_ID || !TOKEN) {
     $("viewMode").innerHTML = `<div class="setup-prompt">Откройте меню → Подключение</div>`;
-    $("counter").textContent = "";
+    updateCounter(0);
     return;
   }
 
@@ -682,7 +682,7 @@ function buildItems() {
 function render() {
   const view = $("viewMode"), items = buildItems();
   updateTagFilterBtnUI();
-  if (!items.length) { view.innerHTML = ""; $("counter").textContent = "0"; return; }
+  if (!items.length) { view.innerHTML = ""; updateCounter(0); return; }
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
@@ -710,7 +710,13 @@ function render() {
         ${viewedBtn}
       </div>`;
   }).join("");
-  $("counter").textContent = String(items.length);
+  updateCounter(items.length);
+}
+
+function updateCounter(n) {
+  const text = String(n);
+  $("filterCounter").textContent = text;
+  $("mobileFilterCounter").textContent = text;
 }
 
 // ===== Interactions =====

@@ -74,9 +74,7 @@ body.editing .edit-panel{
   flex:0 0 auto;
   padding:8px 12px;
 }
-body.editing .counter{
-  display:none;
-}
+
 body.editing .edit-hint{
   padding:6px 12px;
 }
@@ -217,6 +215,13 @@ header{
 }
 .filter-clear:hover{ color:var(--text); background:var(--panel2); }
 .filter-clear.hidden{ display:none; }
+
+.filter-counter{
+  font-size:12px;
+  color:var(--muted2);
+  white-space:nowrap;
+  flex:0 0 auto;
+}
 
 /* Mobile: search button instead of full input */
 .search-toggle-btn{
@@ -543,14 +548,7 @@ header{
 .btn-cancel{ background:var(--border); }
 .btn-save{ background:var(--green); }
 
-.counter{
-  text-align:right;
-  padding:8px 15px 12px;
-  color:var(--muted2);
-  font-size:12px;
-  border-top:1px solid var(--border);
-  background:transparent;
-}
+
 
 /* ===== Dropdowns ===== */
 .dropdown-menu{
