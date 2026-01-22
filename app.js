@@ -400,11 +400,13 @@ function toggleSectionMenu() {
 }
 
 function renderSectionList() {
-  $("sectionList").innerHTML = Object.keys(data.sections).map(key => `
+  const keys = Object.keys(data.sections);
+  const canDelete = keys.length > 1;
+  $("sectionList").innerHTML = keys.map(key => `
     <div class="menu-option ${currentSection === key ? "active" : ""} ${deleteArmSection === key ? "armed" : ""}" onclick="selectSection('${escQ(key)}')">
       <span>${esc(key)}</span>
       <span class="menu-actions" onclick="event.stopPropagation()">
-        <button class="mini-btn danger" onclick="event.stopPropagation(); handleSectionDelete('${escQ(key)}')">×</button>
+        ${canDelete ? `<button class="mini-btn danger" onclick="event.stopPropagation(); handleSectionDelete('${escQ(key)}')">×</button>` : ``}
       </span>
     </div>`).join("");
 }
@@ -428,17 +430,28 @@ function handleNewSection(e) {
 }
 
 function handleSectionDelete(key) {
-  if (Object.keys(data.sections).length <= 1 || !data.sections[key]) return;
+  const keys = Object.keys(data.sections);
+  if (keys.length <= 1 || !data.sections[key]) {
+    // If only one section left, do not arm delete at all.
+    disarmSectionDelete();
+    renderSectionList();
+    return;
+  }
   if (deleteArmSection === key) {
     const payload = { type: "section", key, secData: JSON.parse(JSON.stringify(data.sections[key])), prev: currentSection };
     delete data.sections[key];
-    if (currentSection === key) { currentSection = "__all__"; localStorage.setItem("current_section", "__all__"); updateSectionButton(); }
+    if (currentSection === key) {
+      currentSection = "__all__";
+      localStorage.setItem("current_section", "__all__");
+      updateSectionButton();
+    }
     selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
     saveData(); renderSectionList(); render();
     startUndo(payload, `Раздел удалён: ${key}`);
     return;
   }
-  deleteArmSection = key; renderSectionList();
+  deleteArmSection = key;
+  renderSectionList();
   if (deleteArmSectionTimer) clearTimeout(deleteArmSectionTimer);
   deleteArmSectionTimer = setTimeout(() => { disarmSectionDelete(); renderSectionList(); }, 6000);
 }
@@ -560,7 +573,11 @@ function deleteItemNow(secKey, idx) {
 }
 
 // ===== Edit =====
-function toggleEdit() { if (!TOKEN || !GIST_ID) { toggleSectionMenu(); return; } isEditing ? cancelEdit() : startEdit(); }
+function toggleEdit() {
+  if (!TOKEN || !GIST_ID) { toggleSectionMenu(); return; }
+  if (savingEdit) return;
+  isEditing ? cancelEdit() : startEdit();
+}
 
 function matchFilters(item) {
   const q = filterQuery.trim().toLowerCase();
@@ -647,7 +664,7 @@ function parseAllLines(lines) {
 
 async function saveEdit() {
   if (savingEdit) return;
-  if (!editCtx) return;
+  if (!editCtx || !isEditing) return;
   savingEdit = true;
 
   const btns = document.querySelectorAll("#editMode .edit-panel button");
@@ -673,8 +690,10 @@ async function saveEdit() {
     }
 
     await saveData();
-    renderSectionList();
+
+    // Ensure we leave edit mode exactly once.
     cancelEdit();
+    renderSectionList();
     render();
   } finally {
     btns.forEach(b => (b.disabled = false));
