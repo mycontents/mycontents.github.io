@@ -857,45 +857,6 @@ header{
   font-size:13px;
 }
 
-/* Description menu */
-.dropdown-menu.desc-menu{
-  padding:12px;
-  width:320px;
-  max-width:90vw;
-}
-.desc-menu-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:10px;
-}
-.desc-menu-title{
-  font-size:11px;
-  color:#8b949e;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-}
-.desc-menu-content{
-  font-size:15px;
-  line-height:1.6;
-  color:var(--text);
-  max-height:300px;
-  overflow-y:auto;
-}
-
-/* Poster in description menu */
-.desc-poster{
-  width:100%;
-  max-width:100%;
-  border-radius:8px;
-  margin-bottom:12px;
-  display:block;
-}
-.desc-poster.hidden{
-  display:none;
-}
-
 /* Info/description button on item — only for selected with desc */
 .desc-action{
   display:none;
@@ -920,11 +881,63 @@ header{
   border-color:var(--border);
 }
 
-/* Description button highlighted when menu is open */
+/* Description button highlighted when expanded */
 .item-line.selected .desc-action.has-desc.open{
   color:var(--blue);
   background:#0b0f15;
   border-color:var(--border);
+}
+
+/* Inline description expanded under item */
+.item-line.expanded{
+  flex-wrap:wrap;
+}
+.item-desc-block{
+  width:100%;
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px solid var(--border);
+  display:flex;
+  gap:14px;
+  align-items:flex-start;
+}
+
+.item-desc-poster{
+  width:120px;
+  min-width:120px;
+  border-radius:8px;
+  display:block;
+  flex:0 0 auto;
+}
+
+.item-desc-content{
+  flex:1;
+  min-width:0;
+}
+
+.item-desc-text{
+  font-size:14px;
+  line-height:1.55;
+  color:var(--text);
+  margin-bottom:10px;
+}
+
+.item-desc-actions{
+  display:flex;
+  gap:8px;
+}
+
+/* Mobile: poster on top */
+@media (max-width: 480px) {
+  .item-desc-block{
+    flex-direction:column;
+    gap:12px;
+  }
+  .item-desc-poster{
+    width:100%;
+    max-width:200px;
+    min-width:auto;
+  }
 }
 
 /* ===== Undo bar ===== */

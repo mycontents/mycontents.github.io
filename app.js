@@ -24,7 +24,7 @@ let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingInProgress = false; // Фоновое сохранение в процессе
-let descMenuCtx = null;
+let expandedDescKey = null; // "secKey|idx" для раскрытого описания
 let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
 let tmdbGenres = null;
@@ -516,71 +516,22 @@ function clearTagsForCurrentItem() {
   if (oldTags.filter(t => t !== VIEWED_TAG).length) startUndo({ type: "tagClear", secKey, idx, oldTags }, "Теги очищены");
 }
 
-// ===== Description menu =====
-function openDescMenu(secKey, idx, anchor) {
-  const sec = data.sections[secKey];
-  if (!sec?.items?.[idx]) return;
-  const item = sec.items[idx];
-  if (!item.desc) return;
-  
-  descMenuCtx = { secKey, idx };
-  
-  const posterEl = $("descPoster");
-  if (item.poster) {
-    posterEl.src = item.poster;
-    posterEl.classList.remove("hidden");
+// ===== Description inline expand =====
+function toggleDescExpand(secKey, idx) {
+  const key = `${secKey}|${idx}`;
+  if (expandedDescKey === key) {
+    expandedDescKey = null;
   } else {
-    posterEl.src = "";
-    posterEl.classList.add("hidden");
+    expandedDescKey = key;
   }
-  
-  $("descContent").textContent = item.desc;
-  
-  const line = anchor.closest(".item-line");
-  if (line) {
-    openMenuUnderElement("descMenu", line);
-  } else {
-    openMenu("descMenu", anchor, "right");
-  }
-}
-
-function openMenuUnderElement(menuId, element) {
-  closeAllMenus(menuId);
-  const menu = $(menuId), cont = $("container");
-  menu.classList.remove("hidden");
-  menu.style.visibility = "hidden";
-  
-  const cR = cont.getBoundingClientRect();
-  const eR = element.getBoundingClientRect();
-  const mR = menu.getBoundingClientRect();
-  
-  const top = eR.bottom - cR.top + 4;
-  let left = eR.right - cR.left - mR.width;
-  left = Math.max(0, Math.min(left, cR.width - mR.width));
-  
-  menu.style.top = `${top}px`;
-  menu.style.left = `${left}px`;
-  menu.style.visibility = "visible";
+  render();
 }
 
 function closeDescMenu() { 
-  $("descMenu").classList.add("hidden"); 
-  descMenuCtx = null;
+  expandedDescKey = null;
 }
 
-function toggleDescMenu(secKey, idx, anchor) {
-  const menu = $("descMenu");
-  if (!menu.classList.contains("hidden") && descMenuCtx?.secKey === secKey && descMenuCtx?.idx === idx) {
-    closeDescMenu();
-    render();
-    return;
-  }
-  openDescMenu(secKey, idx, anchor);
-}
-
-function clearDescForCurrentItem() {
-  if (!descMenuCtx) return;
-  const { secKey, idx } = descMenuCtx;
+function clearDescForItem(secKey, idx) {
   const item = data.sections?.[secKey]?.items?.[idx];
   if (!item) return;
   
@@ -592,7 +543,7 @@ function clearDescForCurrentItem() {
   item.poster = null;
   data.sections[secKey].modified = new Date().toISOString();
   
-  closeDescMenu();
+  expandedDescKey = null;
   saveData();
   render();
   
@@ -630,7 +581,7 @@ function openMenu(menuId, anchor, align = "left") {
 }
 
 function closeAllMenus(except) {
-  ["sortMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu", "descMenu"].forEach(id => { if (id !== except) $(id)?.classList.add("hidden"); });
+  ["sortMenu", "sectionMenu", "tagFilterMenu", "tagEditorMenu"].forEach(id => { if (id !== except) $(id)?.classList.add("hidden"); });
   if (except !== "tagEditorMenu") tagEditorCtx = null;
 }
 
@@ -1133,17 +1084,18 @@ function render() {
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); }
+  if (expandedDescKey && !keySet.has(expandedDescKey)) { expandedDescKey = null; }
 
   view.innerHTML = items.map(x => {
     const key = `${x.secKey}|${x.idx}`, sel = selectedKey === key, viewed = isViewed(x.item);
     const hasDesc = !!x.item.desc;
+    const isExpanded = expandedDescKey === key;
     const secTag = currentSection === "__all__" ? `<span class="item-section-tag">${esc(x.secKey)}</span>` : "";
     const tags = displayTags(x.item).sort((a, b) => a.localeCompare(b, "ru"));
     const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
 
-    const descMenuOpen = descMenuCtx?.secKey === x.secKey && descMenuCtx?.idx === x.idx;
     const descBtn = hasDesc
-      ? `<button class="desc-action has-desc ${descMenuOpen ? "open" : ""}" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
+      ? `<button class="desc-action has-desc ${isExpanded ? "open" : ""}" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
       : "";
 
     let viewedBtn;
@@ -1154,14 +1106,35 @@ function render() {
       viewedBtn = `<button class="viewed-action not-viewed" data-action="toggle-viewed"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg></button>`;
     }
 
+    // Inline description block (expanded)
+    let descBlock = "";
+    if (isExpanded && hasDesc) {
+      const posterHtml = x.item.poster 
+        ? `<img class="item-desc-poster" src="${esc(x.item.poster)}" alt="" loading="lazy" />`
+        : "";
+      descBlock = `
+        <div class="item-desc-block">
+          ${posterHtml}
+          <div class="item-desc-content">
+            <div class="item-desc-text">${esc(x.item.desc)}</div>
+            <div class="item-desc-actions">
+              <button class="mini-btn danger" data-action="clear-desc" title="Удалить описание">
+                <svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-trash"></use></svg>
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }
+
     return `
-      <div class="item-line ${sel ? "selected" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}" data-key="${esc(key)}" data-sec="${esc(x.secKey)}" data-idx="${x.idx}">
+      <div class="item-line ${sel ? "selected" : ""} ${isExpanded ? "expanded" : ""} ${deleteArmItemKey === key ? "del-armed" : ""}" data-key="${esc(key)}" data-sec="${esc(x.secKey)}" data-idx="${x.idx}">
         <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
         ${secTag}
         <div class="item-main"><span class="item-text">${esc(x.text)}</span>${tagsHtml}</div>
         ${descBtn}
         <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
         ${viewedBtn}
+        ${descBlock}
       </div>`;
   }).join("");
   updateCounter(items.length);
@@ -1187,7 +1160,12 @@ $("viewMode").addEventListener("click", e => {
     e.stopPropagation();
     const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
-    if (a === "desc") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); render(); } toggleDescMenu(sec, idx, act); return; }
+    if (a === "desc") { 
+      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); } 
+      toggleDescExpand(sec, idx); 
+      return; 
+    }
+    if (a === "clear-desc") { clearDescForItem(sec, idx); return; }
     if (a === "tags") { if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeDescMenu(); render(); } openTagEditor(sec, idx, act); return; }
     if (a === "del") {
       if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render(); armItemDelete(key); return; }
@@ -1217,6 +1195,6 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, closeDescMenu, cycleTmdbMode, clearDescForCurrentItem });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode });
 
 init();
