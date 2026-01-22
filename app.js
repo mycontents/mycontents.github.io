@@ -929,7 +929,10 @@ document.addEventListener("click", e => {
   }
 });
 
-window.addEventListener("scroll", () => { closeAllMenus(); disarmSectionDelete(); }, { passive: true });
+window.addEventListener("scroll", () => {
+  // Не закрываем sectionMenu при скролле (мешает вводу на мобильных с клавиатурой)
+  ["sortMenu", "tagFilterMenu", "tagEditorMenu"].forEach(id => $(id)?.classList.add("hidden"));
+}, { passive: true });
 
 // ===== Utils =====
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
