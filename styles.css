@@ -563,6 +563,10 @@ header{
   -webkit-tap-highlight-color:var(--tap);
   transition:color .15s, background .15s;
 }
+.btn-tmdb-mode.mode-off{
+  color:var(--muted2);
+  opacity:0.5;
+}
 .btn-tmdb-mode.mode-new{
   color:var(--text);
   background:var(--border);

@@ -25,7 +25,7 @@ let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingEdit = false;
 let descMenuCtx = null; // { secKey, idx } for description menu
-let tmdbMode = "new"; // "off" | "new" | "all"
+let tmdbMode = localStorage.getItem("tmdb_mode") || "new"; // "new" | "all" | "off"
 
 // TMDB genre cache
 let tmdbGenres = null;
@@ -280,14 +280,16 @@ function cycleTmdbMode() {
     alert("TMDB API Key не задан. Добавьте его в настройках подключения.");
     return;
   }
-  tmdbMode = tmdbMode === "off" ? "new" : tmdbMode === "new" ? "all" : "off";
+  // Порядок: new → all → off → new
+  tmdbMode = tmdbMode === "new" ? "all" : tmdbMode === "all" ? "off" : "new";
+  localStorage.setItem("tmdb_mode", tmdbMode);
   updateTmdbModeBtn();
 }
 
 function updateTmdbModeBtn() {
   const btn = $("tmdbModeBtn");
   if (!btn) return;
-  btn.classList.remove("mode-new", "mode-all");
+  btn.classList.remove("mode-off", "mode-new", "mode-all");
   if (!TMDB_KEY) {
     btn.style.display = "none";
     return;
@@ -295,17 +297,15 @@ function updateTmdbModeBtn() {
   btn.style.display = "grid";
   if (tmdbMode === "new") btn.classList.add("mode-new");
   else if (tmdbMode === "all") btn.classList.add("mode-all");
+  else btn.classList.add("mode-off");
 }
 
-async function autoFetchTmdbForItems(items, mode) {
-  if (!TMDB_KEY || mode === "off") return;
+async function autoFetchTmdbForItems(items) {
+  if (!TMDB_KEY) return;
   
   for (const { secKey, idx } of items) {
     const item = data.sections?.[secKey]?.items?.[idx];
     if (!item) continue;
-    
-    // Skip if already has desc/poster (unless mode is "all")
-    if (mode === "new" && (item.desc || item.poster)) continue;
     
     try {
       const { genres, overview, poster } = await fetchTmdbDataForItem(item.text);
@@ -908,6 +908,7 @@ function startEdit() {
   isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); setFilterLock(true);
   document.body.classList.add("editing");
   adjustEditHeight();
+  updateTmdbModeBtn();
   if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", adjustEditHeight);
     window.visualViewport.addEventListener("scroll", adjustEditHeight);
@@ -983,6 +984,13 @@ async function saveEdit() {
     const lines = $("editor").value.split("\n").map(s => s.trim()).filter(Boolean);
     normalizeDataModel();
 
+    // Собираем старые позиции для определения новых
+    const oldItems = new Map();
+    for (const key of Object.keys(data.sections)) {
+      const items = data.sections[key]?.items || [];
+      items.forEach((it, i) => oldItems.set(`${key}|${it.text}|${it.created}`, true));
+    }
+
     if (editCtx.mode === "section") {
       const orig = data.sections[editCtx.secKey]?.items || [];
       data.sections[editCtx.secKey] = { items: mergeByMask(orig, editCtx.mask, lines), modified: new Date().toISOString() };
@@ -995,6 +1003,28 @@ async function saveEdit() {
         if (!data.sections[key]) data.sections[key] = { items: [], modified: new Date().toISOString() };
         data.sections[key].items = merged;
         data.sections[key].modified = new Date().toISOString();
+      }
+    }
+
+    // Определяем позиции для автозагрузки TMDB
+    if (tmdbMode !== "off" && TMDB_KEY) {
+      const itemsToFetch = [];
+      for (const secKey of Object.keys(data.sections)) {
+        const items = data.sections[secKey]?.items || [];
+        items.forEach((item, idx) => {
+          const isOld = oldItems.has(`${secKey}|${item.text}|${item.created}`);
+          const hasData = item.desc || item.poster;
+          
+          if (tmdbMode === "all" && !hasData) {
+            itemsToFetch.push({ secKey, idx });
+          } else if (tmdbMode === "new" && !isOld && !hasData) {
+            itemsToFetch.push({ secKey, idx });
+          }
+        });
+      }
+      
+      if (itemsToFetch.length) {
+        await autoFetchTmdbForItems(itemsToFetch);
       }
     }
 
@@ -1121,6 +1151,6 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, closeDescMenu });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, closeDescMenu, cycleTmdbMode, clearDescForCurrentItem });
 
 init();
