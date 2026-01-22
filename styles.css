@@ -920,6 +920,13 @@ header{
   border-color:var(--border);
 }
 
+/* Description button highlighted when menu is open */
+.item-line.selected .desc-action.has-desc.open{
+  color:var(--blue);
+  background:#0b0f15;
+  border-color:var(--border);
+}
+
 /* ===== Undo bar ===== */
 .undo-bar{
   position:fixed;

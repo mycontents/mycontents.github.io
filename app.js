@@ -603,6 +603,7 @@ function toggleDescMenu(secKey, idx, anchor) {
   // If menu is open for the same item, close it
   if (!menu.classList.contains("hidden") && descMenuCtx?.secKey === secKey && descMenuCtx?.idx === idx) {
     closeDescMenu();
+    render(); // re-render to update button state
     return;
   }
   openDescMenu(secKey, idx, anchor);
@@ -1006,16 +1007,26 @@ async function saveEdit() {
       }
     }
 
-    // Определяем позиции для автозагрузки TMDB
+    // Определяем позиции для автозагрузки TMDB (только из видимого списка редактирования)
     if (tmdbMode !== "off" && TMDB_KEY) {
       const itemsToFetch = [];
-      for (const secKey of Object.keys(data.sections)) {
+      
+      // Определяем какие разделы и позиции были в редактировании
+      const editedSections = editCtx.mode === "section" 
+        ? [editCtx.secKey] 
+        : Object.keys(editCtx.masks);
+      
+      for (const secKey of editedSections) {
         const items = data.sections[secKey]?.items || [];
+        const mask = editCtx.mode === "section" ? editCtx.mask : (editCtx.masks[secKey] || []);
+        
         items.forEach((item, idx) => {
+          // Проверяем, была ли эта позиция видима в редактировании
+          const wasVisible = mask[idx] === true;
           const isOld = oldItems.has(`${secKey}|${item.text}|${item.created}`);
           const hasData = item.desc || item.poster;
           
-          if (tmdbMode === "all" && !hasData) {
+          if (tmdbMode === "all" && wasVisible && !hasData) {
             itemsToFetch.push({ secKey, idx });
           } else if (tmdbMode === "new" && !isOld && !hasData) {
             itemsToFetch.push({ secKey, idx });
@@ -1076,8 +1087,10 @@ function render() {
     const tagsHtml = tags.length ? `<span class="item-tags">${tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}</span>` : "";
 
     // Description button: only render if has description (will be shown only when selected via CSS)
+    // Add "open" class if desc menu is open for this item
+    const descMenuOpen = descMenuCtx?.secKey === x.secKey && descMenuCtx?.idx === x.idx;
     const descBtn = hasDesc
-      ? `<button class="desc-action has-desc" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
+      ? `<button class="desc-action has-desc ${descMenuOpen ? "open" : ""}" data-action="desc"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-doc"></use></svg></button>`
       : "";
 
     let viewedBtn;
