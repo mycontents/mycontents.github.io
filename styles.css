@@ -226,23 +226,23 @@ header{
   background:var(--panel);
   border:1px solid var(--border);
   border-radius:var(--r10);
-  min-height:420px;
+  min-height:50px;
   overflow:hidden;
 }
 
 .content-list{
   padding:14px 15px;
-  min-height:420px;
+  min-height:50px;
   line-height:1.5;
 }
 
 .content-list:empty::before{
   content:"—";
   color:var(--muted2);
-  font-size:32px;
+  font-size:24px;
   display:flex;
   justify-content:center;
-  padding-top:160px;
+  padding-top:40px;
 }
 
 .item-line{
@@ -452,7 +452,9 @@ header{
 
 .content-edit{
   width:100%;
-  min-height:420px;
+  min-height:120px;
+  height:calc(100vh - 200px);
+  height:calc(100dvh - 200px);
   border:none;
   background:var(--bg);
   color:var(--text);
@@ -460,9 +462,16 @@ header{
   font-size:14px;
   font-family:inherit;
   line-height:1.6;
-  resize:vertical;
+  resize:none;
 }
 .content-edit:focus{ outline:none; }
+
+@media (max-width: 600px) {
+  .content-edit{
+    height:calc(100vh - 180px);
+    height:calc(100dvh - 180px);
+  }
+}
 
 .edit-panel{
   display:flex;
