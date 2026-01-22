@@ -464,6 +464,11 @@ function setupFilterUI() {
     clear.classList.toggle("hidden", !filterQuery);
     mClear.classList.toggle("hidden", !filterQuery);
     updateSearchBtnUI();
+
+    // On filter change: reset scroll (but do not affect initial load restoration)
+    localStorage.setItem("scroll_y", "0");
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
     selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
   };
   input.oninput = () => handle(input.value);
@@ -479,6 +484,11 @@ function clearFilter() {
   $("filterClear").classList.add("hidden");
   $("mobileFilterClear").classList.add("hidden");
   updateSearchBtnUI();
+
+  // reset scroll on filter change
+  localStorage.setItem("scroll_y", "0");
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
   selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
 }
 
@@ -559,6 +569,11 @@ function toggleTagFilterItem(tag) {
   if (!t || t === VIEWED_TAG) return;
   tagFilter.has(t) ? tagFilter.delete(t) : tagFilter.add(t);
   saveTagFilter(); updateTagFilterBtnUI();
+
+  // reset scroll on filter change
+  localStorage.setItem("scroll_y", "0");
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
   selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   renderTagFilterMenu(); render();
 }
@@ -566,6 +581,11 @@ function toggleTagFilterItem(tag) {
 function clearTagFilter() {
   tagFilter = new Set();
   saveTagFilter(); updateTagFilterBtnUI();
+
+  // reset scroll on filter change
+  localStorage.setItem("scroll_y", "0");
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
   selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
   renderTagFilterMenu(); render();
 }
@@ -727,14 +747,26 @@ function cycleViewedFilter() {
 // ===== Menu =====
 function openMenu(menuId, anchor, align = "left") {
   closeAllMenus(menuId);
-  const menu = $(menuId), cont = $("container");
+  const menu = $(menuId);
   menu.classList.remove("hidden");
   menu.style.visibility = "hidden";
-  const cR = cont.getBoundingClientRect(), aR = anchor.getBoundingClientRect(), mR = menu.getBoundingClientRect();
-  const top = aR.bottom - cR.top + 8;
-  let left = align === "right" ? aR.right - cR.left - mR.width : aR.left - cR.left;
-  left = Math.max(0, Math.min(left, cR.width - mR.width));
-  menu.style.top = `${top}px`; menu.style.left = `${left}px`; menu.style.visibility = "visible";
+
+  const aR = anchor.getBoundingClientRect();
+  const mR = menu.getBoundingClientRect();
+
+  const top = aR.bottom + 8;
+  let left = align === "right" ? (aR.right - mR.width) : aR.left;
+
+  // clamp inside viewport
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  left = Math.max(8, Math.min(left, vw - mR.width - 8));
+  const maxTop = vh - mR.height - 8;
+  const clampedTop = Math.max(8, Math.min(top, maxTop));
+
+  menu.style.top = `${clampedTop}px`;
+  menu.style.left = `${left}px`;
+  menu.style.visibility = "visible";
 }
 
 function closeAllMenus(except) {

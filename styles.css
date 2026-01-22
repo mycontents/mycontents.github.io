@@ -620,7 +620,7 @@ body.editing .scroll-slack{ display:none; }
 
 /* ===== Dropdowns ===== */
 .dropdown-menu{
-  position:absolute;
+  position:fixed;
   background:var(--panel);
   border:1px solid var(--blue);
   border-radius:var(--r10);
