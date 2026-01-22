@@ -31,6 +31,7 @@ async function init() {
   setupFilterUI();
   updateViewedToggleUI();
   updateTagFilterBtnUI();
+  updateSearchBtnUI();
   updateShareButton();
 
   if (!GIST_ID || !TOKEN) {
@@ -139,6 +140,7 @@ function setupFilterUI() {
     input.value = mInput.value = filterQuery;
     clear.classList.toggle("hidden", !filterQuery);
     mClear.classList.toggle("hidden", !filterQuery);
+    updateSearchBtnUI();
     selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
   };
   input.oninput = () => handle(input.value);
@@ -153,6 +155,7 @@ function clearFilter() {
   $("filterInput").value = $("mobileFilterInput").value = "";
   $("filterClear").classList.add("hidden");
   $("mobileFilterClear").classList.add("hidden");
+  updateSearchBtnUI();
   selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
 }
 
@@ -165,10 +168,15 @@ function setFilterLock(locked) {
   }
 }
 
+function updateSearchBtnUI() {
+  const hasFilter = filterQuery.trim().length > 0;
+  $("searchToggleBtn").classList.toggle("on", mobileSearchOpen || hasFilter);
+}
+
 function toggleMobileSearch() {
   mobileSearchOpen = !mobileSearchOpen;
   $("mobileSearchRow").classList.toggle("hidden", !mobileSearchOpen);
-  $("searchToggleBtn").classList.toggle("on", mobileSearchOpen);
+  updateSearchBtnUI();
   if (mobileSearchOpen) { $("mobileFilterInput").value = filterQuery; $("mobileFilterInput").focus(); }
 }
 
