@@ -1148,6 +1148,49 @@ body.editing .scroll-slack{ display:none; }
   }
 }
 
+/* Mobile layout for items: actions row above title/tags */
+@media (max-width: 520px) {
+  .item-row{
+    flex-wrap:wrap;
+    align-items:flex-start;
+    gap:8px 10px;
+    padding-top:8px;
+    padding-bottom:10px;
+  }
+
+  /* Put section tag (when in "Все") into the actions row */
+  .item-row .item-section-tag{
+    order:1;
+    height:28px;
+  }
+
+  /* Actions row (desc, tags, eye) stays near right */
+  .item-row .desc-action,
+  .item-row .tag-action,
+  .item-row .viewed-action{
+    order:2;
+  }
+
+  /* Title/tags row is full width under actions */
+  .item-main{
+    order:3;
+    flex:0 0 100%;
+    width:100%;
+    padding-right:0;
+  }
+
+  /* When selected, do NOT push the whole row to the right (delete button is absolute) */
+  .item-line.selected .item-row{
+    padding-left:8px;
+  }
+
+  /* Move delete button to the top-left of the item row on mobile */
+  .item-del{
+    top:10px;
+    transform:none;
+  }
+}
+
 /* ===== Undo bar ===== */
 .undo-bar{
   position:fixed;
@@ -1160,9 +1203,10 @@ body.editing .scroll-slack{ display:none; }
   align-items:center;
   gap:10px;
 
-  /* Match fill to border for a calmer, unified look */
-  background:var(--border);
-  border:1px solid var(--border);
+  /* Brighter accent fill, keep accent border */
+  background: rgba(216,178,106,.22);
+  background: color-mix(in srgb, var(--blue) 22%, var(--panel));
+  border:1px solid var(--blue);
   box-shadow:0 10px 25px rgba(0,0,0,.35);
   border-radius:999px;
   padding:8px 10px 8px 12px;
