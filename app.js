@@ -993,11 +993,33 @@ $("undoBtn").onclick = () => {
 function toggleItemViewed(secKey, idx) {
   const sec = data.sections[secKey];
   if (!sec?.items?.[idx]) return;
-  const item = sec.items[idx], was = isViewed(item);
+
+  const key = `${secKey}|${idx}`;
+  const item = sec.items[idx];
+  const was = isViewed(item);
+
   setViewed(item, !was);
   sec.modified = new Date().toISOString();
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
-  saveData(); render();
+
+  // Keep selection/expanded description only when we are in "show all" mode.
+  // In hide/only modes the item may disappear after toggling.
+  const keepFocus = viewedFilter === "show";
+  if (!keepFocus) {
+    if (selectedKey === key) {
+      selectedKey = null;
+      localStorage.removeItem("selected_key");
+    }
+    if (expandedDescKey === key) {
+      expandedDescKey = null;
+      localStorage.removeItem("expanded_desc_key");
+    }
+  }
+
+  disarmItemDelete();
+  closeTagEditor();
+
+  saveData();
+  render();
   startUndo({ type: "viewed", secKey, idx, was }, was ? "Снято: просмотрено" : "Отмечено просмотренным");
 }
 
