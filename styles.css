@@ -1082,8 +1082,14 @@ body.editing .scroll-slack{ display:none; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Votes should NOT inherit the rating color */
+.item-desc-votes{
+  color:inherit;
+  font-weight:400;
+}
+
 .item-desc-text{
-  font-size:18px;
+  font-size:15px;
   line-height:1.55;
   color:var(--text);
 }

@@ -1961,15 +1961,22 @@ function render() {
       const leftText = leftParts.join(" · ");
 
       // rating display: 7.2 (52k)
-      const rightText = (ratingVal != null)
-        ? `${ratingVal.toFixed(1)}${votesMeta ? ` (${votesMeta})` : ""}`
-        : "";
       const rColor = (ratingVal != null) ? ratingColor(ratingVal) : null;
+      const ratingHtml = (ratingVal != null)
+        ? `<span class="item-desc-rating" style="--rating-color:${esc(rColor)}">${esc(ratingVal.toFixed(1))}</span>`
+        : "";
+      const votesHtml = (votesMeta && ratingVal != null)
+        ? `<span class="item-desc-votes"> (${esc(votesMeta)})</span>`
+        : "";
 
-      const metaHtml = (leftText || rightText)
+      const rightHtml = (ratingHtml || votesHtml)
+        ? `${ratingHtml}${votesHtml}`
+        : "";
+
+      const metaHtml = (leftText || rightHtml)
         ? `<div class="item-desc-meta">
              <span class="item-desc-meta-left">${esc(leftText)}</span>
-             <span class="item-desc-meta-right">${rightText ? `<span class="item-desc-rating" style="--rating-color:${esc(rColor)}">${esc(rightText)}</span>` : ""}</span>
+             <span class="item-desc-meta-right">${rightHtml}</span>
            </div>`
         : "";
 
