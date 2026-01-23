@@ -479,11 +479,22 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
-/* Rating chip — same emphasis as country tags */
+/* Rating chip — colored (red→green), no border, with votes */
 .tag-chip.rating{
-  color:var(--text);
-  border-color:var(--border);
+  color:var(--rating-color, var(--text));
+  border-color:transparent;
   background:transparent;
+  padding-left:6px;
+  padding-right:6px;
+  font-variant-numeric: tabular-nums;
+}
+.tag-chip.rating .rating-val{
+  font-weight:700;
+  letter-spacing:.02em;
+}
+.tag-chip.rating .rating-votes{
+  color:var(--muted2);
+  font-weight:500;
 }
 
 /* Right actions (tag + viewed) */

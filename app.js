@@ -1918,8 +1918,12 @@ function render() {
     const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
 
     const ratingVal = itemRating(x.item);
+    const votesMeta = (ratingVal != null) ? formatVotes(x.item.votes) : null;
+    const rColor = (ratingVal != null) ? ratingColor(ratingVal) : null;
+
+    // Rating chip: colored, without border, with votes count (if available)
     const ratingChip = (ratingVal != null)
-      ? `<span class="tag-chip rating">${ratingVal.toFixed(1)}</span>`
+      ? `<span class="tag-chip rating" style="--rating-color:${esc(rColor)}"><span class="rating-val">${esc(ratingVal.toFixed(1))}</span>${votesMeta ? `<span class="rating-votes"> (${esc(votesMeta)})</span>` : ""}</span>`
       : "";
 
     const tagsHtml = (countryTags.length || otherTags.length || ratingChip)
@@ -1945,7 +1949,7 @@ function render() {
         ? `<img class="item-desc-poster" src="${esc(x.item.poster)}" alt="" loading="lazy" />`
         : "";
 
-      // Meta: left = type · year, right = rating (votes)
+      // Meta: only type · year (rating moved to the main item chip)
       const tagsForType = displayTags(x.item);
       const hasAnim = tagsForType.includes("анимация");
       const hasJp = tagsForType.includes("jp");
@@ -1953,30 +1957,15 @@ function render() {
         ? (hasAnim ? (hasJp ? "Аниме" : "Мультфильм") : "Фильм")
         : (x.item.tmdbType === "tv" ? (hasAnim ? (hasJp ? "Аниме" : "Сериал") : "Сериал") : "");
       const yearMeta = x.item.year || ((x.text.match(/\((\d{4})\)/) || [])[1] || "");
-      const votesMeta = formatVotes(x.item.votes);
 
       const leftParts = [];
       if (typeLabel) leftParts.push(typeLabel);
       if (yearMeta) leftParts.push(yearMeta);
       const leftText = leftParts.join(" · ");
 
-      // rating display: 7.2 (52k)
-      const rColor = (ratingVal != null) ? ratingColor(ratingVal) : null;
-      const ratingHtml = (ratingVal != null)
-        ? `<span class="item-desc-rating" style="--rating-color:${esc(rColor)}">${esc(ratingVal.toFixed(1))}</span>`
-        : "";
-      const votesHtml = (votesMeta && ratingVal != null)
-        ? `<span class="item-desc-votes"> (${esc(votesMeta)})</span>`
-        : "";
-
-      const rightHtml = (ratingHtml || votesHtml)
-        ? `${ratingHtml}${votesHtml}`
-        : "";
-
-      const metaHtml = (leftText || rightHtml)
+      const metaHtml = leftText
         ? `<div class="item-desc-meta">
              <span class="item-desc-meta-left">${esc(leftText)}</span>
-             <span class="item-desc-meta-right">${rightHtml}</span>
            </div>`
         : "";
 
