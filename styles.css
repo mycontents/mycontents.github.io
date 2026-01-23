@@ -833,9 +833,6 @@ body.editing .scroll-slack{ display:none; }
   display:flex;
   flex-direction:column;
   gap:6px;
-  max-height:200px;
-  overflow:auto;
-  padding-right:2px;
 }
 .tmdb-pick-item{
   border:1px solid var(--border);

@@ -549,6 +549,18 @@ async function fetchTmdbTags() {
   if (!item || !tagEditorCtx) return;
   if (!TMDB_KEY) { alert("TMDB API Key не задан. Добавьте его в настройках подключения."); return; }
 
+  // If pick list is already shown for this item — second press applies auto-choice (first candidate)
+  if (tmdbPickState && tmdbPickState.secKey === tagEditorCtx.secKey && tmdbPickState.idx === tagEditorCtx.idx) {
+    const first = tmdbPickState.candidates?.[0];
+    if (first) {
+      await applyTmdbCandidateToCurrentItem(first);
+      const btn = $("tmdbBtn");
+      btn?.classList.add("success");
+      setTimeout(() => btn?.classList.remove("success"), 1200);
+      return;
+    }
+  }
+
   const btn = $("tmdbBtn");
   btn.classList.add("loading");
   btn.classList.remove("success", "error");
