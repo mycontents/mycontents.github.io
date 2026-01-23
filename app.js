@@ -590,7 +590,9 @@ async function fetchTmdbTags() {
           titleRu: r.title || "",
           titleOrig: r.original_title || "",
           year: y2,
-          origin_country: r.origin_country || []
+          origin_country: r.origin_country || [],
+          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
+          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null
         });
       }
       const tvs = await searchTmdbMany(name, y, "tv", 6);
@@ -605,7 +607,9 @@ async function fetchTmdbTags() {
           titleRu: r.name || "",
           titleOrig: r.original_name || "",
           year: y2,
-          origin_country: r.origin_country || []
+          origin_country: r.origin_country || [],
+          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
+          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null
         });
       }
       return out;
@@ -1547,26 +1551,34 @@ async function saveEdit() {
       const editedSections = savedEditCtx.mode === "section" 
         ? [savedEditCtx.secKey] 
         : Object.keys(savedEditCtx.masks);
-      
+
       let cleared = 0;
       for (const secKey of editedSections) {
         const items = data.sections[secKey]?.items || [];
         const mask = savedEditCtx.mode === "section" ? savedEditCtx.mask : (savedEditCtx.masks[secKey] || []);
-        
+
         items.forEach((item, idx) => {
           const wasVisible = mask[idx] === true;
-          if (wasVisible && (item.desc || item.poster)) {
-            item.desc = null;
-            item.poster = null;
-            cleared++;
-          }
+          if (!wasVisible) return;
+
+          const hadDescOrPoster = !!(item.desc || item.poster);
+          const hadTags = Array.isArray(item.tags) && item.tags.some(t => t !== VIEWED_TAG);
+
+          // clear desc+poster
+          item.desc = null;
+          item.poster = null;
+
+          // clear tags except viewed
+          item.tags = isViewed(item) ? [VIEWED_TAG] : [];
+
+          if (hadDescOrPoster || hadTags) cleared++;
         });
-        
+
         if (cleared) data.sections[secKey].modified = new Date().toISOString();
       }
-      
+
       if (cleared) {
-        showProgress(`Удалено описаний: ${cleared}`, 80);
+        showProgress(`Удалено данных: ${cleared}`, 80);
         await saveData();
         render();
       }

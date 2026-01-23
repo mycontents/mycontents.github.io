@@ -184,7 +184,7 @@ header{
 }
 .view-toggle:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .view-toggle.state-show{ color:var(--text); }
-.view-toggle.state-only{ color:var(--active); background:var(--panel); border-color:var(--border); }
+.view-toggle.state-only{ color:var(--text); background:var(--panel); border-color:var(--blue); }
 
 /* ===== Filter ===== */
 .filter-wrap{
@@ -249,7 +249,7 @@ header{
   flex:0 0 auto;
 }
 .search-toggle-btn:hover{ color:var(--text); border-color:var(--blue); }
-.search-toggle-btn.on{ color:var(--active); }
+.search-toggle-btn.on{ color:var(--text); border-color:var(--blue); }
 
 /* Mobile search row (in document flow) */
 .mobile-search-row{
@@ -286,7 +286,7 @@ header{
 .icon-btn:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .icon-btn:active{ transform:translateY(.5px); }
 .icon-btn.error{ color:var(--red); background:var(--panel); border-color:#3d1f22; }
-.icon-btn.on{ color:var(--active); background:var(--panel); border-color:var(--border); }
+.icon-btn.on{ color:var(--text); background:var(--panel); border-color:var(--blue); }
 
 .icon{ width:18px; height:18px; fill:currentColor; display:block; }
 .icon.small{ width:14px; height:14px; }
@@ -479,11 +479,11 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
-/* Rating chip (after country) */
+/* Rating chip (after country) — same look as normal tags */
 .tag-chip.rating{
-  color:var(--text);
-  border-color:rgba(47,158,98,.35);
-  background:rgba(47,158,98,.10);
+  color:var(--muted);
+  border-color:var(--border);
+  background:transparent;
 }
 
 /* Right actions (tag + viewed) */
@@ -833,9 +833,9 @@ body.editing .scroll-slack{ display:none; }
 }
 .rating-btn:hover{ color:var(--text); background:var(--panel2); border-color:var(--blue); }
 .rating-btn.on{
-  color:var(--active);
-  background:rgba(47,158,98,.12);
-  border-color:rgba(47,158,98,.35);
+  color:var(--text);
+  background:transparent;
+  border-color:var(--blue);
 }
 
 /* TMDB button */
@@ -927,8 +927,8 @@ body.editing .scroll-slack{ display:none; }
 }
 .tag-option.on .tag-check{
   border-color:rgba(216,178,106,.6);
-  background:rgba(216,178,106,.12);
-  color:var(--active);
+  background:transparent;
+  color:var(--text);
 }
 
 .tag-name{
