@@ -479,9 +479,9 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
-/* Rating chip (after country) — same look as normal tags */
+/* Rating chip — same emphasis as country tags */
 .tag-chip.rating{
-  color:var(--muted);
+  color:var(--text);
   border-color:var(--border);
   background:transparent;
 }
