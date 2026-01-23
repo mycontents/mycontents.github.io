@@ -1,4 +1,8 @@
 :root{
+  /* ===== Content panel theme (edit here) ===== */
+  --content-panel-bg: transparent;
+  --content-panel-border: transparent;
+
   --bg:#0d1117;
   --panel:#161b22;
   --panel2:#0f141b;
@@ -282,8 +286,8 @@ header{
 
 /* ===== Content ===== */
 .content-area{
-  background:var(--panel);
-  border:1px solid var(--border);
+  background:var(--content-panel-bg);
+  border:1px solid var(--content-panel-border);
   border-radius:var(--r10);
   min-height:50px;
   overflow:hidden;
