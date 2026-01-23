@@ -2140,9 +2140,11 @@ function render() {
           <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
           ${secTag}
           <div class="item-main"><span class="item-text" data-role="text" contenteditable="false" spellcheck="false">${esc(x.text)}</span>${tagsHtml}</div>
-          ${descBtn}
-          <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
-          ${viewedBtn}
+          <div class="item-actions">
+            ${descBtn}
+            <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
+            ${viewedBtn}
+          </div>
         </div>
         ${descBlock}
       </div>`;
