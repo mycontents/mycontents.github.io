@@ -29,6 +29,7 @@ let expandedDescKey = localStorage.getItem("expanded_desc_key") || null; // "sec
 let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
 let tmdbGenres = null;
+let tmdbPickState = null; // { candidates: [], secKey, idx }
 
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
@@ -323,11 +324,56 @@ async function loadTmdbGenres() {
 }
 
 function parseTitleForSearch(text) {
-  const yearMatch = text.match(/\((\d{4})\)/);
+  const yearMatch = String(text || "").match(/\((\d{4})\)/);
   const year = yearMatch ? yearMatch[1] : null;
-  let clean = text.replace(/\(\d{4}\)/, "").trim();
+  let clean = String(text || "").replace(/\(\d{4}\)/, "").trim();
   const parts = clean.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
   return { names: parts.length ? parts : [clean], year };
+}
+
+function hideTmdbPick() {
+  const el = $("tmdbPick");
+  if (!el) return;
+  el.classList.add("hidden");
+  el.innerHTML = "";
+}
+
+function formatTmdbCandidateLabel(c) {
+  const ru = (c.titleRu || "").trim();
+  const orig = (c.titleOrig || "").trim();
+  const y = c.year ? ` (${c.year})` : "";
+  if (!orig || orig.toLowerCase() === ru.toLowerCase()) return `${ru}${y}`;
+  return `${ru} / ${orig}${y}`;
+}
+
+function showTmdbPick(candidates) {
+  const wrap = $("tmdbPick");
+  if (!wrap) return;
+  wrap.classList.remove("hidden");
+  wrap.innerHTML = `
+    <div class="tmdb-pick-title">Найдено несколько совпадений</div>
+    <div class="tmdb-pick-list" id="tmdbPickList"></div>
+  `;
+  const list = $("tmdbPickList");
+  list.innerHTML = candidates.map((c, i) => {
+    const label = formatTmdbCandidateLabel(c);
+    const meta = c.mediaType === "movie" ? "Фильм" : "Сериал";
+    return `
+      <button class="tmdb-pick-item" type="button" data-pick="${i}">
+        ${esc(label)}
+        <div class="tmdb-pick-meta">${meta}</div>
+      </button>`;
+  }).join("");
+
+  list.querySelectorAll("[data-pick]").forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const i = Number(btn.dataset.pick);
+      const c = candidates[i];
+      if (!c) return;
+      await applyTmdbCandidateToCurrentItem(c);
+    };
+  });
 }
 
 async function searchTmdb(query, year, type) {
@@ -341,7 +387,7 @@ async function searchTmdb(query, year, type) {
     const json = await res.json();
     const result = json.results?.[0];
     if (!result) return null;
-    
+
     // Получаем детали для страны производства
     try {
       const detailsRes = await fetch(`${TMDB_BASE}/${type}/${result.id}?api_key=${TMDB_KEY}&language=ru`);
@@ -349,9 +395,23 @@ async function searchTmdb(query, year, type) {
       result.production_countries = details.production_countries || [];
       result.origin_country = details.origin_country || [];
     } catch {}
-    
+
     return result;
   } catch { return null; }
+}
+
+async function searchTmdbMany(query, year, type, limit = 6) {
+  if (!TMDB_KEY) return [];
+  const params = new URLSearchParams({ api_key: TMDB_KEY, query, language: "ru" });
+  if (year) {
+    params.set(type === "movie" ? "year" : "first_air_date_year", year);
+  }
+  try {
+    const res = await fetch(`${TMDB_BASE}/search/${type}?${params}`);
+    const json = await res.json();
+    const arr = Array.isArray(json.results) ? json.results : [];
+    return arr.slice(0, limit);
+  } catch { return []; }
 }
 
 const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
@@ -419,54 +479,150 @@ async function fetchTmdbDataForItem(text) {
   return { genres: [], overview: null, poster: null, originalTitle: null, year: null };
 }
 
+async function applyTmdbCandidateToCurrentItem(c) {
+  const item = getEditorItem();
+  if (!item || !tagEditorCtx) return;
+
+  const genresMap = await loadTmdbGenres();
+  if (!genresMap) return;
+
+  // Fetch details for country code (iso_3166_1)
+  let countryCode = null;
+  try {
+    const detailsRes = await fetch(`${TMDB_BASE}/${c.mediaType}/${c.id}?api_key=${TMDB_KEY}&language=ru`);
+    const details = await detailsRes.json();
+    if (c.mediaType === "tv") {
+      if (Array.isArray(details.origin_country) && details.origin_country.length) countryCode = details.origin_country[0];
+      else if (Array.isArray(c.origin_country) && c.origin_country.length) countryCode = c.origin_country[0];
+    } else {
+      // movie
+      if (Array.isArray(details.production_countries) && details.production_countries.length) {
+        countryCode = details.production_countries[0].iso_3166_1;
+      }
+    }
+  } catch {}
+
+  const genreTags = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
+    .map(id => genresMap.get(id))
+    .filter(Boolean);
+
+  // Add country tag as code (lowercase)
+  if (countryCode) genreTags.push(String(countryCode).toLowerCase());
+
+  let updated = false;
+
+  // Title additions (orig + year)
+  const textUpdates = buildTitleAdditions(item.text, c.titleOrig, c.year);
+  if (textUpdates) {
+    item.text = item.text + textUpdates;
+    updated = true;
+  }
+
+  // Tags
+  if (genreTags.length) {
+    const existing = new Set(item.tags.map(normTag));
+    const newTags = genreTags.map(normTag).filter(t => t && !existing.has(t) && t !== VIEWED_TAG);
+    if (newTags.length) {
+      item.tags = uniqueTags([...item.tags, ...newTags]);
+      updated = true;
+    }
+  }
+
+  // Desc + poster
+  if (c.overview && !item.desc) { item.desc = c.overview; updated = true; }
+  if (c.poster && !item.poster) { item.poster = c.poster; updated = true; }
+
+  if (updated) {
+    data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
+    await saveData();
+    render();
+    renderTagEditorList();
+    renderTagFilterMenu();
+  }
+
+  tmdbPickState = null;
+  hideTmdbPick();
+}
+
 async function fetchTmdbTags() {
   const item = getEditorItem();
   if (!item || !tagEditorCtx) return;
   if (!TMDB_KEY) { alert("TMDB API Key не задан. Добавьте его в настройках подключения."); return; }
-  
+
   const btn = $("tmdbBtn");
   btn.classList.add("loading");
   btn.classList.remove("success", "error");
-  
+
   try {
-    const { genres, overview, poster, originalTitle, year } = await fetchTmdbDataForItem(item.text);
-    let updated = false;
-    
-    // Дополняем наименование оригинальным названием и годом если их нет
-    const textUpdates = buildTitleAdditions(item.text, originalTitle, year);
-    if (textUpdates) {
-      item.text = item.text + textUpdates;
-      updated = true;
-    }
-    
-    if (genres.length) {
-      const existing = new Set(item.tags.map(normTag));
-      const newTags = genres.filter(g => !existing.has(normTag(g)));
-      if (newTags.length) {
-        item.tags = uniqueTags([...item.tags, ...newTags]);
-        updated = true;
+    const { names, year } = parseTitleForSearch(item.text);
+
+    // Build candidates: try each name with year, then without year
+    const gather = async (name, y) => {
+      const out = [];
+      const movies = await searchTmdbMany(name, y, "movie", 6);
+      for (const r of movies) {
+        const y2 = r.release_date ? r.release_date.slice(0, 4) : null;
+        out.push({
+          id: r.id,
+          mediaType: "movie",
+          genre_ids: r.genre_ids,
+          overview: r.overview || null,
+          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
+          titleRu: r.title || "",
+          titleOrig: r.original_title || "",
+          year: y2,
+          origin_country: r.origin_country || []
+        });
       }
+      const tvs = await searchTmdbMany(name, y, "tv", 6);
+      for (const r of tvs) {
+        const y2 = r.first_air_date ? r.first_air_date.slice(0, 4) : null;
+        out.push({
+          id: r.id,
+          mediaType: "tv",
+          genre_ids: r.genre_ids,
+          overview: r.overview || null,
+          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
+          titleRu: r.name || "",
+          titleOrig: r.original_name || "",
+          year: y2,
+          origin_country: r.origin_country || []
+        });
+      }
+      return out;
+    };
+
+    let candidates = [];
+    for (const n of names) candidates.push(...await gather(n, year));
+    if (!candidates.length && year) {
+      for (const n of names) candidates.push(...await gather(n, null));
     }
-    
-    if (overview && !item.desc) {
-      item.desc = overview;
-      updated = true;
-    }
-    
-    if (poster && !item.poster) {
-      item.poster = poster;
-      updated = true;
-    }
-    
-    if (updated) {
-      data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
-      saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
-      btn.classList.add("success");
-    } else if (genres.length || overview || poster) {
-      btn.classList.add("success");
-    } else {
+
+    // Deduplicate by mediaType+id
+    const uniq = new Map();
+    for (const c of candidates) uniq.set(`${c.mediaType}:${c.id}`, c);
+    candidates = [...uniq.values()];
+
+    // If none
+    if (!candidates.length) {
+      hideTmdbPick();
       btn.classList.add("error");
+      return;
     }
+
+    // If single match — apply immediately
+    if (candidates.length === 1) {
+      hideTmdbPick();
+      await applyTmdbCandidateToCurrentItem(candidates[0]);
+      btn.classList.add("success");
+      return;
+    }
+
+    // Multiple matches — show pick list
+    tmdbPickState = { candidates, secKey: tagEditorCtx.secKey, idx: tagEditorCtx.idx };
+    showTmdbPick(candidates);
+    btn.classList.add("success");
+
   } catch {
     btn.classList.add("error");
   } finally {
@@ -503,6 +659,7 @@ function buildTitleAdditions(text, originalTitle, year) {
 function updateTmdbBtnVisibility() {
   const btn = $("tmdbBtn");
   if (btn) btn.style.display = TMDB_KEY ? "grid" : "none";
+  if (!TMDB_KEY) { tmdbPickState = null; hideTmdbPick(); }
 }
 
 function cycleTmdbMode() {
@@ -696,6 +853,9 @@ function openTagEditor(secKey, idx, anchor) {
   if (expandedDescKey) closeDescMenu();
 
   tagEditorCtx = { secKey, idx };
+  tmdbPickState = null;
+  hideTmdbPick();
+
   $("tagEditorTitle").textContent = `Теги`;
   $("tagAddInput").value = "";
   updateTmdbBtnVisibility();
@@ -704,7 +864,12 @@ function openTagEditor(secKey, idx, anchor) {
   $("tagAddInput").focus();
 }
 
-function closeTagEditor() { tagEditorCtx = null; $("tagEditorMenu").classList.add("hidden"); }
+function closeTagEditor() {
+  tagEditorCtx = null;
+  tmdbPickState = null;
+  hideTmdbPick();
+  $("tagEditorMenu").classList.add("hidden");
+}
 
 function getEditorItem() {
   if (!tagEditorCtx) return null;

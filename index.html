@@ -129,7 +129,7 @@
     <!-- Tag editor menu -->
     <div class="dropdown-menu tag-editor-menu hidden" id="tagEditorMenu">
       <div class="tag-menu-head">
-        <button class="mini-btn tmdb-btn" id="tmdbBtn" onclick="fetchTmdbTags()" title="Загрузить жанры из TMDB">
+        <button class="mini-btn tmdb-btn" id="tmdbBtn" onclick="fetchTmdbTags()" title="Загрузить данные из TMDB">
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-download"></use></svg>
         </button>
         <div class="tag-menu-title" id="tagEditorTitle">Теги</div>
@@ -137,6 +137,10 @@
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-trash"></use></svg>
         </button>
       </div>
+
+      <!-- TMDB pick list (shown only when multiple matches found) -->
+      <div class="tmdb-pick hidden" id="tmdbPick"></div>
+
       <div class="tag-add-row">
         <input class="tag-add-input" id="tagAddInput" placeholder="Добавить тег..." autocomplete="off" spellcheck="false" onkeydown="handleTagAdd(event)" />
         <button class="mini-btn" onclick="addTagFromInput()" title="Добавить">
