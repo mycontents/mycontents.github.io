@@ -30,6 +30,9 @@ let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
 let tmdbGenres = null;
 
+// Inline rename in view mode
+let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
+
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
@@ -37,6 +40,94 @@ if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 let restoringUI = true;
 
 const $ = (id) => document.getElementById(id);
+
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    render();
+  });
+}
+
+function sanitizeInlineText(s) {
+  return String(s || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function beginInlineEdit(line) {
+  if (isEditing || savingInProgress) return;
+  if (!line) return;
+  const key = line.dataset.key;
+  const p = parseItemKey(key);
+  const item = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
+  const el = line.querySelector('[data-role="text"]');
+  if (!item || !el) return;
+
+  // Ensure selected
+  if (selectedKey !== key) {
+    selectedKey = key;
+    localStorage.setItem("selected_key", selectedKey);
+    document.querySelectorAll("#viewMode .item-line.selected").forEach(x => x.classList.remove("selected"));
+    line.classList.add("selected");
+  }
+
+  inlineEdit = { active: true, key, secKey: p.secKey, idx: p.idx, el, orig: item.text || "" };
+  el.setAttribute("contenteditable", "true");
+  el.focus();
+
+  // Move caret to end
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+
+  el.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); commitInlineEdit(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancelInlineEdit(); }
+  };
+  el.onblur = () => commitInlineEdit();
+}
+
+function endInlineEditLocal() {
+  if (!inlineEdit.el) { inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" }; return; }
+  inlineEdit.el.onkeydown = null;
+  inlineEdit.el.onblur = null;
+  inlineEdit.el.setAttribute("contenteditable", "false");
+  inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
+}
+
+function cancelInlineEdit() {
+  if (!inlineEdit.active) return;
+  if (inlineEdit.el) inlineEdit.el.textContent = inlineEdit.orig;
+  endInlineEditLocal();
+  scheduleRender();
+}
+
+function commitInlineEdit() {
+  if (!inlineEdit.active) return;
+  const { secKey, idx, el, orig } = inlineEdit;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  const next = sanitizeInlineText(el?.textContent);
+
+  // If empty, revert
+  const finalText = next || orig;
+
+  endInlineEditLocal();
+
+  if (!item) return;
+  if (finalText === (item.text || "")) {
+    scheduleRender();
+    return;
+  }
+
+  item.text = finalText;
+  data.sections[secKey].modified = new Date().toISOString();
+  saveData();
+  scheduleRender();
+}
 
 // ===== Init =====
 async function init() {
@@ -1395,8 +1486,8 @@ function render() {
     // Разделяем на обычные теги и страны; страны отображаем последними
     const otherTags = rawTags.filter(t => !isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
     const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
-    const tagsHtml = (countryTags.length || otherTags.length) 
-      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}</span>` 
+    const tagsHtml = (countryTags.length || otherTags.length)
+      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}</span>`
       : "";
 
     const descBtn = hasDesc
@@ -1434,7 +1525,7 @@ function render() {
         <div class="item-row">
           <button class="item-del" data-action="del"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-x"></use></svg></button>
           ${secTag}
-          <div class="item-main"><span class="item-text">${esc(x.text)}</span>${tagsHtml}</div>
+          <div class="item-main"><span class="item-text" data-role="text" contenteditable="false" spellcheck="false">${esc(x.text)}</span>${tagsHtml}</div>
           ${descBtn}
           <button class="tag-action" data-action="tags"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-tag"></use></svg></button>
           ${viewedBtn}
@@ -1458,23 +1549,43 @@ $("viewMode").addEventListener("pointerup", () => { pointer.down = false; });
 
 $("viewMode").addEventListener("click", e => {
   if (isEditing) return;
+
+  // If inline edit is active and user clicks elsewhere — commit.
+  if (inlineEdit.active) {
+    const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
+    if (!inside) commitInlineEdit();
+  }
+
   const line = e.target.closest(".item-line");
   if (!line) return;
+
+  const key = line.dataset.key;
+  const wasSelected = selectedKey === key;
+
   const act = e.target.closest("[data-action]");
   if (act) {
     e.stopPropagation();
-    const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx, key = line.dataset.key;
+    if (inlineEdit.active) commitInlineEdit();
+
+    const a = act.dataset.action, sec = line.dataset.sec, idx = +line.dataset.idx;
+
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
+
     if (a === "desc") {
-      if (selectedKey !== key) { selectedKey = key; localStorage.setItem("selected_key", selectedKey); disarmItemDelete(); }
-      // При открытии описания скрываем всплывающее меню тегов
+      if (selectedKey !== key) {
+        selectedKey = key;
+        localStorage.setItem("selected_key", selectedKey);
+        disarmItemDelete();
+      }
       closeTagEditor();
       toggleDescExpand(sec, idx);
       return;
     }
+
     if (a === "clear-desc") { clearDescForItem(sec, idx); return; }
+
     if (a === "tags") {
-      // Повторное нажатие по кнопке тегов закрывает меню
+      // Toggle: second press closes
       const menu = $("tagEditorMenu");
       const same = tagEditorCtx && tagEditorCtx.secKey === sec && tagEditorCtx.idx === idx;
       if (same && menu && !menu.classList.contains("hidden")) { closeTagEditor(); return; }
@@ -1483,7 +1594,6 @@ $("viewMode").addEventListener("click", e => {
         selectedKey = key;
         localStorage.setItem("selected_key", selectedKey);
         disarmItemDelete();
-        // выделяем строку без полного ререндера (чтобы якорь меню был валиден)
         document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
         line.classList.add("selected");
       }
@@ -1491,24 +1601,45 @@ $("viewMode").addEventListener("click", e => {
       openTagEditor(sec, idx, act);
       return;
     }
-    if (a === "del") { 
-      if (selectedKey !== key) { selectedKey = key; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render(); armItemDelete(key); return; }
+
+    if (a === "del") {
+      if (selectedKey !== key) {
+        selectedKey = key;
+        localStorage.setItem("selected_key", selectedKey);
+        disarmItemDelete();
+        closeTagEditor();
+        closeDescMenu();
+        render();
+        armItemDelete(key);
+        return;
+      }
       if (deleteArmItemKey === key) { deleteItemNow(sec, idx); return; }
-      armItemDelete(key); return;
+      armItemDelete(key);
+      return;
     }
   }
+
   const sel = window.getSelection();
   if (sel && !sel.isCollapsed) return;
   if (pointer.startedAt && Date.now() - pointer.startedAt > 350) return;
   if (pointer.moved) return;
-  const key = line.dataset.key;
-  selectedKey = selectedKey === key ? null : key;
-  if (selectedKey) localStorage.setItem("selected_key", selectedKey);
-  else localStorage.removeItem("selected_key");
-  disarmItemDelete(); closeTagEditor();
-  // ВАЖНО: описание не закрываем при снятии выделения — оно может оставаться раскрытым
-  document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
-  if (selectedKey) line.classList.add("selected");
+
+  // Selection: clicking the already selected item does NOT clear selection.
+  if (!wasSelected) {
+    selectedKey = key;
+    localStorage.setItem("selected_key", selectedKey);
+    disarmItemDelete();
+    closeTagEditor();
+    document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
+    line.classList.add("selected");
+  } else {
+    // Keep selection, just disarm delete if it was armed
+    disarmItemDelete();
+  }
+
+  // Start inline editing when user taps the title text
+  const textEl = e.target.closest('[data-role="text"]');
+  if (textEl && !inlineEdit.active) beginInlineEdit(line);
 });
 
 // Persist scroll position (normal mode only)
@@ -1526,6 +1657,12 @@ window.addEventListener("beforeunload", () => {
 });
 
 document.addEventListener("click", e => {
+  // Commit inline edit on any outside click
+  if (inlineEdit.active) {
+    const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
+    if (!inside) commitInlineEdit();
+  }
+
   if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".view-toggle") && !e.target.closest(".search-toggle-btn")) {
     closeAllMenus();
     sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
