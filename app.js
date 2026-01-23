@@ -37,6 +37,9 @@ let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, 
 let lastTextTap = { key: null, at: 0 };
 let lastItemTap = { key: null, at: 0 };
 
+// Inline rename for section name (header)
+let sectionRename = { active: false, orig: "", lastTapAt: 0 };
+
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
@@ -225,6 +228,134 @@ function applyUrlSetup() {
       history.replaceState({}, "", location.pathname);
     }
   } catch {}
+}
+
+function sanitizeSectionName(s) {
+  return String(s || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function mergeSectionInto(targetKey, sourceKey) {
+  if (!data.sections?.[sourceKey] || !data.sections?.[targetKey] || sourceKey === targetKey) return;
+  const src = data.sections[sourceKey];
+  const dst = data.sections[targetKey];
+
+  // Merge items (keep order: existing target items first, then source)
+  dst.items = [...(dst.items || []), ...(src.items || [])];
+  dst.modified = new Date().toISOString();
+
+  // If current section points to source, redirect
+  if (currentSection === sourceKey) {
+    currentSection = targetKey;
+    localStorage.setItem("current_section", currentSection);
+  }
+
+  // Adjust selection/expanded keys if they were in source
+  if (selectedKey) {
+    const p = parseItemKey(selectedKey);
+    if (p && p.secKey === sourceKey) {
+      selectedKey = null;
+      localStorage.removeItem("selected_key");
+    }
+  }
+  if (expandedDescKey) {
+    const p = parseItemKey(expandedDescKey);
+    if (p && p.secKey === sourceKey) {
+      expandedDescKey = null;
+      localStorage.removeItem("expanded_desc_key");
+    }
+  }
+
+  delete data.sections[sourceKey];
+}
+
+function commitSectionRename() {
+  if (!sectionRename.active) return;
+  const el = $("currentSectionName");
+  const orig = sectionRename.orig;
+  const nextRaw = sanitizeSectionName(el?.textContent);
+
+  // End edit UI first
+  sectionRename.active = false;
+  el?.setAttribute("contenteditable", "false");
+
+  const from = orig;
+  const to = nextRaw || orig;
+
+  // Restore visual (will be overwritten by updateSectionButton anyway)
+  el.textContent = to;
+
+  // No change
+  if (!from || to === from) {
+    updateSectionButton();
+    return;
+  }
+
+  // If empty -> revert
+  if (!to) {
+    updateSectionButton();
+    return;
+  }
+
+  // If target already exists -> merge
+  if (data.sections[to] && data.sections[from]) {
+    mergeSectionInto(to, from);
+  } else if (data.sections[from]) {
+    // Rename key
+    data.sections[to] = data.sections[from];
+    data.sections[to].modified = new Date().toISOString();
+    delete data.sections[from];
+
+    if (currentSection === from) {
+      currentSection = to;
+      localStorage.setItem("current_section", currentSection);
+    }
+  }
+
+  saveData();
+  renderSectionList();
+  updateSectionButton();
+  render();
+}
+
+function cancelSectionRename() {
+  if (!sectionRename.active) return;
+  const el = $("currentSectionName");
+  el?.setAttribute("contenteditable", "false");
+  sectionRename.active = false;
+  updateSectionButton();
+}
+
+function beginSectionRename() {
+  if (isEditing || savingInProgress) return;
+  if (currentSection === "__all__") return;
+  const el = $("currentSectionName");
+  if (!el) return;
+
+  // Close menus to avoid conflicts
+  closeAllMenus();
+
+  sectionRename.active = true;
+  sectionRename.orig = currentSection;
+
+  el.setAttribute("contenteditable", "true");
+  el.focus();
+
+  // Select all
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+
+  el.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancelSectionRename(); el.blur(); }
+  };
+  el.onblur = () => {
+    el.onkeydown = null;
+    el.onblur = null;
+    commitSectionRename();
+  };
 }
 
 // ===== Data model =====
@@ -1298,8 +1429,29 @@ function copyShareLink() {
 // ===== Sections =====
 function toggleSectionMenu() {
   if (isEditing) return;
+
+  // If user is currently renaming the section name, do nothing.
+  if (sectionRename.active) return;
+
+  // Elegant rename: fast double tap on the section button (when not "Все") starts rename instead of opening menu.
+  if (currentSection !== "__all__") {
+    const now = Date.now();
+    const fast = (now - (sectionRename.lastTapAt || 0)) <= 350;
+    sectionRename.lastTapAt = now;
+    if (fast) {
+      beginSectionRename();
+      return;
+    }
+  }
+
   const menu = $("sectionMenu");
-  if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); $("newSectionInput").classList.add("hidden"); $("settingsPanel").classList.add("hidden"); disarmSectionDelete(); return; }
+  if (!menu.classList.contains("hidden")) {
+    menu.classList.add("hidden");
+    $("newSectionInput").classList.add("hidden");
+    $("settingsPanel").classList.add("hidden");
+    disarmSectionDelete();
+    return;
+  }
   renderSectionList(); $("newSectionInput").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
   openMenu("sectionMenu", $("sectionBtn"), "left");
 }
@@ -2168,6 +2320,16 @@ document.addEventListener("click", e => {
     if (!inside) commitInlineEdit();
   }
 
+  // Commit section rename if user clicked outside the section name
+  if (sectionRename.active) {
+    const nameEl = $("currentSectionName");
+    const insideName = (e.target === nameEl) || e.target.closest('#currentSectionName') === nameEl;
+    if (!insideName) {
+      // Trigger blur -> commit
+      nameEl?.blur();
+    }
+  }
+
   if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".view-toggle") && !e.target.closest(".search-toggle-btn")) {
     closeAllMenus();
     sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
@@ -2198,6 +2360,6 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename });
 
 init();
