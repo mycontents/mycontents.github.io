@@ -1,9 +1,16 @@
 :root{
+  /* ===== Theme knobs (edit here) ===== */
+  --page-bg:#0d1117;
+  --accent:#58a6ff;
+
   /* ===== Content panel theme (edit here) ===== */
   --content-panel-bg: transparent;
   --content-panel-border: transparent;
 
-  --bg:#0d1117;
+  /* Aliases used across the app */
+  --bg:var(--page-bg);
+  --blue:var(--accent);
+
   --panel:#161b22;
   --panel2:#0f141b;
   --border:#30363d;
@@ -13,7 +20,6 @@
   --muted:#6e7681;
   --muted2:#484f58;
 
-  --blue:#58a6ff;
   --red:#f85149;
   --green:#238636;
 
@@ -349,6 +355,10 @@ body.editing .scroll-slack{ display:none; }
   box-shadow:inset 0 0 0 1px var(--border);
 }
 
+/* Expanded, but not selected: subtle outline without changing background */
+.item-line.expanded:not(.selected){
+  box-shadow:inset 0 0 0 1px var(--border);
+}
 
 
 /* Кнопка удаления позиции (слева) — абсолютная, не влияет на layout */
