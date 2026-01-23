@@ -16,12 +16,13 @@
   --border:#3a332b;
   --border2:#242019;
 
-  --text:#e7e0d8;
-  --muted:#a39687;
-  --muted2:#6f645a;
+  --text:#e6e4e1;
+  --muted:#9a9288;
+  --muted2:#6b6258;
 
   --red:#ff6b63;
-  --green:#2ea043;
+  --green:#2f9e62;
+  --active:#2f9e62;
 
   --r10:10px;
   --tap:transparent;
@@ -183,7 +184,7 @@ header{
 }
 .view-toggle:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .view-toggle.state-show{ color:var(--text); }
-.view-toggle.state-only{ color:var(--blue); background:var(--panel); border-color:var(--border); }
+.view-toggle.state-only{ color:var(--active); background:var(--panel); border-color:var(--border); }
 
 /* ===== Filter ===== */
 .filter-wrap{
@@ -248,7 +249,7 @@ header{
   flex:0 0 auto;
 }
 .search-toggle-btn:hover{ color:var(--text); border-color:var(--blue); }
-.search-toggle-btn.on{ color:var(--blue); }
+.search-toggle-btn.on{ color:var(--active); }
 
 /* Mobile search row (in document flow) */
 .mobile-search-row{
@@ -285,7 +286,7 @@ header{
 .icon-btn:hover{ color:var(--text); background:var(--panel); border-color:var(--border); }
 .icon-btn:active{ transform:translateY(.5px); }
 .icon-btn.error{ color:var(--red); background:var(--panel); border-color:#3d1f22; }
-.icon-btn.on{ color:var(--blue); background:var(--panel); border-color:var(--border); }
+.icon-btn.on{ color:var(--active); background:var(--panel); border-color:var(--border); }
 
 .icon{ width:18px; height:18px; fill:currentColor; display:block; }
 .icon.small{ width:14px; height:14px; }
@@ -627,7 +628,7 @@ body.editing .scroll-slack{ display:none; }
 }
 .btn-tmdb-mode.mode-all{
   color:white;
-  background:var(--blue);
+  background:var(--active);
 }
 .btn-tmdb-mode.mode-clear{
   color:white;
@@ -784,7 +785,8 @@ body.editing .scroll-slack{ display:none; }
   -webkit-tap-highlight-color:var(--tap);
 }
 .btn-primary{ background:var(--green); }
-.btn-share{ background:#1f6feb; }
+.btn-share{ background:var(--border); }
+.btn-share:hover{ border-color:var(--blue); }
 
 .setup-prompt{ padding:16px; color:#8b949e; text-align:center; }
 
@@ -894,7 +896,7 @@ body.editing .scroll-slack{ display:none; }
 .tag-option.on .tag-check{
   border-color:rgba(216,178,106,.6);
   background:rgba(216,178,106,.12);
-  color:var(--blue);
+  color:var(--active);
 }
 
 .tag-name{
