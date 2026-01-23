@@ -325,12 +325,71 @@ async function loadTmdbGenres() {
   } catch { return null; }
 }
 
+function extractYearAndCleanTitle(s) {
+  let t = String(s || "").trim();
+  let year = null;
+
+  // (2004)
+  let m = t.match(/\((19\d{2}|20\d{2})\)/);
+  if (m) {
+    year = m[1];
+    t = t.replace(m[0], " ");
+  }
+
+  // 2004 - Title / 2004. Title / 2004 Title
+  if (!year) {
+    m = t.match(/^\s*(19\d{2}|20\d{2})\s*[-–—.,:]?\s*(.+)$/);
+    if (m) {
+      year = m[1];
+      t = m[2];
+    }
+  }
+
+  // Title - 2004 / Title. 2004 / Title 2004
+  if (!year) {
+    m = t.match(/^(.+?)\s*[-–—.,:]?\s*(19\d{2}|20\d{2})\s*$/);
+    if (m) {
+      year = m[2];
+      t = m[1];
+    }
+  }
+
+  // Any standalone year token
+  if (!year) {
+    m = t.match(/\b(19\d{2}|20\d{2})\b/);
+    if (m) {
+      year = m[1];
+      t = t.replace(m[0], " ");
+    }
+  }
+
+  t = t.replace(/\s+/g, " ").trim();
+  return { title: t, year };
+}
+
 function parseTitleForSearch(text) {
-  const yearMatch = String(text || "").match(/\((\d{4})\)/);
-  const year = yearMatch ? yearMatch[1] : null;
-  let clean = String(text || "").replace(/\(\d{4}\)/, "").trim();
-  const parts = clean.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
-  return { names: parts.length ? parts : [clean], year };
+  const raw = String(text || "").trim();
+  const parts = raw.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
+
+  let year = null;
+  const names = [];
+  for (const p of (parts.length ? parts : [raw])) {
+    const r = extractYearAndCleanTitle(p);
+    if (!year && r.year) year = r.year;
+    if (r.title) names.push(r.title);
+  }
+
+  // De-dup preserve order
+  const out = [];
+  const seen = new Set();
+  for (const n of names) {
+    const k = n.toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+  }
+
+  return { names: out.length ? out : [raw], year };
 }
 
 function hideTmdbPick() {
@@ -420,7 +479,7 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
 
 async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null };
+  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null, tmdbType: null };
   
   const { names, year } = parseTitleForSearch(text);
   
@@ -464,7 +523,8 @@ async function fetchTmdbDataForItem(text) {
       originalTitle: origTitle || null,
       year: resultYear,
       rating: (typeof result.vote_average === "number") ? result.vote_average : null,
-      votes: (typeof result.vote_count === "number") ? result.vote_count : null
+      votes: (typeof result.vote_count === "number") ? result.vote_count : null,
+      tmdbType: result.mediaType || null
     };
   };
   
@@ -480,7 +540,7 @@ async function fetchTmdbDataForItem(text) {
     }
   }
   
-  return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null };
+  return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null, tmdbType: null };
 }
 
 async function applyTmdbCandidateToCurrentItem(c) {
@@ -515,10 +575,10 @@ async function applyTmdbCandidateToCurrentItem(c) {
 
   let updated = false;
 
-  // Title additions (orig + year)
-  const textUpdates = buildTitleAdditions(item.text, c.titleOrig, c.year);
-  if (textUpdates) {
-    item.text = item.text + textUpdates;
+  // Title normalize/additions (orig + year)
+  const nextTitle = buildTitleUpdate(item.text, c.titleOrig, c.year);
+  if (nextTitle) {
+    item.text = nextTitle;
     updated = true;
   }
 
@@ -539,6 +599,10 @@ async function applyTmdbCandidateToCurrentItem(c) {
   // Rating
   if (typeof c.voteAverage === "number" && item.rating == null) { item.rating = c.voteAverage; updated = true; }
   if (typeof c.voteCount === "number" && item.votes == null) { item.votes = c.voteCount; updated = true; }
+
+  // Type + year (for description header)
+  if (c.mediaType && !item.tmdbType) { item.tmdbType = c.mediaType; updated = true; }
+  if (c.year && !item.year) { item.year = String(c.year); updated = true; }
 
   if (updated) {
     data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
@@ -655,29 +719,56 @@ async function fetchTmdbTags() {
   }
 }
 
-// Формирует дополнение к названию (оригинальное название / год) если их нет
-function buildTitleAdditions(text, originalTitle, year) {
-  const hasYear = /\(\d{4}\)/.test(text);
-  const hasSlash = text.includes("/");
-  
-  let additions = "";
-  
-  // Добавляем оригинальное название если его нет (проверяем через /)
-  if (originalTitle && !hasSlash) {
-    // Проверяем что оригинальное название отличается от текущего (не кириллица)
-    const isLatin = /^[a-zA-Z]/.test(originalTitle);
-    const textIsLatin = /^[a-zA-Z]/.test(text.trim());
-    if (isLatin && !textIsLatin && originalTitle.toLowerCase() !== text.trim().toLowerCase()) {
-      additions += " / " + originalTitle;
+// Нормализует название: приводит год к виду (YYYY) и при необходимости добавляет / Original Title
+function buildTitleUpdate(text, originalTitle, tmdbYear) {
+  const raw = String(text || "").trim();
+  const parts = raw.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
+
+  let yearInText = null;
+  const cleanedParts = [];
+
+  for (const p of (parts.length ? parts : [raw])) {
+    const r = extractYearAndCleanTitle(p);
+    if (!yearInText && r.year) yearInText = r.year;
+    if (r.title) cleanedParts.push(r.title);
+  }
+
+  let out = cleanedParts.join(" / ").replace(/\s+/g, " ").trim();
+
+  // Decide year to show: prefer year already present in text, else TMDB year
+  const y = yearInText || (tmdbYear ? String(tmdbYear) : null);
+  if (y) {
+    // Ensure year is only once and always as (YYYY)
+    out = out.replace(/\s*\((19\d{2}|20\d{2})\)\s*$/g, "").trim();
+    out = `${out} (${y})`;
+  }
+
+  // Add original title if we have only one title part and it's not already bilingual
+  // and original looks Latin while current looks non-Latin.
+  if (originalTitle) {
+    const hasSlash = out.includes("/");
+    if (!hasSlash) {
+      const cur = out.replace(/\s*\((19\d{2}|20\d{2})\)\s*$/g, "").trim();
+      const orig = String(originalTitle).trim();
+      const isLatin = /^[A-Za-z]/.test(orig);
+      const curIsLatin = /^[A-Za-z]/.test(cur);
+      if (isLatin && !curIsLatin && orig.toLowerCase() !== cur.toLowerCase()) {
+        out = out.replace(/\s*\((19\d{2}|20\d{2})\)\s*$/g, "").trim();
+        out = `${out} / ${orig}`;
+        if (y) out = `${out} (${y})`;
+      }
     }
   }
-  
-  // Добавляем год если его нет
-  if (year && !hasYear) {
-    additions += ` (${year})`;
-  }
-  
-  return additions || null;
+
+  return out && out !== raw ? out : null;
+}
+
+function formatVotes(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1) + "M";
+  if (v >= 1_000) return (v / 1_000).toFixed(v >= 10_000 ? 0 : 1) + "k";
+  return String(v);
 }
 
 function updateTmdbBtnVisibility() {
@@ -1569,6 +1660,12 @@ async function saveEdit() {
           item.desc = null;
           item.poster = null;
 
+          // clear rating/meta
+          item.rating = null;
+          item.votes = null;
+          item.tmdbType = null;
+          item.year = null;
+
           // clear tags except viewed
           item.tags = isViewed(item) ? [VIEWED_TAG] : [];
 
@@ -1643,13 +1740,13 @@ async function saveEdit() {
           showProgress(`Загрузка ${i + 1}/${total}...`, percent);
           
           try {
-            const { genres, overview, poster, originalTitle, year, rating, votes } = await fetchTmdbDataForItem(item.text);
+            const { genres, overview, poster, originalTitle, year, rating, votes, tmdbType } = await fetchTmdbDataForItem(item.text);
             let updated = false;
             
-            // Дополняем наименование оригинальным названием и годом
-            const textUpdates = buildTitleAdditions(item.text, originalTitle, year);
-            if (textUpdates) {
-              item.text = item.text + textUpdates;
+            // Нормализуем/дополняем наименование (orig + year)
+            const nextTitle = buildTitleUpdate(item.text, originalTitle, year);
+            if (nextTitle) {
+              item.text = nextTitle;
               updated = true;
             }
             
@@ -1674,6 +1771,8 @@ async function saveEdit() {
 
             if (rating != null && item.rating == null) { item.rating = rating; updated = true; }
             if (votes != null && item.votes == null) { item.votes = votes; updated = true; }
+            if (tmdbType && !item.tmdbType) { item.tmdbType = tmdbType; updated = true; }
+            if (year && !item.year) { item.year = String(year); updated = true; }
             
             if (updated) {
               data.sections[secKey].modified = new Date().toISOString();
@@ -1784,10 +1883,28 @@ function render() {
       const posterHtml = x.item.poster 
         ? `<img class="item-desc-poster" src="${esc(x.item.poster)}" alt="" loading="lazy" />`
         : "";
+
+      // Meta: type · year · rating · votes
+      const tagsForType = displayTags(x.item);
+      const hasAnim = tagsForType.includes("анимация");
+      const hasJp = tagsForType.includes("jp");
+      const typeLabel = x.item.tmdbType === "movie"
+        ? (hasAnim ? (hasJp ? "Аниме" : "Мультфильм") : "Фильм")
+        : (x.item.tmdbType === "tv" ? (hasAnim ? (hasJp ? "Аниме" : "Сериал") : "Сериал") : "");
+      const yearMeta = x.item.year || ((x.text.match(/\((\d{4})\)/) || [])[1] || "");
+      const votesMeta = formatVotes(x.item.votes);
+      const metaParts = [];
+      if (typeLabel) metaParts.push(typeLabel);
+      if (yearMeta) metaParts.push(yearMeta);
+      if (ratingVal != null) metaParts.push(ratingVal.toFixed(1));
+      if (votesMeta) metaParts.push(votesMeta);
+      const metaHtml = metaParts.length ? `<div class="item-desc-meta">${esc(metaParts.join(" · "))}</div>` : "";
+
       descBlock = `
         <div class="item-desc-block">
           ${posterHtml}
           <div class="item-desc-content">
+            ${metaHtml}
             <div class="item-desc-text">${esc(x.item.desc)}</div>
           </div>
           <button class="desc-del-btn" data-action="clear-desc" title="Удалить описание">

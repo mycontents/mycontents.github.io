@@ -1049,8 +1049,15 @@ body.editing .scroll-slack{ display:none; }
   padding-right:44px;
 }
 
+.item-desc-meta{
+  font-size:12px;
+  line-height:1.3;
+  color:var(--muted2);
+  margin:0 0 6px;
+}
+
 .item-desc-text{
-  font-size:14px;
+  font-size:18px;
   line-height:1.55;
   color:var(--text);
 }
