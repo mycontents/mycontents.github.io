@@ -34,6 +34,7 @@ let tmdbPickState = null; // { candidates: [], secKey, idx }
 
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
+let lastTextTap = { key: null, at: 0 };
 
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -1912,9 +1913,20 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
-  // Start inline editing when user taps the title text
+  // Start inline editing only on FAST double tap/click on the title text
   const textEl = e.target.closest('[data-role="text"]');
-  if (textEl && !inlineEdit.active) beginInlineEdit(line);
+  if (textEl && !inlineEdit.active) {
+    const now = Date.now();
+    const sameKey = lastTextTap.key === key;
+    const fast = (now - lastTextTap.at) <= 350;
+
+    if (sameKey && fast) {
+      lastTextTap = { key: null, at: 0 };
+      beginInlineEdit(line);
+    } else {
+      lastTextTap = { key, at: now };
+    }
+  }
 });
 
 // Persist scroll position (normal mode only)
