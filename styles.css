@@ -1186,9 +1186,14 @@ body.editing .scroll-slack{ display:none; }
     padding-right:0;
   }
 
-  /* IMPORTANT: keep the selected-row left padding so the absolute delete button never overlaps the section tag */
+  /* On mobile: do NOT add left padding to the whole row */
   .item-line.selected .item-row{
-    padding-left:42px;
+    padding-left:8px;
+  }
+
+  /* Instead, shift only the section tag to make room for the delete button */
+  .item-line.selected .item-section-tag{
+    margin-left:34px;
   }
 
   /* Move delete button to the top-left of the item row on mobile */
