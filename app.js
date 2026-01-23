@@ -1486,7 +1486,21 @@ function toggleEdit() {
 
 function itemRating(item) {
   const r = Number(item?.rating);
-  return Number.isFinite(r) ? r : null;
+  if (!Number.isFinite(r)) return null;
+  // По требованию: если рейтинг не получен/нулевой (0.0), считаем что его нет
+  if (r <= 0) return null;
+  return r;
+}
+
+function ratingColor(r) {
+  const v = Number(r);
+  if (!Number.isFinite(v)) return null;
+
+  // Map 0..10 to red..green (hue 0..120)
+  const t = Math.max(0, Math.min(1, v / 10));
+  const hue = 120 * t;
+  // Slightly bright but not neon
+  return `hsl(${hue} 70% 55%)`;
 }
 
 function matchFilters(item) {
@@ -1884,7 +1898,7 @@ function render() {
         ? `<img class="item-desc-poster" src="${esc(x.item.poster)}" alt="" loading="lazy" />`
         : "";
 
-      // Meta: type · year · rating · votes
+      // Meta: left = type · year, right = rating (votes)
       const tagsForType = displayTags(x.item);
       const hasAnim = tagsForType.includes("анимация");
       const hasJp = tagsForType.includes("jp");
@@ -1893,12 +1907,24 @@ function render() {
         : (x.item.tmdbType === "tv" ? (hasAnim ? (hasJp ? "Аниме" : "Сериал") : "Сериал") : "");
       const yearMeta = x.item.year || ((x.text.match(/\((\d{4})\)/) || [])[1] || "");
       const votesMeta = formatVotes(x.item.votes);
-      const metaParts = [];
-      if (typeLabel) metaParts.push(typeLabel);
-      if (yearMeta) metaParts.push(yearMeta);
-      if (ratingVal != null) metaParts.push(ratingVal.toFixed(1));
-      if (votesMeta) metaParts.push(votesMeta);
-      const metaHtml = metaParts.length ? `<div class="item-desc-meta">${esc(metaParts.join(" · "))}</div>` : "";
+
+      const leftParts = [];
+      if (typeLabel) leftParts.push(typeLabel);
+      if (yearMeta) leftParts.push(yearMeta);
+      const leftText = leftParts.join(" · ");
+
+      // rating display: 7.2 (52k)
+      const rightText = (ratingVal != null)
+        ? `${ratingVal.toFixed(1)}${votesMeta ? ` (${votesMeta})` : ""}`
+        : "";
+      const rColor = (ratingVal != null) ? ratingColor(ratingVal) : null;
+
+      const metaHtml = (leftText || rightText)
+        ? `<div class="item-desc-meta">
+             <span class="item-desc-meta-left">${esc(leftText)}</span>
+             <span class="item-desc-meta-right">${rightText ? `<span class="item-desc-rating" style="--rating-color:${esc(rColor)}">${esc(rightText)}</span>` : ""}</span>
+           </div>`
+        : "";
 
       descBlock = `
         <div class="item-desc-block">
@@ -2093,7 +2119,7 @@ function keyExistsInData(key) {
 }
 
 // ===== Utils =====
-function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
