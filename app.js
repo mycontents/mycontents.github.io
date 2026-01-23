@@ -71,20 +71,25 @@ async function init() {
 
       const existingKeys = new Set(Array.from(document.querySelectorAll("#viewMode .item-line")).map(el => el.dataset.key));
 
-      // Validate expanded description key
-      if (expandedDescKey && !existingKeys.has(expandedDescKey)) {
-        expandedDescKey = null;
-        localStorage.removeItem("expanded_desc_key");
+      // Validate expanded description key by DATA (not by current visibility).
+      // This allows keeping an opened description even if the item is temporarily hidden by filters.
+      if (expandedDescKey) {
+        const p = parseItemKey(expandedDescKey);
+        const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
+        if (!it || !it.desc) {
+          expandedDescKey = null;
+          localStorage.removeItem("expanded_desc_key");
+        }
       }
 
-      // Validate selected key
+      // Validate selected key (selection is tied to the current visible list)
       if (selectedKey && !existingKeys.has(selectedKey)) {
         selectedKey = null;
         localStorage.removeItem("selected_key");
       }
 
-      // Re-render once if expandedDescKey exists to ensure DOM contains expanded block
-      if (expandedDescKey) render();
+      // Re-render once only if expanded description is currently visible (so the expanded DOM exists)
+      if (expandedDescKey && existingKeys.has(expandedDescKey)) render();
 
       // Apply selected class without forcing re-render
       if (selectedKey) {
@@ -1369,7 +1374,17 @@ function render() {
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
-  if (expandedDescKey && !keySet.has(expandedDescKey)) { expandedDescKey = null; localStorage.removeItem("expanded_desc_key"); }
+
+  // Keep expanded description even if the item is temporarily hidden by filters/section.
+  // Only reset when the item no longer exists in DATA or has no description anymore.
+  if (expandedDescKey) {
+    const p = parseItemKey(expandedDescKey);
+    const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
+    if (!it || !it.desc) {
+      expandedDescKey = null;
+      localStorage.removeItem("expanded_desc_key");
+    }
+  }
 
   view.innerHTML = items.map(x => {
     const key = `${x.secKey}|${x.idx}`, sel = selectedKey === key, viewed = isViewed(x.item);
@@ -1518,6 +1533,23 @@ document.addEventListener("click", e => {
     renderSectionList();
   }
 });
+
+function parseItemKey(key) {
+  if (!key) return null;
+  const s = String(key);
+  const i = s.lastIndexOf("|");
+  if (i < 0) return null;
+  const secKey = s.slice(0, i);
+  const idx = Number(s.slice(i + 1));
+  if (!secKey || !Number.isInteger(idx) || idx < 0) return null;
+  return { secKey, idx };
+}
+
+function keyExistsInData(key) {
+  const p = parseItemKey(key);
+  if (!p) return false;
+  return !!data.sections?.[p.secKey]?.items?.[p.idx];
+}
 
 // ===== Utils =====
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
