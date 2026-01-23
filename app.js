@@ -35,6 +35,7 @@ let tmdbPickState = null; // { candidates: [], secKey, idx }
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
 let lastTextTap = { key: null, at: 0 };
+let lastItemTap = { key: null, at: 0 };
 
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -1100,29 +1101,64 @@ function addTagFromInput() {
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
 }
 
+function clearApiDataForItem(item, { keepTags = true } = {}) {
+  if (!item) return;
+  // Clear anything that could be loaded from TMDB/API
+  item.desc = null;
+  item.poster = null;
+  item.rating = null;
+  item.votes = null;
+  item.tmdbType = null;
+  item.year = null;
+  // Keep tags by default (only tag manipulation is requested here)
+  if (!keepTags) {
+    const wasViewed = isViewed(item);
+    item.tags = wasViewed ? [VIEWED_TAG] : [];
+  }
+}
+
 function removeTagWithUndo(tag) {
   const item = getEditorItem();
   if (!item || !tagEditorCtx) return;
   const t = normTag(tag);
   if (!t || t === VIEWED_TAG) return;
-  const oldTags = [...item.tags];
+
+  // Per requirement: removing tags from tag editor should also clear API-loaded fields
+  const oldItem = JSON.parse(JSON.stringify(item));
+
   item.tags = uniqueTags(item.tags.filter(x => normTag(x) !== t));
+  clearApiDataForItem(item, { keepTags: true });
+
   const { secKey, idx } = tagEditorCtx;
   data.sections[secKey].modified = new Date().toISOString();
+
+  // Close expanded description if it was open for this item (since desc is cleared)
+  const key = `${secKey}|${idx}`;
+  if (expandedDescKey === key) closeDescMenu();
+
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
-  startUndo({ type: "tag", secKey, idx, oldTags }, `Тег удалён: ${t}`);
+  startUndo({ type: "itemRestore", secKey, idx, oldItem }, `Тег удалён: ${t}`);
 }
 
 function clearTagsForCurrentItem() {
   const item = getEditorItem();
   if (!item || !tagEditorCtx) return;
-  const oldTags = [...item.tags];
+
+  // Per requirement: clearing tags should also clear API-loaded fields
+  const oldItem = JSON.parse(JSON.stringify(item));
+
   const wasViewed = isViewed(item);
   item.tags = wasViewed ? [VIEWED_TAG] : [];
+  clearApiDataForItem(item, { keepTags: true });
+
   const { secKey, idx } = tagEditorCtx;
   data.sections[secKey].modified = new Date().toISOString();
+
+  const key = `${secKey}|${idx}`;
+  if (expandedDescKey === key) closeDescMenu();
+
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
-  if (oldTags.filter(t => t !== VIEWED_TAG).length) startUndo({ type: "tagClear", secKey, idx, oldTags }, "Теги очищены");
+  startUndo({ type: "itemRestore", secKey, idx, oldItem }, "Теги очищены");
 }
 
 // ===== Description inline expand =====
@@ -1405,6 +1441,17 @@ $("undoBtn").onclick = () => {
   } else if (p.type === "tag" || p.type === "tagClear") {
     const item = data.sections?.[p.secKey]?.items?.[p.idx];
     if (item) { item.tags = uniqueTags(p.oldTags); data.sections[p.secKey].modified = new Date().toISOString(); saveData(); render(); renderTagEditorList(); renderTagFilterMenu(); }
+  } else if (p.type === "itemRestore") {
+    const item = data.sections?.[p.secKey]?.items?.[p.idx];
+    if (item) {
+      // Restore the entire item snapshot (including tags and API-loaded fields)
+      const wasViewed = isViewed(item);
+      Object.assign(item, p.oldItem);
+      // Ensure viewed tag stays consistent if it was toggled elsewhere
+      if (wasViewed) setViewed(item, true);
+      data.sections[p.secKey].modified = new Date().toISOString();
+      saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
+    }
   } else if (p.type === "desc") {
     const item = data.sections?.[p.secKey]?.items?.[p.idx];
     if (item) { 
@@ -2068,6 +2115,38 @@ $("viewMode").addEventListener("click", e => {
       beginInlineEdit(line);
     } else {
       lastTextTap = { key, at: now };
+    }
+    return;
+  }
+
+  // Toggle description on FAST double tap/click on the item (excluding buttons and title text).
+  // Allowed areas: tags, empty space, and the description block itself.
+  const clickedAction = !!e.target.closest('[data-action]');
+  const clickedButton = !!e.target.closest('button');
+  const clickedTitleText = !!textEl;
+
+  if (!clickedAction && !clickedButton && !clickedTitleText) {
+    const now = Date.now();
+    const sameKey = lastItemTap.key === key;
+    const fast = (now - lastItemTap.at) <= 350;
+
+    if (sameKey && fast) {
+      lastItemTap = { key: null, at: 0 };
+      const sec = line.dataset.sec, idx = +line.dataset.idx;
+      const item = data.sections?.[sec]?.items?.[idx];
+      if (item?.desc) {
+        // Ensure selected (so UI state is consistent)
+        if (selectedKey !== key) {
+          selectedKey = key;
+          localStorage.setItem('selected_key', selectedKey);
+          document.querySelectorAll('#viewMode .item-line.selected').forEach(el => el.classList.remove('selected'));
+          line.classList.add('selected');
+        }
+        closeTagEditor();
+        toggleDescExpand(sec, idx);
+      }
+    } else {
+      lastItemTap = { key, at: now };
     }
   }
 });
