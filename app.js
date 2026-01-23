@@ -11,6 +11,7 @@ let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "ma
 let filterQuery = localStorage.getItem("filter_query") || "";
 let viewedFilter = localStorage.getItem("viewed_filter") || "hide";
 let tagFilter = loadTagFilter();
+let ratingFilter = loadRatingFilter(); // number|null : минимальный рейтинг (>=)
 
 let data = { sections: {} };
 let isEditing = false;
@@ -418,7 +419,7 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
 
 async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null };
+  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null };
   
   const { names, year } = parseTitleForSearch(text);
   
@@ -460,7 +461,9 @@ async function fetchTmdbDataForItem(text) {
       overview: result.overview || null,
       poster: result.poster_path ? TMDB_IMG + result.poster_path : null,
       originalTitle: origTitle || null,
-      year: resultYear
+      year: resultYear,
+      rating: (typeof result.vote_average === "number") ? result.vote_average : null,
+      votes: (typeof result.vote_count === "number") ? result.vote_count : null
     };
   };
   
@@ -476,7 +479,7 @@ async function fetchTmdbDataForItem(text) {
     }
   }
   
-  return { genres: [], overview: null, poster: null, originalTitle: null, year: null };
+  return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null };
 }
 
 async function applyTmdbCandidateToCurrentItem(c) {
@@ -531,6 +534,10 @@ async function applyTmdbCandidateToCurrentItem(c) {
   // Desc + poster
   if (c.overview && !item.desc) { item.desc = c.overview; updated = true; }
   if (c.poster && !item.poster) { item.poster = c.poster; updated = true; }
+
+  // Rating
+  if (typeof c.voteAverage === "number" && item.rating == null) { item.rating = c.voteAverage; updated = true; }
+  if (typeof c.voteCount === "number" && item.votes == null) { item.votes = c.voteCount; updated = true; }
 
   if (updated) {
     data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
@@ -786,13 +793,26 @@ function loadTagFilter() {
   } catch { return new Set(); }
 }
 function saveTagFilter() { localStorage.setItem("tag_filter", JSON.stringify([...tagFilter])); }
-function updateTagFilterBtnUI() { $("tagFilterBtn")?.classList.toggle("on", tagFilter.size > 0); }
+
+function loadRatingFilter() {
+  const v = Number(localStorage.getItem("rating_filter") || "0");
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function saveRatingFilter() {
+  if (ratingFilter == null) localStorage.removeItem("rating_filter");
+  else localStorage.setItem("rating_filter", String(ratingFilter));
+}
+
+function updateTagFilterBtnUI() {
+  $("tagFilterBtn")?.classList.toggle("on", tagFilter.size > 0 || ratingFilter != null);
+}
 
 function toggleTagFilterMenu() {
   if (isEditing) return;
   const menu = $("tagFilterMenu");
   if (!menu.classList.contains("hidden")) { menu.classList.add("hidden"); return; }
   renderTagFilterMenu();
+  renderRatingFilterMenu();
   openMenu("tagFilterMenu", $("tagFilterBtn"), "right");
 }
 
@@ -826,7 +846,40 @@ function renderTagFilterMenu() {
   list.querySelectorAll(".tag-option").forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); toggleTagFilterItem(el.dataset.tag); };
   });
-  hint.textContent = tagFilter.size ? `Выбрано: ${tagFilter.size}` : "";
+
+  const parts = [];
+  if (tagFilter.size) parts.push(`Теги: ${tagFilter.size}`);
+  if (ratingFilter != null) parts.push(`Рейтинг ≥ ${ratingFilter}`);
+  hint.textContent = parts.join(" · ");
+}
+
+function renderRatingFilterMenu() {
+  const wrap = $("ratingFilterList");
+  if (!wrap) return;
+  const values = [2,3,4,5,6,7,8,9];
+  wrap.innerHTML = values.map(v => {
+    const on = ratingFilter === v;
+    return `<button class="rating-btn ${on ? "on" : ""}" type="button" data-rating="${v}">≥${v}</button>`;
+  }).join("");
+
+  wrap.querySelectorAll("[data-rating]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const v = Number(btn.dataset.rating);
+      ratingFilter = (ratingFilter === v) ? null : v;
+      saveRatingFilter();
+      updateTagFilterBtnUI();
+
+      // reset scroll on filter change
+      localStorage.setItem("scroll_y", "0");
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+      selectedKey = null; disarmItemDelete(); closeTagEditor();
+      renderTagFilterMenu();
+      renderRatingFilterMenu();
+      render();
+    };
+  });
 }
 
 function toggleTagFilterItem(tag) {
@@ -845,14 +898,19 @@ function toggleTagFilterItem(tag) {
 
 function clearTagFilter() {
   tagFilter = new Set();
-  saveTagFilter(); updateTagFilterBtnUI();
+  ratingFilter = null;
+  saveTagFilter();
+  saveRatingFilter();
+  updateTagFilterBtnUI();
 
   // reset scroll on filter change
   localStorage.setItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
   selectedKey = null; disarmItemDelete(); closeTagEditor();
-  renderTagFilterMenu(); render();
+  renderTagFilterMenu();
+  renderRatingFilterMenu();
+  render();
 }
 
 // ===== Tag editor =====
@@ -1330,10 +1388,21 @@ function toggleEdit() {
   isEditing ? cancelEdit() : startEdit();
 }
 
+function itemRating(item) {
+  const r = Number(item?.rating);
+  return Number.isFinite(r) ? r : null;
+}
+
 function matchFilters(item) {
   const q = filterQuery.trim().toLowerCase();
   if (q && !String(item.text).toLowerCase().includes(q)) return false;
   if (tagFilter.size && !displayTags(item).some(t => tagFilter.has(t))) return false;
+
+  if (ratingFilter != null) {
+    const r = itemRating(item);
+    if (r == null || r < ratingFilter) return false;
+  }
+
   const v = isViewed(item);
   if (viewedFilter === "hide" && v) return false;
   if (viewedFilter === "only" && !v) return false;
@@ -1561,7 +1630,7 @@ async function saveEdit() {
           showProgress(`Загрузка ${i + 1}/${total}...`, percent);
           
           try {
-            const { genres, overview, poster, originalTitle, year } = await fetchTmdbDataForItem(item.text);
+            const { genres, overview, poster, originalTitle, year, rating, votes } = await fetchTmdbDataForItem(item.text);
             let updated = false;
             
             // Дополняем наименование оригинальным названием и годом
@@ -1589,6 +1658,9 @@ async function saveEdit() {
               item.poster = poster;
               updated = true;
             }
+
+            if (rating != null && item.rating == null) { item.rating = rating; updated = true; }
+            if (votes != null && item.votes == null) { item.votes = votes; updated = true; }
             
             if (updated) {
               data.sections[secKey].modified = new Date().toISOString();
@@ -1626,6 +1698,14 @@ function buildItems() {
   const q = filterQuery.trim().toLowerCase();
   if (q) items = items.filter(x => x.text.toLowerCase().includes(q));
   if (tagFilter.size) items = items.filter(x => displayTags(x.item).some(t => tagFilter.has(t)));
+
+  if (ratingFilter != null) {
+    items = items.filter(x => {
+      const r = itemRating(x.item);
+      return r != null && r >= ratingFilter;
+    });
+  }
+
   items = items.filter(x => {
     const v = isViewed(x.item);
     if (viewedFilter === "hide") return !v;
@@ -1663,8 +1743,14 @@ function render() {
     // Разделяем на обычные теги и страны; страны отображаем последними
     const otherTags = rawTags.filter(t => !isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
     const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
-    const tagsHtml = (countryTags.length || otherTags.length)
-      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}</span>`
+
+    const ratingVal = itemRating(x.item);
+    const ratingChip = (ratingVal != null)
+      ? `<span class="tag-chip rating">${ratingVal.toFixed(1)}</span>`
+      : "";
+
+    const tagsHtml = (countryTags.length || otherTags.length || ratingChip)
+      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${ratingChip}</span>`
       : "";
 
     const descBtn = hasDesc

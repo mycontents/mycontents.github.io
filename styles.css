@@ -479,6 +479,13 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
+/* Rating chip (after country) */
+.tag-chip.rating{
+  color:var(--text);
+  border-color:rgba(47,158,98,.35);
+  background:rgba(47,158,98,.10);
+}
+
 /* Right actions (tag + viewed) */
 .right-action,
 .tag-action{
@@ -804,6 +811,31 @@ body.editing .scroll-slack{ display:none; }
   color:#8b949e;
   text-transform:uppercase;
   letter-spacing:.08em;
+}
+
+/* Rating filter */
+.rating-title{ margin-top:2px; }
+.rating-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:6px;
+  margin-top:8px;
+}
+.rating-btn{
+  height:28px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--muted);
+  font-size:12px;
+  cursor:pointer;
+  -webkit-tap-highlight-color:var(--tap);
+}
+.rating-btn:hover{ color:var(--text); background:var(--panel2); border-color:var(--blue); }
+.rating-btn.on{
+  color:var(--active);
+  background:rgba(47,158,98,.12);
+  border-color:rgba(47,158,98,.35);
 }
 
 /* TMDB button */
