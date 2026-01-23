@@ -469,7 +469,7 @@ function setupFilterUI() {
     localStorage.setItem("scroll_y", "0");
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
-    selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
+    selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
   };
   input.oninput = () => handle(input.value);
   mInput.oninput = () => handle(mInput.value);
@@ -489,7 +489,7 @@ function clearFilter() {
   localStorage.setItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); render();
+  selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
 }
 
 function setFilterLock(locked) {
@@ -574,7 +574,7 @@ function toggleTagFilterItem(tag) {
   localStorage.setItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  selectedKey = null; disarmItemDelete(); closeTagEditor();
   renderTagFilterMenu(); render();
 }
 
@@ -586,7 +586,7 @@ function clearTagFilter() {
   localStorage.setItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  selectedKey = null; disarmItemDelete(); closeTagEditor();
   renderTagFilterMenu(); render();
 }
 
@@ -595,6 +595,10 @@ function openTagEditor(secKey, idx, anchor) {
   if (isEditing) return;
   const sec = data.sections[secKey];
   if (!sec?.items?.[idx]) return;
+
+  // По требованию: при открытии редактора тегов закрываем раскрытое описание
+  if (expandedDescKey) closeDescMenu();
+
   tagEditorCtx = { secKey, idx };
   $("tagEditorTitle").textContent = `Теги`;
   $("tagAddInput").value = "";
@@ -740,7 +744,7 @@ function cycleViewedFilter() {
   if (isEditing) return;
   viewedFilter = viewedFilter === "hide" ? "show" : viewedFilter === "show" ? "only" : "hide";
   localStorage.setItem("viewed_filter", viewedFilter);
-  selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu();
+  selectedKey = null; disarmItemDelete(); closeTagEditor();
   updateViewedToggleUI(); render();
 }
 
@@ -851,8 +855,6 @@ function renderSectionList() {
 function selectSection(key) {
   currentSection = key; localStorage.setItem("current_section", key);
   selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
-  // при смене раздела раскрытое описание обычно становится нерелевантным
-  expandedDescKey = null; localStorage.removeItem("expanded_desc_key");
   updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
   // сбрасываем scroll, чтобы не сохранялось старое положение другого раздела
   localStorage.setItem("scroll_y", "0");
@@ -1366,8 +1368,8 @@ function render() {
   if (!items.length) { view.innerHTML = ""; updateCounter(0); return; }
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
-  if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); }
-  if (expandedDescKey && !keySet.has(expandedDescKey)) { expandedDescKey = null; }
+  if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
+  if (expandedDescKey && !keySet.has(expandedDescKey)) { expandedDescKey = null; localStorage.removeItem("expanded_desc_key"); }
 
   view.innerHTML = items.map(x => {
     const key = `${x.secKey}|${x.idx}`, sel = selectedKey === key, viewed = isViewed(x.item);
