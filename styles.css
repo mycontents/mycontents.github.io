@@ -1,7 +1,7 @@
 :root{
   /* ===== Theme knobs (edit here) ===== */
-  --page-bg:#0d1117;
-  --accent:#58a6ff;
+  --page-bg:#0F0E0D;
+  --accent:#d8b26a;
 
   /* ===== Content panel theme (edit here) ===== */
   --content-panel-bg: transparent;
@@ -11,17 +11,17 @@
   --bg:var(--page-bg);
   --blue:var(--accent);
 
-  --panel:#161b22;
-  --panel2:#0f141b;
-  --border:#30363d;
-  --border2:#21262d;
+  --panel:#171512;
+  --panel2:#12100e;
+  --border:#3a332b;
+  --border2:#242019;
 
-  --text:#c9d1d9;
-  --muted:#6e7681;
-  --muted2:#484f58;
+  --text:#e7e0d8;
+  --muted:#a39687;
+  --muted2:#6f645a;
 
-  --red:#f85149;
-  --green:#238636;
+  --red:#ff6b63;
+  --green:#2ea043;
 
   --r10:10px;
   --tap:transparent;
@@ -846,8 +846,8 @@ body.editing .scroll-slack{ display:none; }
   -webkit-tap-highlight-color:var(--tap);
 }
 .tmdb-pick-item:hover{
-  border-color:rgba(88,166,255,.6);
-  background:rgba(88,166,255,.08);
+  border-color:rgba(216,178,106,.6);
+  background:rgba(216,178,106,.08);
 }
 .tmdb-pick-meta{
   font-size:11px;
@@ -892,8 +892,8 @@ body.editing .scroll-slack{ display:none; }
   flex:0 0 auto;
 }
 .tag-option.on .tag-check{
-  border-color:rgba(88,166,255,.6);
-  background:rgba(88,166,255,.12);
+  border-color:rgba(216,178,106,.6);
+  background:rgba(216,178,106,.12);
   color:var(--blue);
 }
 
