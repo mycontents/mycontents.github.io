@@ -501,9 +501,9 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
-/* Serial tag — same style as country */
+/* Serial tag — intermediate color between muted and text */
 .tag-chip.serial{
-  color:var(--text);
+  color:#c4bdb4;
   border-color:var(--border);
 }
 
@@ -968,6 +968,18 @@ body.editing .scroll-slack{ display:none; }
   border-color:rgba(216,178,106,.6);
   background:transparent;
   color:var(--text);
+}
+
+/* Excluded state — red cross */
+.tag-option.excluded .tag-check{
+  border-color:rgba(255,107,99,.6);
+  background:rgba(255,107,99,.1);
+  color:var(--red);
+}
+.tag-option.excluded .tag-name{
+  color:var(--red);
+  text-decoration:line-through;
+  text-decoration-color:rgba(255,107,99,.4);
 }
 
 .tag-name{

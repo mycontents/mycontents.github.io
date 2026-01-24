@@ -11,6 +11,7 @@ let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "ma
 let filterQuery = localStorage.getItem("filter_query") || "";
 let viewedFilter = localStorage.getItem("viewed_filter") || "hide";
 let tagFilter = loadTagFilter();
+let tagFilterExcluded = loadTagFilterExcluded();
 let ratingFilter = loadRatingFilter(); // number|null : минимальный рейтинг (>=)
 
 let data = { sections: {} };
@@ -1273,7 +1274,16 @@ function loadTagFilter() {
     return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
   } catch { return new Set(); }
 }
-function saveTagFilter() { localStorage.setItem("tag_filter", JSON.stringify([...tagFilter])); }
+function loadTagFilterExcluded() {
+  try {
+    const arr = JSON.parse(localStorage.getItem("tag_filter_excluded") || "[]");
+    return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
+  } catch { return new Set(); }
+}
+function saveTagFilter() {
+  localStorage.setItem("tag_filter", JSON.stringify([...tagFilter]));
+  localStorage.setItem("tag_filter_excluded", JSON.stringify([...tagFilterExcluded]));
+}
 
 function loadRatingFilter() {
   const v = Number(localStorage.getItem("rating_filter") || "0");
@@ -1285,7 +1295,7 @@ function saveRatingFilter() {
 }
 
 function updateTagFilterBtnUI() {
-  $("tagFilterBtn")?.classList.toggle("on", tagFilter.size > 0 || ratingFilter != null);
+  $("tagFilterBtn")?.classList.toggle("on", tagFilter.size > 0 || tagFilterExcluded.size > 0 || ratingFilter != null);
 }
 
 function toggleTagFilterMenu() {
@@ -1320,9 +1330,13 @@ function renderTagFilterMenu() {
 
   list.innerHTML = tags.map(t => {
     const displayName = isCountryTag(t) ? countryDisplayName(t) : t;
+    const isIncluded = tagFilter.has(t);
+    const isExcluded = tagFilterExcluded.has(t);
+    const stateClass = isExcluded ? "excluded" : (isIncluded ? "on" : "");
+    const iconId = isExcluded ? "i-x" : "i-check";
     return `
-    <div class="tag-option ${tagFilter.has(t) ? "on" : ""}" data-tag="${esc(t)}">
-      <span class="tag-check"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#i-check"></use></svg></span>
+    <div class="tag-option ${stateClass}" data-tag="${esc(t)}">
+      <span class="tag-check"><svg class="icon small" viewBox="0 0 16 16"><use href="${ICONS}#${iconId}"></use></svg></span>
       <span class="tag-name">${esc(displayName)}</span>
       <span class="tag-count">${counts.get(t)}</span>
     </div>`;
@@ -1333,7 +1347,8 @@ function renderTagFilterMenu() {
   });
 
   const parts = [];
-  if (tagFilter.size) parts.push(`Теги: ${tagFilter.size}`);
+  if (tagFilter.size) parts.push(`Вкл: ${tagFilter.size}`);
+  if (tagFilterExcluded.size) parts.push(`Искл: ${tagFilterExcluded.size}`);
   if (ratingFilter != null) parts.push(`Рейтинг ≥ ${ratingFilter}`);
   hint.textContent = parts.join(" · ");
 }
@@ -1370,7 +1385,23 @@ function renderRatingFilterMenu() {
 function toggleTagFilterItem(tag) {
   const t = normTag(tag);
   if (!t || t === VIEWED_TAG) return;
-  tagFilter.has(t) ? tagFilter.delete(t) : tagFilter.add(t);
+  
+  // Cycle: off → on → excluded → off
+  const isIncluded = tagFilter.has(t);
+  const isExcluded = tagFilterExcluded.has(t);
+  
+  if (!isIncluded && !isExcluded) {
+    // off → on
+    tagFilter.add(t);
+  } else if (isIncluded && !isExcluded) {
+    // on → excluded
+    tagFilter.delete(t);
+    tagFilterExcluded.add(t);
+  } else {
+    // excluded → off
+    tagFilterExcluded.delete(t);
+  }
+  
   saveTagFilter(); updateTagFilterBtnUI();
 
   // reset scroll on filter change
@@ -1383,6 +1414,7 @@ function toggleTagFilterItem(tag) {
 
 function clearTagFilter() {
   tagFilter = new Set();
+  tagFilterExcluded = new Set();
   ratingFilter = null;
   saveTagFilter();
   saveRatingFilter();
@@ -1970,7 +2002,14 @@ function ratingColor(r) {
 function matchFilters(item) {
   const q = filterQuery.trim().toLowerCase();
   if (q && !String(item.text).toLowerCase().includes(q)) return false;
-  if (tagFilter.size && !displayTags(item).some(t => tagFilter.has(t))) return false;
+  
+  const itemTags = displayTags(item);
+  
+  // Excluded tags have highest priority — if any excluded tag is present, hide item
+  if (tagFilterExcluded.size && itemTags.some(t => tagFilterExcluded.has(t))) return false;
+  
+  // Included tags — item must have at least one of them
+  if (tagFilter.size && !itemTags.some(t => tagFilter.has(t))) return false;
 
   if (ratingFilter != null) {
     const r = itemRating(item);
