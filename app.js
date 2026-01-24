@@ -34,7 +34,6 @@ let tmdbPickState = null; // { candidates: [], secKey, idx }
 
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
-let lastTextTap = { key: null, at: 0 };
 let lastItemTap = { key: null, at: 0 };
 
 // Inline rename for section name (header)
@@ -2370,10 +2369,9 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
-  // Toggle description on FAST double tap/click on the item (excluding buttons).
-  // Allowed areas: title text, tags, empty space, and the description block itself.
-  // If double-tapped on title text AND item has description -> toggle description.
-  // If double-tapped on title text AND item has NO description -> start inline edit.
+  // Double tap behavior:
+  // - on title text: start inline edit (only)
+  // - elsewhere on the item (excluding buttons/actions): toggle description (if any)
   const textEl = e.target.closest('[data-role="text"]');
   const clickedAction = !!e.target.closest('[data-action]');
   const clickedButton = !!e.target.closest('button');
@@ -2385,7 +2383,6 @@ $("viewMode").addEventListener("click", e => {
 
     if (sameKey && fast) {
       lastItemTap = { key: null, at: 0 };
-      lastTextTap = { key: null, at: 0 };
       const sec = line.dataset.sec, idx = +line.dataset.idx;
       const item = data.sections?.[sec]?.items?.[idx];
 
@@ -2397,24 +2394,15 @@ $("viewMode").addEventListener("click", e => {
         line.classList.add('selected');
       }
 
-      // Double tap on title text: toggle description (if any) AND start inline edit
       if (textEl) {
-        closeTagEditor();
-        if (item?.desc) {
-          toggleDescExpand(sec, idx);
-        }
-        // Start inline edit after description toggle (need to find element again after render)
-        if (!inlineEdit.active) {
-          // toggleDescExpand calls render() which replaces DOM, so find element by key
-          setTimeout(() => {
-            const newLine = document.querySelector(`#viewMode .item-line[data-key="${key}"]`);
-            if (newLine && !inlineEdit.active) {
-              beginInlineEdit(newLine);
-            }
-          }, 0);
-        }
-      } else if (item?.desc) {
-        // Double tap elsewhere (not on title): just toggle description
+        // Start inline edit with caret at click position
+        const caretOffset = caretOffsetFromEvent(textEl, e);
+        beginInlineEdit(line, (typeof caretOffset === 'number') ? { caretOffset } : {});
+        return;
+      }
+
+      // Double tap elsewhere toggles description (if any)
+      if (item?.desc) {
         closeTagEditor();
         toggleDescExpand(sec, idx);
       }
