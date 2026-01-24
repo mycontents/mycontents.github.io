@@ -343,6 +343,10 @@ body.editing .scroll-slack{ display:none; }
 
   user-select:text;
   -webkit-user-select:text;
+
+  /* Prevent browser context menu on long press */
+  -webkit-touch-callout:none;
+  touch-action:manipulation;
 }
 .item-line:last-child{ margin-bottom:0; }
 

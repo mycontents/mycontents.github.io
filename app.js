@@ -2581,6 +2581,12 @@ $("viewMode").addEventListener("pointerdown", e => {
   }
 });
 
+// Prevent browser context menu on long press (mobile Chrome shows "Download/Share/Print")
+$("viewMode").addEventListener("contextmenu", e => {
+  e.preventDefault();
+  return false;
+});
+
 $("viewMode").addEventListener("pointermove", e => {
   if (pointer.down && Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) {
     pointer.moved = true;
