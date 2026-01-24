@@ -469,13 +469,23 @@ function beginSectionRename() {
   sel?.removeAllRanges();
   sel?.addRange(range);
 
+  // Keep it strictly single-line like an address bar
+  el.onbeforeinput = (ev) => {
+    // Block insertion of line breaks
+    if (ev?.inputType === "insertParagraph" || ev?.inputType === "insertLineBreak") {
+      ev.preventDefault();
+    }
+  };
+
   el.onkeydown = (e) => {
     if (e.key === "Enter") { e.preventDefault(); el.blur(); }
     else if (e.key === "Escape") { e.preventDefault(); cancelSectionRename(); el.blur(); }
   };
+
   el.onblur = () => {
     el.onkeydown = null;
     el.onblur = null;
+    el.onbeforeinput = null;
     commitSectionRename();
   };
 }

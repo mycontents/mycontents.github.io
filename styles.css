@@ -107,6 +107,7 @@ header{
   display:flex;
   align-items:center;
   gap:10px;
+  min-width:0;
 }
 
 /* Left group: section + viewed toggle (stays left) */
@@ -114,7 +115,8 @@ header{
   display:flex;
   align-items:center;
   gap:10px;
-  flex:0 0 auto;
+  flex:0 1 auto; /* allow shrinking on narrow screens */
+  min-width:0;
 }
 
 /* Right group: all other controls (pushed to right, filter expands on desktop) */
@@ -147,7 +149,9 @@ header{
   border-radius:var(--r10);
   cursor:pointer;
   -webkit-tap-highlight-color:var(--tap);
-  flex:0 0 auto;
+  flex:0 1 auto; /* allow shrinking */
+  min-width:0;
+  max-width:clamp(140px, 42vw, 220px);
 }
 .section-btn:hover{ border-color:var(--blue); }
 .section-btn:active{ transform:translateY(.5px); }
@@ -162,15 +166,24 @@ header{
   white-space:nowrap;
 }
 #currentSectionName[contenteditable="true"]{
-  /* While editing: allow wrapping/scrolling if needed */
-  overflow:visible;
-  text-overflow:clip;
-  white-space:normal;
+  /* While editing: keep single line, allow horizontal scroll like an address bar */
+  white-space:nowrap;
+  display:block;
+  min-width:0;
+  max-width:100%;
+
+  /* prevent multiline/paragraphs */
+  overflow-x:auto;
+  overflow-y:hidden;
+  word-break:normal;
 
   outline:none;
   border-bottom:1px solid var(--blue);
   padding-bottom:1px;
+
+  scrollbar-width:none; /* Firefox */
 }
+#currentSectionName[contenteditable="true"]::-webkit-scrollbar{ width:0; height:0; }
 
 /* section label (single line) */
 .sec-label{
@@ -284,7 +297,7 @@ header{
 }
 
 @media (max-width: 600px) {
-  .section-btn{ min-width:auto; max-width:140px; }
+  .section-btn{ min-width:0; max-width:calc(100vw - 16px - 16px - 40px - 10px - 40px - 10px - 40px - 10px); }
   .filter-wrap:not(.mobile-filter){ display:none; }
   .search-toggle-btn{ display:grid; }
 }
@@ -718,7 +731,7 @@ body.editing .scroll-slack{ display:none; }
   box-shadow:0 10px 30px rgba(0,0,0,.35);
 }
 
-.dropdown-menu.section-menu{ padding:8px 0; min-width:260px; }
+.dropdown-menu.section-menu{ padding:8px 0; min-width:260px; max-width:min(92vw, 360px); }
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
 .dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
 .dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; position:absolute; }
