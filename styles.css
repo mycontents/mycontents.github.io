@@ -165,16 +165,18 @@ header{
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+
+/* When editing: show full text, no ellipsis, horizontal scroll like address bar */
 #currentSectionName[contenteditable="true"]{
-  /* While editing: keep single line, allow horizontal scroll like an address bar */
   white-space:nowrap;
   display:block;
   min-width:0;
   max-width:100%;
 
-  /* prevent multiline/paragraphs */
+  /* Remove ellipsis, enable horizontal scroll */
   overflow-x:auto;
   overflow-y:hidden;
+  text-overflow:clip;
   word-break:normal;
 
   outline:none;

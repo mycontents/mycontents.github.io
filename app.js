@@ -470,6 +470,9 @@ function beginSectionRename() {
   sel?.removeAllRanges();
   sel?.addRange(range);
 
+  // Scroll to end so caret is visible
+  el.scrollLeft = el.scrollWidth;
+
   // Keep it strictly single-line like an address bar
   el.onbeforeinput = (ev) => {
     // Block insertion of line breaks
