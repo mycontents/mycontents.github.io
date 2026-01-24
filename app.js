@@ -2391,7 +2391,7 @@ function render() {
       : "";
 
     const tagsHtml = (serialTag || countryTags.length || otherTags.length || ratingChip)
-      ? `<span class="item-tags">${serialTag ? `<span class="tag-chip">${esc(serialTag)}</span>` : ""}${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${ratingChip}</span>`
+      ? `<span class="item-tags">${serialTag ? `<span class="tag-chip serial">${esc(serialTag)}</span>` : ""}${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${ratingChip}</span>`
       : "";
 
     const descBtn = hasDesc

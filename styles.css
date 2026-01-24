@@ -501,6 +501,12 @@ body.editing .scroll-slack{ display:none; }
   border-color:var(--border);
 }
 
+/* Serial tag — same style as country */
+.tag-chip.serial{
+  color:var(--text);
+  border-color:var(--border);
+}
+
 /* Rating chip — colored (red→green), no border, with votes */
 .tag-chip.rating{
   color:var(--rating-color, var(--text));
