@@ -1227,7 +1227,7 @@ body.editing .scroll-slack{ display:none; }
   background: color-mix(in srgb, var(--blue) 22%, var(--panel));
   border:1px solid var(--blue);
   box-shadow:0 10px 25px rgba(0,0,0,.35);
-  border-radius:999px;
+  border-radius:var(--r10);
   padding:8px 10px 8px 12px;
   max-width:min(92vw, 560px);
 }
@@ -1242,7 +1242,7 @@ body.editing .scroll-slack{ display:none; }
 .undo-btn{
   width:34px;
   height:34px;
-  border-radius:999px;
+  border-radius:var(--r10);
   border:1px solid rgba(0,0,0,.25);
   background:rgba(0,0,0,.18);
   color:var(--text);

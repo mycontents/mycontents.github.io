@@ -83,11 +83,20 @@ function beginInlineEdit(line) {
   el.setAttribute("contenteditable", "true");
   el.focus();
 
-  // Move caret to end
+  // Try to place caret at click position; fall back to end of text
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    // Browser may have already placed caret at click position
+    const existingRange = sel.getRangeAt(0);
+    if (el.contains(existingRange.startContainer)) {
+      // Caret is already inside the element at click position — keep it
+      return;
+    }
+  }
+  // Fallback: move caret to end
   const range = document.createRange();
   range.selectNodeContents(el);
   range.collapse(false);
-  const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(range);
 
@@ -2269,47 +2278,40 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
-  // Start inline editing only on FAST double tap/click on the title text
+  // Toggle description on FAST double tap/click on the item (excluding buttons).
+  // Allowed areas: title text, tags, empty space, and the description block itself.
+  // If double-tapped on title text AND item has description -> toggle description.
+  // If double-tapped on title text AND item has NO description -> start inline edit.
   const textEl = e.target.closest('[data-role="text"]');
-  if (textEl && !inlineEdit.active) {
-    const now = Date.now();
-    const sameKey = lastTextTap.key === key;
-    const fast = (now - lastTextTap.at) <= 350;
-
-    if (sameKey && fast) {
-      lastTextTap = { key: null, at: 0 };
-      beginInlineEdit(line);
-    } else {
-      lastTextTap = { key, at: now };
-    }
-    return;
-  }
-
-  // Toggle description on FAST double tap/click on the item (excluding buttons and title text).
-  // Allowed areas: tags, empty space, and the description block itself.
   const clickedAction = !!e.target.closest('[data-action]');
   const clickedButton = !!e.target.closest('button');
-  const clickedTitleText = !!textEl;
 
-  if (!clickedAction && !clickedButton && !clickedTitleText) {
+  if (!clickedAction && !clickedButton) {
     const now = Date.now();
     const sameKey = lastItemTap.key === key;
     const fast = (now - lastItemTap.at) <= 350;
 
     if (sameKey && fast) {
       lastItemTap = { key: null, at: 0 };
+      lastTextTap = { key: null, at: 0 };
       const sec = line.dataset.sec, idx = +line.dataset.idx;
       const item = data.sections?.[sec]?.items?.[idx];
+
+      // Ensure selected
+      if (selectedKey !== key) {
+        selectedKey = key;
+        localStorage.setItem('selected_key', selectedKey);
+        document.querySelectorAll('#viewMode .item-line.selected').forEach(el => el.classList.remove('selected'));
+        line.classList.add('selected');
+      }
+
       if (item?.desc) {
-        // Ensure selected (so UI state is consistent)
-        if (selectedKey !== key) {
-          selectedKey = key;
-          localStorage.setItem('selected_key', selectedKey);
-          document.querySelectorAll('#viewMode .item-line.selected').forEach(el => el.classList.remove('selected'));
-          line.classList.add('selected');
-        }
+        // Has description -> toggle it
         closeTagEditor();
         toggleDescExpand(sec, idx);
+      } else if (textEl && !inlineEdit.active) {
+        // No description, but clicked on title -> start inline edit
+        beginInlineEdit(line);
       }
     } else {
       lastItemTap = { key, at: now };
