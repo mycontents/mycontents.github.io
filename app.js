@@ -947,6 +947,19 @@ async function applyTmdbCandidateToCurrentItem(c) {
       item.year = String(tvMeta.firstAirDate).slice(0, 4);
       updated = true;
     }
+
+    // Add "сериал" tag for TV shows (first among regular tags)
+    const hasSerialTag = (item.tags || []).some(t => normTag(t) === "сериал");
+    if (!hasSerialTag) {
+      const viewedIdx = (item.tags || []).indexOf(VIEWED_TAG);
+      if (viewedIdx >= 0) {
+        item.tags.splice(viewedIdx + 1, 0, "сериал");
+      } else {
+        item.tags = ["сериал", ...(item.tags || [])];
+      }
+      item.tags = uniqueTags(item.tags);
+      updated = true;
+    }
   }
 
   if (updated) {
@@ -1287,7 +1300,11 @@ function toggleTagFilterMenu() {
 function renderTagFilterMenu() {
   const list = $("tagFilterList"), hint = $("tagFilterHint");
   const counts = new Map();
-  for (const sec of Object.values(data.sections)) {
+  // Collect tags only from current section (or all sections if "__all__")
+  const sectionKeys = currentSection === "__all__" ? Object.keys(data.sections) : [currentSection];
+  for (const secKey of sectionKeys) {
+    const sec = data.sections[secKey];
+    if (!sec) continue;
     for (const it of sec.items || []) {
       for (const t of displayTags(it)) counts.set(t, (counts.get(t) || 0) + 1);
     }
@@ -2235,6 +2252,22 @@ async function saveEdit() {
                   item.tags = afterArr;
                   updated = true;
                 }
+              }
+            }
+
+            // Add "сериал" tag for TV shows (first among regular tags)
+            if (tmdbType === "tv") {
+              const hasSeriалTag = (item.tags || []).some(t => normTag(t) === "сериал");
+              if (!hasSeriалTag) {
+                // Insert after __viewed__ if present, else at start
+                const viewedIdx = (item.tags || []).indexOf(VIEWED_TAG);
+                if (viewedIdx >= 0) {
+                  item.tags.splice(viewedIdx + 1, 0, "сериал");
+                } else {
+                  item.tags = ["сериал", ...(item.tags || [])];
+                }
+                item.tags = uniqueTags(item.tags);
+                updated = true;
               }
             }
             
