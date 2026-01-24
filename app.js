@@ -853,14 +853,26 @@ async function applyTmdbCandidateToCurrentItem(c) {
   const genresMap = await loadTmdbGenres();
   if (!genresMap) return;
 
-  // Fetch details for country code (iso_3166_1)
+  // Fetch details: country code + (for TV) seasons/episodes + air dates
   let countryCode = null;
+  let tvMeta = { seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null };
+
   try {
     const detailsRes = await fetch(`${TMDB_BASE}/${c.mediaType}/${c.id}?api_key=${TMDB_KEY}&language=ru`);
     const details = await detailsRes.json();
+
     if (c.mediaType === "tv") {
       if (Array.isArray(details.origin_country) && details.origin_country.length) countryCode = details.origin_country[0];
       else if (Array.isArray(c.origin_country) && c.origin_country.length) countryCode = c.origin_country[0];
+
+      tvMeta = {
+        seasons: Number.isFinite(Number(details.number_of_seasons)) ? Number(details.number_of_seasons) : null,
+        episodes: Number.isFinite(Number(details.number_of_episodes)) ? Number(details.number_of_episodes) : null,
+        firstAirDate: details.first_air_date || null,
+        lastAirDate: details.last_air_date || null,
+        inProduction: (typeof details.in_production === "boolean") ? details.in_production : null
+      };
+
     } else {
       // movie
       if (Array.isArray(details.production_countries) && details.production_countries.length) {
@@ -869,12 +881,16 @@ async function applyTmdbCandidateToCurrentItem(c) {
     }
   } catch {}
 
-  const genreTags = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
+  const genreTagsRaw = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
     .map(id => genresMap.get(id))
     .filter(Boolean);
 
   // Add country tag as code (lowercase)
-  if (countryCode) genreTags.push(String(countryCode).toLowerCase());
+  const tagPool = [...genreTagsRaw];
+  if (countryCode) tagPool.push(String(countryCode).toLowerCase());
+
+  // Normalize anime tags for anything applied from TMDB
+  const genreTags = normalizeAnimeTags(tagPool);
 
   let updated = false;
 
@@ -887,11 +903,22 @@ async function applyTmdbCandidateToCurrentItem(c) {
 
   // Tags
   if (genreTags.length) {
-    const existing = new Set(item.tags.map(normTag));
+    const existing = new Set((item.tags || []).map(normTag));
     const newTags = genreTags.map(normTag).filter(t => t && !existing.has(t) && t !== VIEWED_TAG);
     if (newTags.length) {
-      item.tags = uniqueTags([...item.tags, ...newTags]);
+      item.tags = uniqueTags([...(item.tags || []), ...newTags]);
+      // Ensure anime normalization also affects already-existing tags (if any)
+      item.tags = normalizeAnimeTags(item.tags);
       updated = true;
+    } else {
+      // Still normalize (in case item already had anim+country tags)
+      const before = JSON.stringify(uniqueTags(item.tags || []));
+      const afterArr = normalizeAnimeTags(item.tags || []);
+      const after = JSON.stringify(afterArr);
+      if (before !== after) {
+        item.tags = afterArr;
+        updated = true;
+      }
     }
   }
 
@@ -906,6 +933,21 @@ async function applyTmdbCandidateToCurrentItem(c) {
   // Type + year (for description header)
   if (c.mediaType && !item.tmdbType) { item.tmdbType = c.mediaType; updated = true; }
   if (c.year && !item.year) { item.year = String(c.year); updated = true; }
+
+  // TV meta
+  if (c.mediaType === "tv") {
+    if (tvMeta.seasons != null && item.seasons == null) { item.seasons = tvMeta.seasons; updated = true; }
+    if (tvMeta.episodes != null && item.episodes == null) { item.episodes = tvMeta.episodes; updated = true; }
+    if (tvMeta.firstAirDate && !item.firstAirDate) { item.firstAirDate = tvMeta.firstAirDate; updated = true; }
+    if (tvMeta.lastAirDate && !item.lastAirDate) { item.lastAirDate = tvMeta.lastAirDate; updated = true; }
+    if (tvMeta.inProduction != null && item.inProduction == null) { item.inProduction = tvMeta.inProduction; updated = true; }
+
+    // If year is missing, try to derive from first_air_date
+    if (!item.year && tvMeta.firstAirDate) {
+      item.year = String(tvMeta.firstAirDate).slice(0, 4);
+      updated = true;
+    }
+  }
 
   if (updated) {
     data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
@@ -1072,6 +1114,33 @@ function formatVotes(n) {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1) + "M";
   if (v >= 1_000) return (v / 1_000).toFixed(v >= 10_000 ? 0 : 1) + "k";
   return String(v);
+}
+
+function ruPlural(n, one, few, many) {
+  const x = Math.abs(Number(n));
+  if (!Number.isFinite(x)) return many;
+  const mod10 = x % 10;
+  const mod100 = x % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+function formatTvYearRange(item) {
+  const start = (item?.firstAirDate || "").slice(0, 4);
+  const end = (item?.lastAirDate || "").slice(0, 4);
+  const inProd = (typeof item?.inProduction === "boolean") ? item.inProduction : null;
+
+  if (start) {
+    if (inProd) return `${start}–…`;
+    if (end && end !== start) return `${start}–${end}`;
+    return start;
+  }
+
+  // Fallback to stored year if any
+  const y = String(item?.year || "").trim();
+  return y || "";
 }
 
 function updateTmdbBtnVisibility() {
@@ -1412,6 +1481,14 @@ function clearApiDataForItem(item, { keepTags = true } = {}) {
   item.votes = null;
   item.tmdbType = null;
   item.year = null;
+
+  // Series meta (TMDB TV details)
+  item.seasons = null;
+  item.episodes = null;
+  item.firstAirDate = null;
+  item.lastAirDate = null;
+  item.inProduction = null;
+
   // Keep tags by default (only tag manipulation is requested here)
   if (!keepTags) {
     const wasViewed = isViewed(item);
@@ -2050,6 +2127,13 @@ async function saveEdit() {
           item.tmdbType = null;
           item.year = null;
 
+          // clear TV meta
+          item.seasons = null;
+          item.episodes = null;
+          item.firstAirDate = null;
+          item.lastAirDate = null;
+          item.inProduction = null;
+
           // clear tags except viewed
           item.tags = isViewed(item) ? [VIEWED_TAG] : [];
 
@@ -2124,7 +2208,7 @@ async function saveEdit() {
           showProgress(`Загрузка ${i + 1}/${total}...`, percent);
           
           try {
-            const { genres, overview, poster, originalTitle, year, rating, votes, tmdbType } = await fetchTmdbDataForItem(item.text);
+            const { genres, overview, poster, originalTitle, year, rating, votes, tmdbType, seasons, episodes, firstAirDate, lastAirDate, inProduction } = await fetchTmdbDataForItem(item.text);
             let updated = false;
             
             // Нормализуем/дополняем наименование (orig + year)
@@ -2135,11 +2219,22 @@ async function saveEdit() {
             }
             
             if (genres.length) {
-              const existing = new Set(item.tags.map(normTag));
+              const existing = new Set((item.tags || []).map(normTag));
               const newTags = genres.filter(g => !existing.has(normTag(g)));
               if (newTags.length) {
-                item.tags = uniqueTags([...item.tags, ...newTags]);
+                item.tags = uniqueTags([...(item.tags || []), ...newTags]);
+                // Extra normalization for anime rules
+                item.tags = normalizeAnimeTags(item.tags);
                 updated = true;
+              } else {
+                // Still normalize (in case item already had anim+country)
+                const before = JSON.stringify(uniqueTags(item.tags || []));
+                const afterArr = normalizeAnimeTags(item.tags || []);
+                const after = JSON.stringify(afterArr);
+                if (before !== after) {
+                  item.tags = afterArr;
+                  updated = true;
+                }
               }
             }
             
@@ -2157,6 +2252,18 @@ async function saveEdit() {
             if (votes != null && item.votes == null) { item.votes = votes; updated = true; }
             if (tmdbType && !item.tmdbType) { item.tmdbType = tmdbType; updated = true; }
             if (year && !item.year) { item.year = String(year); updated = true; }
+
+            // TV meta (store for later rendering)
+            if (tmdbType === "tv") {
+              if (seasons != null && item.seasons == null) { item.seasons = seasons; updated = true; }
+              if (episodes != null && item.episodes == null) { item.episodes = episodes; updated = true; }
+              if (firstAirDate && !item.firstAirDate) { item.firstAirDate = firstAirDate; updated = true; }
+              if (lastAirDate && !item.lastAirDate) { item.lastAirDate = lastAirDate; updated = true; }
+              if (inProduction != null && item.inProduction == null) { item.inProduction = inProduction; updated = true; }
+
+              // If year is missing, derive from first_air_date
+              if (!item.year && firstAirDate) { item.year = String(firstAirDate).slice(0, 4); updated = true; }
+            }
             
             if (updated) {
               data.sections[secKey].modified = new Date().toISOString();
@@ -2272,17 +2379,30 @@ function render() {
         ? `<img class="item-desc-poster" src="${esc(x.item.poster)}" alt="" loading="lazy" />`
         : "";
 
-      // Meta: only type · year (rating moved to the main item chip)
+      // Meta: type · seasons · episodes · year-range
       const tagsForType = displayTags(x.item);
-      const hasAnim = tagsForType.includes("анимация");
-      const hasJp = tagsForType.includes("jp");
+      const isAnime = tagsForType.includes("аниме");
+      const hasAnim = tagsForType.includes("анимация") || tagsForType.includes("мультфильм") || tagsForType.includes("мультсериал");
+
       const typeLabel = x.item.tmdbType === "movie"
-        ? (hasAnim ? (hasJp ? "Аниме" : "Мультфильм") : "Фильм")
-        : (x.item.tmdbType === "tv" ? (hasAnim ? (hasJp ? "Аниме" : "Сериал") : "Сериал") : "");
-      const yearMeta = x.item.year || ((x.text.match(/\((\d{4})\)/) || [])[1] || "");
+        ? (isAnime ? "Аниме" : (hasAnim ? "Мультфильм" : "Фильм"))
+        : (x.item.tmdbType === "tv" ? (isAnime ? "Аниме" : "Сериал") : "");
 
       const leftParts = [];
       if (typeLabel) leftParts.push(typeLabel);
+
+      // Only for TV: seasons + total episodes
+      if (x.item.tmdbType === "tv") {
+        const s = Number(x.item.seasons);
+        const e = Number(x.item.episodes);
+        if (Number.isFinite(s) && s > 0) leftParts.push(`${s} ${ruPlural(s, "сезон", "сезона", "сезонов")}`);
+        if (Number.isFinite(e) && e > 0) leftParts.push(`${e} ${ruPlural(e, "серия", "серии", "серий")}`);
+      }
+
+      const yearMeta = (x.item.tmdbType === "tv")
+        ? formatTvYearRange(x.item)
+        : (x.item.year || ((x.text.match(/\((\d{4})\)/) || [])[1] || ""));
+
       if (yearMeta) leftParts.push(yearMeta);
       const leftText = leftParts.join(" · ");
 
