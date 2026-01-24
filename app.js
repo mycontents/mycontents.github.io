@@ -520,6 +520,23 @@ const COUNTRY_CODES = {
 };
 const COUNTRY_CODES_SET = new Set(Object.keys(COUNTRY_CODES).map(c => c.toLowerCase()));
 
+// Anime detection: if we have animation-related genre + production country (JP/KR/CN)
+// then replace animation tags with "аниме".
+const ANIME_COUNTRIES = new Set(["jp", "kr", "cn"]);
+const ANIME_SOURCE_TAGS = new Set(["анимация", "мультфильм", "мультсериал"]);
+
+function normalizeAnimeTags(tags) {
+  const arr = Array.isArray(tags) ? tags.map(normTag).filter(Boolean) : [];
+  const hasAnim = arr.some(t => ANIME_SOURCE_TAGS.has(t));
+  const hasCountry = arr.some(t => ANIME_COUNTRIES.has(t));
+  if (hasAnim && hasCountry) {
+    const filtered = arr.filter(t => !ANIME_SOURCE_TAGS.has(t));
+    filtered.push("аниме");
+    return uniqueTags(filtered);
+  }
+  return uniqueTags(arr);
+}
+
 function isCountryTag(tag) { return COUNTRY_CODES_SET.has(normTag(tag)); }
 function countryDisplayName(code) { return COUNTRY_CODES[code.toUpperCase()] || code.toUpperCase(); }
 function setViewed(item, v) {
@@ -697,10 +714,23 @@ async function searchTmdb(query, year, type) {
     const result = json.results?.[0];
     if (!result) return null;
 
-    // Получаем детали для страны производства
+    // Получаем детали (страна + метаданные для сериалов)
     try {
       const detailsRes = await fetch(`${TMDB_BASE}/${type}/${result.id}?api_key=${TMDB_KEY}&language=ru`);
       const details = await detailsRes.json();
+
+      // Keep minimal details payload for later formatting (seasons/episodes/year range)
+      result.__details = {
+        number_of_seasons: details.number_of_seasons,
+        number_of_episodes: details.number_of_episodes,
+        first_air_date: details.first_air_date,
+        last_air_date: details.last_air_date,
+        in_production: details.in_production,
+        status: details.status,
+        production_countries: details.production_countries,
+        origin_country: details.origin_country
+      };
+
       result.production_countries = details.production_countries || [];
       result.origin_country = details.origin_country || [];
     } catch {}
@@ -727,7 +757,11 @@ const TMDB_IMG = "https://image.tmdb.org/t/p/w300";
 
 async function fetchTmdbDataForItem(text) {
   const genres = await loadTmdbGenres();
-  if (!genres) return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null, tmdbType: null };
+  if (!genres) return {
+    genres: [], overview: null, poster: null, originalTitle: null,
+    year: null, rating: null, votes: null, tmdbType: null,
+    seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null
+  };
   
   const { names, year } = parseTitleForSearch(text);
   
@@ -744,9 +778,9 @@ async function fetchTmdbDataForItem(text) {
     const origTitle = isMovie ? result.original_title : result.original_name;
     const releaseDate = isMovie ? result.release_date : result.first_air_date;
     const resultYear = releaseDate ? releaseDate.substring(0, 4) : null;
-    
-    const genreList = result.genre_ids.map(id => genres.get(id)).filter(Boolean);
-    
+
+    const genreListRaw = result.genre_ids.map(id => genres.get(id)).filter(Boolean);
+
     // Извлекаем код страны (US, KR, JP и т.д.) — храним как код
     let countryCode = null;
     if (result.origin_country?.length) {
@@ -758,21 +792,38 @@ async function fetchTmdbDataForItem(text) {
         if (name.toLowerCase() === countryName) { countryCode = code; break; }
       }
     }
-    
+
     // Добавляем код страны в теги (в нижнем регистре)
-    if (countryCode && !genreList.includes(countryCode.toLowerCase())) {
-      genreList.push(countryCode.toLowerCase());
+    const genreListWithCountry = [...genreListRaw];
+    if (countryCode && !genreListWithCountry.includes(countryCode.toLowerCase())) {
+      genreListWithCountry.push(countryCode.toLowerCase());
     }
-    
+
+    // Normalize anime tags (only for data loaded from TMDB)
+    const normalizedGenreTags = normalizeAnimeTags(genreListWithCountry);
+
+    // Extra series meta (from details, if available)
+    const d = result.__details || null;
+    const seasons = (d && Number.isFinite(Number(d.number_of_seasons))) ? Number(d.number_of_seasons) : null;
+    const episodes = (d && Number.isFinite(Number(d.number_of_episodes))) ? Number(d.number_of_episodes) : null;
+    const firstAirDate = d?.first_air_date || null;
+    const lastAirDate = d?.last_air_date || null;
+    const inProduction = (typeof d?.in_production === "boolean") ? d.in_production : null;
+
     return {
-      genres: genreList,
+      genres: normalizedGenreTags,
       overview: result.overview || null,
       poster: result.poster_path ? TMDB_IMG + result.poster_path : null,
       originalTitle: origTitle || null,
       year: resultYear,
       rating: (typeof result.vote_average === "number") ? result.vote_average : null,
       votes: (typeof result.vote_count === "number") ? result.vote_count : null,
-      tmdbType: result.mediaType || null
+      tmdbType: result.mediaType || null,
+      seasons,
+      episodes,
+      firstAirDate,
+      lastAirDate,
+      inProduction
     };
   };
   
@@ -788,7 +839,11 @@ async function fetchTmdbDataForItem(text) {
     }
   }
   
-  return { genres: [], overview: null, poster: null, originalTitle: null, year: null, rating: null, votes: null, tmdbType: null };
+  return {
+    genres: [], overview: null, poster: null, originalTitle: null,
+    year: null, rating: null, votes: null, tmdbType: null,
+    seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null
+  };
 }
 
 async function applyTmdbCandidateToCurrentItem(c) {
