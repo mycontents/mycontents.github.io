@@ -2311,9 +2311,15 @@ $("viewMode").addEventListener("click", e => {
         if (item?.desc) {
           toggleDescExpand(sec, idx);
         }
-        // Start inline edit after description toggle
+        // Start inline edit after description toggle (need to find element again after render)
         if (!inlineEdit.active) {
-          beginInlineEdit(line);
+          // toggleDescExpand calls render() which replaces DOM, so find element by key
+          setTimeout(() => {
+            const newLine = document.querySelector(`#viewMode .item-line[data-key="${key}"]`);
+            if (newLine && !inlineEdit.active) {
+              beginInlineEdit(newLine);
+            }
+          }, 0);
         }
       } else if (item?.desc) {
         // Double tap elsewhere (not on title): just toggle description
