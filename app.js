@@ -43,7 +43,7 @@ let sectionRename = { active: false, orig: "", lastTapAt: 0 };
 // Long press for move menu
 let longPressTimer = null;
 let longPressTarget = null;
-const LONG_PRESS_MS = 3000;
+const LONG_PRESS_MS = 2000;
 
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -2557,19 +2557,34 @@ function updateCounter(n) {
 // ===== Interactions =====
 $("viewMode").addEventListener("pointerdown", e => {
   if (isEditing) return;
-  pointer = { down: true, moved: false, startX: e.clientX, startY: e.clientY, startedAt: Date.now() };
 
-  // Long press detection — only on "empty" area (not buttons, not text)
   const line = e.target.closest(".item-line");
   const isButton = !!e.target.closest("button");
-  const isText = !!e.target.closest('[data-role="text"]');
   const isAction = !!e.target.closest("[data-action]");
 
-  if (line && !isButton && !isText && !isAction) {
+  // Text areas where selection is allowed (title + expanded description text)
+  const isText = !!e.target.closest('[data-role="text"], .item-desc-text');
+  const isInput = !!e.target.closest('input, textarea, [contenteditable="true"]');
+
+  pointer = {
+    down: true,
+    moved: false,
+    startX: e.clientX,
+    startY: e.clientY,
+    startedAt: Date.now(),
+    // If user started press on a non-text zone, we will clear any accidental selection on release
+    startedOnNonText: !!(line && !isButton && !isAction && !isText && !isInput)
+  };
+
+  // Long press detection — only on empty/non-text area (not buttons, not title text, not desc text)
+  if (line && !isButton && !isText && !isAction && !isInput) {
     cancelLongPress();
     longPressTarget = line;
     longPressTimer = setTimeout(() => {
       if (!pointer.moved && longPressTarget === line) {
+        // Clear any browser text selection that could have appeared
+        try { window.getSelection()?.removeAllRanges(); } catch {}
+
         const sec = line.dataset.sec;
         const idx = Number(line.dataset.idx);
         if (sec && Number.isInteger(idx)) {
@@ -2595,11 +2610,18 @@ $("viewMode").addEventListener("pointermove", e => {
 });
 
 $("viewMode").addEventListener("pointerup", () => {
+  // If the press started on a non-text area, avoid accidental selection of nearby text on mobile
+  if (pointer?.startedOnNonText) {
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+  }
   pointer.down = false;
   cancelLongPress();
 });
 
 $("viewMode").addEventListener("pointercancel", () => {
+  if (pointer?.startedOnNonText) {
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+  }
   pointer.down = false;
   cancelLongPress();
 });

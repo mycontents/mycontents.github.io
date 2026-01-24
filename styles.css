@@ -153,7 +153,20 @@ header{
 .section-btn:active{ transform:translateY(.5px); }
 
 /* Inline rename for section name (header button) */
+#currentSectionName{
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 #currentSectionName[contenteditable="true"]{
+  /* While editing: allow wrapping/scrolling if needed */
+  overflow:visible;
+  text-overflow:clip;
+  white-space:normal;
+
   outline:none;
   border-bottom:1px solid var(--blue);
   padding-bottom:1px;
@@ -341,8 +354,9 @@ body.editing .scroll-slack{ display:none; }
   cursor:default;
   -webkit-tap-highlight-color:var(--tap);
 
-  user-select:text;
-  -webkit-user-select:text;
+  /* Prevent accidental selection on empty areas (selection is enabled only on actual text nodes) */
+  user-select:none;
+  -webkit-user-select:none;
 
   /* Prevent browser context menu on long press */
   -webkit-touch-callout:none;
@@ -469,6 +483,12 @@ body.editing .scroll-slack{ display:none; }
   white-space:pre-wrap;
   word-break:break-word;
   cursor:text;
+  user-select:text;
+  -webkit-user-select:text;
+}
+
+/* Allow text selection inside expanded description only */
+.item-desc-text{
   user-select:text;
   -webkit-user-select:text;
 }
@@ -712,6 +732,16 @@ body.editing .scroll-slack{ display:none; }
   gap:10px;
   user-select:none;
   -webkit-tap-highlight-color:var(--tap);
+
+  /* Prevent long section names from breaking layout */
+  min-width:0;
+}
+
+.menu-option > span:first-child{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .menu-option:hover{ background:var(--border2); }
 .menu-option.active{ color:var(--blue); }
