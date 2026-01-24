@@ -1320,8 +1320,12 @@ function renderTagFilterMenu() {
     }
   }
   const tags = [...counts.keys()].sort((a, b) => {
+    // "сериал" always first
+    const aS = normTag(a) === "сериал", bS = normTag(b) === "сериал";
+    if (aS !== bS) return aS ? -1 : 1;
+    // countries last
     const aC = isCountryTag(a), bC = isCountryTag(b);
-    if (aC !== bC) return aC ? 1 : -1; // страны внизу
+    if (aC !== bC) return aC ? 1 : -1;
     const aN = isCountryTag(a) ? countryDisplayName(a) : a;
     const bN = isCountryTag(b) ? countryDisplayName(b) : b;
     return aN.localeCompare(bN, "ru");
@@ -2006,10 +2010,10 @@ function matchFilters(item) {
   const itemTags = displayTags(item);
   
   // Excluded tags have highest priority — if any excluded tag is present, hide item
-  if (tagFilterExcluded.size && itemTags.some(t => tagFilterExcluded.has(t))) return false;
+  if (tagFilterExcluded.size && itemTags.some(t => tagFilterExcluded.has(normTag(t)))) return false;
   
   // Included tags — item must have at least one of them
-  if (tagFilter.size && !itemTags.some(t => tagFilter.has(t))) return false;
+  if (tagFilter.size && !itemTags.some(t => tagFilter.has(normTag(t)))) return false;
 
   if (ratingFilter != null) {
     const r = itemRating(item);
@@ -2372,7 +2376,12 @@ function buildItems() {
   }
   const q = filterQuery.trim().toLowerCase();
   if (q) items = items.filter(x => x.text.toLowerCase().includes(q));
-  if (tagFilter.size) items = items.filter(x => displayTags(x.item).some(t => tagFilter.has(t)));
+  
+  // Excluded tags — hide items that have any excluded tag (highest priority)
+  if (tagFilterExcluded.size) items = items.filter(x => !displayTags(x.item).some(t => tagFilterExcluded.has(normTag(t))));
+  
+  // Included tags — show only items that have at least one included tag
+  if (tagFilter.size) items = items.filter(x => displayTags(x.item).some(t => tagFilter.has(normTag(t))));
 
   if (ratingFilter != null) {
     items = items.filter(x => {
