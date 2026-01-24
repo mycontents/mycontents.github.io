@@ -400,6 +400,10 @@ function commitSectionRename() {
   sectionRename.active = false;
   el?.setAttribute("contenteditable", "false");
 
+  // IMPORTANT: reset horizontal scroll so ellipsis mode shows the beginning of text
+  // (otherwise long names can end up scrolled to the far right and look "empty")
+  try { if (el) el.scrollLeft = 0; } catch {}
+
   const from = orig;
   const to = nextRaw || orig;
 
@@ -444,6 +448,10 @@ function cancelSectionRename() {
   const el = $("currentSectionName");
   el?.setAttribute("contenteditable", "false");
   sectionRename.active = false;
+
+  // Reset horizontal scroll to avoid "empty" look after editing long names
+  try { if (el) el.scrollLeft = 0; } catch {}
+
   updateSectionButton();
 }
 
@@ -1797,7 +1805,13 @@ function selectSection(key) {
   render();
 }
 
-function updateSectionButton() { $("currentSectionName").textContent = currentSection === "__all__" ? "Все" : currentSection; }
+function updateSectionButton() {
+  const el = $("currentSectionName");
+  if (!el) return;
+  el.textContent = currentSection === "__all__" ? "Все" : currentSection;
+  // Ensure we are showing the start of the text in ellipsis mode
+  try { el.scrollLeft = 0; } catch {}
+}
 
 function showNewSectionInput() { const inp = $("newSectionInput"); inp.classList.remove("hidden"); inp.value = ""; inp.focus(); disarmSectionDelete(); }
 
