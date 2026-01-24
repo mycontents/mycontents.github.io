@@ -43,7 +43,7 @@ let sectionRename = { active: false, orig: "", lastTapAt: 0 };
 // Long press for move menu
 let longPressTimer = null;
 let longPressTarget = null;
-const LONG_PRESS_MS = 5000;
+const LONG_PRESS_MS = 3000;
 
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -2802,13 +2802,17 @@ function openMoveMenu(secKey, idx, anchorEl) {
   const item = data.sections?.[secKey]?.items?.[idx];
   if (!item) return;
 
-  moveCtx = { secKey, idx };
+  // Close any other open menus first
   closeAllMenus();
   closeMoveMenu();
+
+  // Set context AFTER closeMoveMenu(), otherwise it would be wiped.
+  moveCtx = { secKey, idx };
 
   const menu = $("moveMenu");
   const list = $("moveSectionList");
   const input = $("moveNewInput");
+  const okBtn = $("moveNewOkBtn");
 
   // Build section buttons (exclude __all__)
   const keys = Object.keys(data.sections);
@@ -2830,9 +2834,26 @@ function openMoveMenu(secKey, idx, anchorEl) {
     };
   });
 
+  // Input + OK button state
+  const updateOk = () => {
+    const name = sanitizeSectionName(input.value);
+    const enabled = !!name;
+    if (okBtn) {
+      okBtn.disabled = !enabled;
+      okBtn.classList.toggle("disabled", !enabled);
+    }
+  };
+
   input.value = "";
+  updateOk();
+
+  input.oninput = () => updateOk();
   input.onkeydown = (e) => {
-    if (e.key === "Enter") { e.preventDefault(); confirmMoveToNewSection(); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Only act if non-empty
+      if (sanitizeSectionName(input.value)) confirmMoveToNewSection();
+    }
     else if (e.key === "Escape") { e.preventDefault(); closeMoveMenu(); }
   };
 
@@ -2865,7 +2886,11 @@ function confirmMoveToNewSection() {
   if (!moveCtx) return;
   const input = $("moveNewInput");
   const newSecName = sanitizeSectionName(input.value);
-  if (!newSecName) { closeMoveMenu(); return; }
+  // If empty — do nothing (OK button should be disabled anyway)
+  if (!newSecName) {
+    input?.focus();
+    return;
+  }
 
   const { secKey, idx } = moveCtx;
 

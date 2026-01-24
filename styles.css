@@ -1375,3 +1375,10 @@ body.editing .scroll-slack{ display:none; }
   outline:none;
   border-color:var(--blue);
 }
+
+/* Move menu: disabled OK button */
+#moveNewOkBtn.disabled,
+#moveNewOkBtn:disabled{
+  opacity:.45;
+  pointer-events:none;
+}

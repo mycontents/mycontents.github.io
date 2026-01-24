@@ -6,8 +6,8 @@
   <title>Контент</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <link rel="stylesheet" href="styles.css?v=2026-01-24-6" />
-  <script src="app.js?v=2026-01-24-6" defer></script>
+  <link rel="stylesheet" href="styles.css?v=2026-01-24-7" />
+  <script src="app.js?v=2026-01-24-7" defer></script>
 </head>
 <body>
   <div class="container" id="container">
@@ -138,7 +138,7 @@
       <div class="move-section-list" id="moveSectionList"></div>
       <div class="move-new-section">
         <input type="text" class="move-new-input" id="moveNewInput" placeholder="Новый раздел..." />
-        <button class="mini-btn" onclick="confirmMoveToNewSection()" title="Создать и перенести">
+        <button class="mini-btn" id="moveNewOkBtn" onclick="confirmMoveToNewSection()" title="Создать и перенести">
           <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
         </button>
       </div>
