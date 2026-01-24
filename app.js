@@ -62,7 +62,90 @@ function sanitizeInlineText(s) {
   return String(s || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function beginInlineEdit(line) {
+function charOffsetFromRange(containerEl, range) {
+  try {
+    const pre = document.createRange();
+    pre.selectNodeContents(containerEl);
+    pre.setEnd(range.startContainer, range.startOffset);
+    return pre.toString().length;
+  } catch {
+    return null;
+  }
+}
+
+function caretOffsetFromEvent(containerEl, e) {
+  if (!containerEl) return null;
+
+  // 1) Prefer current selection if it's inside the element
+  try {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const r = sel.getRangeAt(0);
+      if (containerEl.contains(r.startContainer)) {
+        const off = charOffsetFromRange(containerEl, r);
+        if (typeof off === "number") return off;
+      }
+    }
+  } catch {}
+
+  // 2) Fallback to caret-from-point APIs
+  const x = e?.clientX, y = e?.clientY;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  let r = null;
+  try {
+    if (document.caretRangeFromPoint) {
+      r = document.caretRangeFromPoint(x, y);
+    } else if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (p) {
+        r = document.createRange();
+        r.setStart(p.offsetNode, p.offset);
+        r.collapse(true);
+      }
+    }
+  } catch {}
+
+  if (r && containerEl.contains(r.startContainer)) {
+    const off = charOffsetFromRange(containerEl, r);
+    if (typeof off === "number") return off;
+  }
+
+  return null;
+}
+
+function setCaretByCharOffset(containerEl, offset) {
+  const total = (containerEl?.textContent || "").length;
+  let target = Number(offset);
+  if (!Number.isFinite(target)) return;
+  target = Math.max(0, Math.min(total, target));
+
+  const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, null);
+  let node = null;
+  let remaining = target;
+
+  while ((node = walker.nextNode())) {
+    const len = node.nodeValue?.length ?? 0;
+    if (remaining <= len) break;
+    remaining -= len;
+  }
+
+  const sel = window.getSelection();
+  const range = document.createRange();
+
+  if (node) {
+    range.setStart(node, remaining);
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(containerEl);
+    range.collapse(false);
+  }
+
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+function beginInlineEdit(line, opts = {}) {
   if (isEditing || savingInProgress) return;
   if (!line) return;
   const key = line.dataset.key;
@@ -83,22 +166,31 @@ function beginInlineEdit(line) {
   el.setAttribute("contenteditable", "true");
   el.focus();
 
-  // Try to place caret at click position; fall back to end of text
   const sel = window.getSelection();
-  if (sel && sel.rangeCount > 0) {
-    // Browser may have already placed caret at click position
+
+  // Caret placement priority:
+  // 1) explicit char offset (used when DOM was re-rendered)
+  // 2) keep browser caret if it is already inside
+  // 3) fallback to end
+  let caretOk = false;
+
+  if (typeof opts.caretOffset === "number") {
+    setCaretByCharOffset(el, opts.caretOffset);
+    caretOk = true;
+  } else if (sel && sel.rangeCount > 0) {
     const existingRange = sel.getRangeAt(0);
     if (el.contains(existingRange.startContainer)) {
-      // Caret is already inside the element at click position — keep it
-      return;
+      caretOk = true;
     }
   }
-  // Fallback: move caret to end
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  sel?.removeAllRanges();
-  sel?.addRange(range);
+
+  if (!caretOk) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
 
   el.onkeydown = (e) => {
     if (e.key === "Enter") { e.preventDefault(); commitInlineEdit(); }
