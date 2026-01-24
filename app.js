@@ -40,6 +40,11 @@ let lastItemTap = { key: null, at: 0 };
 // Inline rename for section name (header)
 let sectionRename = { active: false, orig: "", lastTapAt: 0 };
 
+// Long press for move menu
+let longPressTimer = null;
+let longPressTarget = null;
+const LONG_PRESS_MS = 5000;
+
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
@@ -1913,6 +1918,24 @@ $("undoBtn").onclick = () => {
       data.sections[p.secKey].modified = new Date().toISOString(); 
       saveData(); render(); 
     }
+  } else if (p.type === "moveItem") {
+    // Undo move: remove from toSec, insert back to fromSec at original position
+    const toArr = data.sections?.[p.toSec]?.items;
+    const fromArr = data.sections?.[p.fromSec]?.items;
+    if (toArr && fromArr) {
+      // Find and remove from target
+      const idxInTarget = toArr.findIndex(it => 
+        it.text === p.item.text && it.created === p.item.created
+      );
+      if (idxInTarget >= 0) {
+        toArr.splice(idxInTarget, 1);
+        data.sections[p.toSec].modified = new Date().toISOString();
+      }
+      // Insert back at original position
+      fromArr.splice(Math.min(p.fromIdx, fromArr.length), 0, p.item);
+      data.sections[p.fromSec].modified = new Date().toISOString();
+      saveData(); renderSectionList(); render();
+    }
   }
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = null; undoPayload = null; hideUndo();
@@ -2532,9 +2555,48 @@ function updateCounter(n) {
 }
 
 // ===== Interactions =====
-$("viewMode").addEventListener("pointerdown", e => { if (isEditing) return; pointer = { down: true, moved: false, startX: e.clientX, startY: e.clientY, startedAt: Date.now() }; });
-$("viewMode").addEventListener("pointermove", e => { if (pointer.down && Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) pointer.moved = true; });
-$("viewMode").addEventListener("pointerup", () => { pointer.down = false; });
+$("viewMode").addEventListener("pointerdown", e => {
+  if (isEditing) return;
+  pointer = { down: true, moved: false, startX: e.clientX, startY: e.clientY, startedAt: Date.now() };
+
+  // Long press detection — only on "empty" area (not buttons, not text)
+  const line = e.target.closest(".item-line");
+  const isButton = !!e.target.closest("button");
+  const isText = !!e.target.closest('[data-role="text"]');
+  const isAction = !!e.target.closest("[data-action]");
+
+  if (line && !isButton && !isText && !isAction) {
+    cancelLongPress();
+    longPressTarget = line;
+    longPressTimer = setTimeout(() => {
+      if (!pointer.moved && longPressTarget === line) {
+        const sec = line.dataset.sec;
+        const idx = Number(line.dataset.idx);
+        if (sec && Number.isInteger(idx)) {
+          openMoveMenu(sec, idx, line);
+        }
+      }
+      cancelLongPress();
+    }, LONG_PRESS_MS);
+  }
+});
+
+$("viewMode").addEventListener("pointermove", e => {
+  if (pointer.down && Math.hypot(e.clientX - pointer.startX, e.clientY - pointer.startY) > 10) {
+    pointer.moved = true;
+    cancelLongPress();
+  }
+});
+
+$("viewMode").addEventListener("pointerup", () => {
+  pointer.down = false;
+  cancelLongPress();
+});
+
+$("viewMode").addEventListener("pointercancel", () => {
+  pointer.down = false;
+  cancelLongPress();
+});
 
 $("viewMode").addEventListener("click", e => {
   if (isEditing) return;
@@ -2702,6 +2764,7 @@ document.addEventListener("click", e => {
 
   if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".view-toggle") && !e.target.closest(".search-toggle-btn")) {
     closeAllMenus();
+    closeMoveMenu();
     sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
     disarmSectionDelete();
     renderSectionList();
@@ -2725,11 +2788,157 @@ function keyExistsInData(key) {
   return !!data.sections?.[p.secKey]?.items?.[p.idx];
 }
 
+// ===== Move item to section =====
+let moveCtx = null; // { secKey, idx }
+
+function openMoveMenu(secKey, idx, anchorEl) {
+  if (isEditing || savingInProgress) return;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  if (!item) return;
+
+  moveCtx = { secKey, idx };
+  closeAllMenus();
+  closeMoveMenu();
+
+  const menu = $("moveMenu");
+  const list = $("moveSectionList");
+  const input = $("moveNewInput");
+
+  // Build section buttons (exclude __all__)
+  const keys = Object.keys(data.sections);
+  list.innerHTML = keys.map(k => {
+    const isCurrent = k === secKey;
+    return `<button class="move-section-btn ${isCurrent ? "current" : ""}" type="button" data-move-to="${escQ(k)}">${esc(k)}</button>`;
+  }).join("");
+
+  list.querySelectorAll("[data-move-to]").forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const targetSec = btn.dataset.moveTo;
+      if (targetSec === secKey) {
+        // Same section — do nothing
+        closeMoveMenu();
+        return;
+      }
+      moveItemToSection(secKey, idx, targetSec);
+    };
+  });
+
+  input.value = "";
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); confirmMoveToNewSection(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeMoveMenu(); }
+  };
+
+  // Position menu near anchor
+  menu.classList.remove("hidden");
+  menu.style.visibility = "hidden";
+
+  const container = $("container");
+  const cR = container.getBoundingClientRect();
+  const aR = anchorEl.getBoundingClientRect();
+  const mR = menu.getBoundingClientRect();
+
+  const top = (aR.bottom - cR.top) + 8;
+  let left = (aR.left - cR.left) + (aR.width / 2) - (mR.width / 2);
+  left = Math.max(8, Math.min(left, cR.width - mR.width - 8));
+
+  menu.style.position = "absolute";
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
+  menu.style.visibility = "visible";
+}
+
+function closeMoveMenu() {
+  moveCtx = null;
+  const menu = $("moveMenu");
+  if (menu) menu.classList.add("hidden");
+}
+
+function confirmMoveToNewSection() {
+  if (!moveCtx) return;
+  const input = $("moveNewInput");
+  const newSecName = sanitizeSectionName(input.value);
+  if (!newSecName) { closeMoveMenu(); return; }
+
+  const { secKey, idx } = moveCtx;
+
+  // If new section name equals current — do nothing
+  if (newSecName === secKey) {
+    closeMoveMenu();
+    return;
+  }
+
+  // Create section if needed
+  if (!data.sections[newSecName]) {
+    data.sections[newSecName] = { items: [], modified: new Date().toISOString() };
+    renderSectionList();
+  }
+
+  moveItemToSection(secKey, idx, newSecName);
+}
+
+function moveItemToSection(fromSec, idx, toSec) {
+  const fromArr = data.sections[fromSec]?.items;
+  if (!fromArr || !fromArr[idx]) { closeMoveMenu(); return; }
+  if (fromSec === toSec) { closeMoveMenu(); return; }
+
+  const item = fromArr[idx];
+  const itemCopy = JSON.parse(JSON.stringify(item));
+
+  // Remove from source
+  fromArr.splice(idx, 1);
+  data.sections[fromSec].modified = new Date().toISOString();
+
+  // Add to target (at end)
+  if (!data.sections[toSec]) {
+    data.sections[toSec] = { items: [], modified: new Date().toISOString() };
+  }
+  const toArr = data.sections[toSec].items;
+  const newIdx = toArr.length;
+  toArr.push(item);
+  data.sections[toSec].modified = new Date().toISOString();
+
+  // Clear selection/expanded if they pointed to moved item
+  const oldKey = `${fromSec}|${idx}`;
+  if (selectedKey === oldKey) {
+    selectedKey = null;
+    localStorage.removeItem("selected_key");
+  }
+  if (expandedDescKey === oldKey) {
+    expandedDescKey = null;
+    localStorage.removeItem("expanded_desc_key");
+  }
+
+  closeMoveMenu();
+  saveData();
+  renderSectionList();
+  render();
+
+  // Undo
+  startUndo({
+    type: "moveItem",
+    fromSec,
+    fromIdx: idx,
+    toSec,
+    toIdx: newIdx,
+    item: itemCopy
+  }, `Перенесено в: ${toSec}`);
+}
+
+function cancelLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  longPressTarget = null;
+}
+
 // ===== Utils =====
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename, confirmMoveToNewSection, closeMoveMenu });
 
 init();

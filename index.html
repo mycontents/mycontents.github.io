@@ -132,6 +132,18 @@
       <div class="tag-menu-hint" id="tagFilterHint"></div>
     </div>
 
+    <!-- Move to section menu -->
+    <div class="dropdown-menu move-menu hidden" id="moveMenu">
+      <div class="move-menu-title">Перенести в раздел</div>
+      <div class="move-section-list" id="moveSectionList"></div>
+      <div class="move-new-section">
+        <input type="text" class="move-new-input" id="moveNewInput" placeholder="Новый раздел..." />
+        <button class="mini-btn" onclick="confirmMoveToNewSection()" title="Создать и перенести">
+          <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-check"></use></svg>
+        </button>
+      </div>
+    </div>
+
     <!-- Tag editor menu -->
     <div class="dropdown-menu tag-editor-menu hidden" id="tagEditorMenu">
       <div class="tag-menu-head">
