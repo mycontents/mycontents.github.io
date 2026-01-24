@@ -2376,8 +2376,9 @@ function render() {
     const isExpanded = expandedDescKey === key;
     const secTag = currentSection === "__all__" ? `<span class="item-section-tag">${esc(x.secKey)}</span>` : "";
     const rawTags = displayTags(x.item);
-    // Разделяем на обычные теги и страны; страны отображаем последними
-    const otherTags = rawTags.filter(t => !isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
+    // Разделяем на: тег "сериал" (первый), обычные теги, страны (последние)
+    const serialTag = rawTags.find(t => normTag(t) === "сериал");
+    const otherTags = rawTags.filter(t => !isCountryTag(t) && normTag(t) !== "сериал").sort((a, b) => a.localeCompare(b, "ru"));
     const countryTags = rawTags.filter(t => isCountryTag(t)).sort((a, b) => a.localeCompare(b, "ru"));
 
     const ratingVal = itemRating(x.item);
@@ -2389,8 +2390,8 @@ function render() {
       ? `<span class="tag-chip rating" style="--rating-color:${esc(rColor)}"><span class="rating-val">${esc(ratingVal.toFixed(1))}</span>${votesMeta ? `<span class="rating-votes"> (${esc(votesMeta)})</span>` : ""}</span>`
       : "";
 
-    const tagsHtml = (countryTags.length || otherTags.length || ratingChip)
-      ? `<span class="item-tags">${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${ratingChip}</span>`
+    const tagsHtml = (serialTag || countryTags.length || otherTags.length || ratingChip)
+      ? `<span class="item-tags">${serialTag ? `<span class="tag-chip">${esc(serialTag)}</span>` : ""}${otherTags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join("")}${countryTags.map(t => `<span class="tag-chip country">${esc(countryDisplayName(t))}</span>`).join("")}${ratingChip}</span>`
       : "";
 
     const descBtn = hasDesc
