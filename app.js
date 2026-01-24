@@ -462,9 +462,10 @@ function beginSectionRename() {
   el.setAttribute("contenteditable", "true");
   el.focus();
 
-  // Select all
+  // Place caret at the end (not select all)
   const range = document.createRange();
   range.selectNodeContents(el);
+  range.collapse(false); // collapse to end
   const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(range);
