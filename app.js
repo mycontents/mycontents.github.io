@@ -2305,13 +2305,20 @@ $("viewMode").addEventListener("click", e => {
         line.classList.add('selected');
       }
 
-      if (item?.desc) {
-        // Has description -> toggle it
+      // Double tap on title text: toggle description (if any) AND start inline edit
+      if (textEl) {
+        closeTagEditor();
+        if (item?.desc) {
+          toggleDescExpand(sec, idx);
+        }
+        // Start inline edit after description toggle
+        if (!inlineEdit.active) {
+          beginInlineEdit(line);
+        }
+      } else if (item?.desc) {
+        // Double tap elsewhere (not on title): just toggle description
         closeTagEditor();
         toggleDescExpand(sec, idx);
-      } else if (textEl && !inlineEdit.active) {
-        // No description, but clicked on title -> start inline edit
-        beginInlineEdit(line);
       }
     } else {
       lastItemTap = { key, at: now };
