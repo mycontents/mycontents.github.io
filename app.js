@@ -35,6 +35,7 @@ let tmdbPickState = null; // { candidates: [], secKey, idx }
 
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
+let ignoreOutsideCommitOnce = false; // prevent immediate commit on the same click that started inline edit
 let lastItemTap = { key: null, at: 0 };
 
 // Inline rename for section name (header)
@@ -61,6 +62,22 @@ function scheduleRender() {
     renderQueued = false;
     render();
   });
+}
+
+// Safari/iOS: if inline edit is started by a click that is NOT on the text node itself
+// (e.g. "+" button adding an empty item, or tapping empty area of an empty item),
+// our global document click handler would otherwise immediately commit it.
+// We ignore committing for exactly the same click event.
+function markIgnoreOutsideCommitOnce() {
+  ignoreOutsideCommitOnce = true;
+  // Reset after current event propagation finishes.
+  try {
+    queueMicrotask(() => { ignoreOutsideCommitOnce = false; });
+  } catch {
+    setTimeout(() => { ignoreOutsideCommitOnce = false; }, 0);
+  }
+  // Safety fallback
+  setTimeout(() => { ignoreOutsideCommitOnce = false; }, 0);
 }
 
 function sanitizeInlineText(s) {
@@ -167,9 +184,16 @@ function beginInlineEdit(line, opts = {}) {
     line.classList.add("selected");
   }
 
+  // IMPORTANT (iOS Safari): starting edit from a click on a non-text area
+  // can be immediately cancelled by the global document click handler.
+  // Mark this click as "ignore outside commit".
+  markIgnoreOutsideCommitOnce();
+
   inlineEdit = { active: true, key, secKey: p.secKey, idx: p.idx, el, orig: item.text || "" };
   el.setAttribute("contenteditable", "true");
-  el.focus();
+
+  // iOS Safari: focus should happen inside user gesture.
+  try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
 
   const sel = window.getSelection();
 
@@ -1571,7 +1595,7 @@ function addTagFromInput() {
   inp.value = "";
   const item = getEditorItem();
   if (!item || !tagEditorCtx) return;
-  item.tags = uniqueTags([...item.tags, t]);
+  item.tags = uniqueTags([...(item.tags || []), t]);
   data.sections[tagEditorCtx.secKey].modified = new Date().toISOString();
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
 }
