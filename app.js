@@ -80,6 +80,27 @@ function markIgnoreOutsideCommitOnce() {
   setTimeout(() => { ignoreOutsideCommitOnce = false; }, 0);
 }
 
+function ensureIosKeyboardFocus(el) {
+  // iOS Safari can ignore focus() on contenteditable unless we force a selection range.
+  if (!el) return;
+  try {
+    try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+  } catch {}
+
+  try {
+    const sel = window.getSelection();
+    if (!sel) return;
+    // If selection is not inside el, force it to be.
+    const needs = !(sel.rangeCount > 0 && el.contains(sel.getRangeAt(0).startContainer));
+    if (needs) {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+  } catch {}
+}
 function sanitizeInlineText(s) {
   return String(s || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -192,8 +213,8 @@ function beginInlineEdit(line, opts = {}) {
   inlineEdit = { active: true, key, secKey: p.secKey, idx: p.idx, el, orig: item.text || "" };
   el.setAttribute("contenteditable", "true");
 
-  // iOS Safari: focus should happen inside user gesture.
-  try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
+  // iOS Safari: focus should happen inside user gesture (and selection must be inside contenteditable).
+  ensureIosKeyboardFocus(el);
 
   const sel = window.getSelection();
 
@@ -509,6 +530,9 @@ function beginSectionRename() {
   const el = $("currentSectionName");
   if (!el) return;
 
+  // iOS Safari: prevent immediate outside-click commit/blur and let focus show keyboard without zoom.
+  markIgnoreOutsideCommitOnce();
+
   // Close menus to avoid conflicts
   closeAllMenus();
 
@@ -516,7 +540,7 @@ function beginSectionRename() {
   sectionRename.orig = currentSection;
 
   el.setAttribute("contenteditable", "true");
-  el.focus();
+  ensureIosKeyboardFocus(el);
 
   // Place caret at the end (not select all)
   const range = document.createRange();
@@ -2762,9 +2786,12 @@ $("viewMode").addEventListener("click", e => {
   if (isEditing) return;
 
   // If inline edit is active and user clicks elsewhere — commit.
+  // IMPORTANT: ignore the same click that just started inline edit (iOS Safari keyboard/focus fix).
   if (inlineEdit.active) {
-    const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
-    if (!inside) commitInlineEdit();
+    if (!ignoreOutsideCommitOnce) {
+      const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
+      if (!inside) commitInlineEdit();
+    }
   }
 
   const line = e.target.closest(".item-line");
@@ -2848,13 +2875,24 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
+  const clickedAction = !!e.target.closest('[data-action]');
+  const clickedButton = !!e.target.closest('button');
+  const textEl = e.target.closest('[data-role="text"]');
+
+  // (3) If item title is empty: a single tap on ANY non-button zone starts inline edit.
+  if (!clickedAction && !clickedButton) {
+    const sec = line.dataset.sec, idx = +line.dataset.idx;
+    const item = data.sections?.[sec]?.items?.[idx];
+    const empty = !String(item?.text || "").trim();
+    if (empty) {
+      beginInlineEdit(line, textEl ? (typeof caretOffsetFromEvent(textEl, e) === 'number' ? { caretOffset: caretOffsetFromEvent(textEl, e) } : {}) : {});
+      return;
+    }
+  }
+
   // Double tap behavior:
   // - on title text: start inline edit (only)
   // - elsewhere on the item (excluding buttons/actions): toggle description (if any)
-  const textEl = e.target.closest('[data-role="text"]');
-  const clickedAction = !!e.target.closest('[data-action]');
-  const clickedButton = !!e.target.closest('button');
-
   if (!clickedAction && !clickedButton) {
     const now = Date.now();
     const sameKey = lastItemTap.key === key;
@@ -2907,9 +2945,12 @@ window.addEventListener("beforeunload", () => {
 
 document.addEventListener("click", e => {
   // Commit inline edit on any outside click
+  // IMPORTANT: ignore the same click that just started inline edit (iOS Safari keyboard/focus fix).
   if (inlineEdit.active) {
-    const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
-    if (!inside) commitInlineEdit();
+    if (!ignoreOutsideCommitOnce) {
+      const inside = e.target === inlineEdit.el || e.target.closest('[data-role="text"]') === inlineEdit.el;
+      if (!inside) commitInlineEdit();
+    }
   }
 
   // Commit section rename if user clicked outside the section name
@@ -3252,16 +3293,24 @@ function addNewItem() {
   // Cleanup legacy key if it exists
   localStorage.removeItem("pending_tmdb_for");
 
-  // Reset scroll to bottom area and render
+  // Render immediately so the new DOM node exists
   render();
 
-  requestAnimationFrame(() => {
-    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
-    if (line) {
-      line.scrollIntoView({ block: "center", behavior: "smooth" });
-      beginInlineEdit(line);
-    }
-  });
+  // iOS Safari: to show keyboard, focus must happen as close as possible to the user gesture.
+  // So we start inline edit synchronously (no rAF). If element isn't in DOM yet, fallback to rAF.
+  const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+  if (line) {
+    try { line.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+    beginInlineEdit(line);
+  } else {
+    requestAnimationFrame(() => {
+      const line2 = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+      if (line2) {
+        try { line2.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+        beginInlineEdit(line2);
+      }
+    });
+  }
 }
 
 // ===== Utils =====

@@ -152,6 +152,9 @@ header{
   flex:0 1 auto; /* allow shrinking */
   min-width:0;
   max-width:clamp(140px, 42vw, 220px);
+
+  /* Prevent iOS double-tap zoom (same approach as items) */
+  touch-action:manipulation;
 }
 .section-btn:hover{ border-color:var(--blue); }
 .section-btn:active{ transform:translateY(.5px); }
