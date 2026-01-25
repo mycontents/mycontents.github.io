@@ -173,9 +173,6 @@ header{
   min-width:0;
   max-width:100%;
 
-  /* Prevent iOS Safari auto-zoom on focus */
-  font-size:16px;
-
   /* Remove ellipsis, enable horizontal scroll */
   overflow-x:auto;
   overflow-y:hidden;

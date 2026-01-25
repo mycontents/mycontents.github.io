@@ -2824,27 +2824,13 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
-  // Single-tap behavior for empty items:
-  // If title is empty, a single tap anywhere on the item (except buttons/actions)
-  // should immediately start renaming.
-  const clickedAction = !!e.target.closest('[data-action]');
-  const clickedButton = !!e.target.closest('button');
-  const textEl = e.target.closest('[data-role="text"]');
-
-  if (!clickedAction && !clickedButton) {
-    const sec0 = line.dataset.sec, idx0 = +line.dataset.idx;
-    const item0 = data.sections?.[sec0]?.items?.[idx0];
-    if (item0 && !String(item0.text || '').trim()) {
-      // Start inline edit immediately for empty titles.
-      // Focus is synchronous (important for iOS keyboard).
-      beginInlineEdit(line);
-      return;
-    }
-  }
-
   // Double tap behavior:
   // - on title text: start inline edit (only)
   // - elsewhere on the item (excluding buttons/actions): toggle description (if any)
+  const textEl = e.target.closest('[data-role="text"]');
+  const clickedAction = !!e.target.closest('[data-action]');
+  const clickedButton = !!e.target.closest('button');
+
   if (!clickedAction && !clickedButton) {
     const now = Date.now();
     const sameKey = lastItemTap.key === key;
@@ -3202,6 +3188,9 @@ function addNewItem() {
   sec.items.push(newItem);
   sec.modified = new Date().toISOString();
 
+  // Save immediately so undo/refresh won't lose it
+  saveData();
+
   // Ensure it is visible by clearing filters (otherwise inline edit element won't exist)
   if (filterQuery) {
     filterQuery = "";
@@ -3239,59 +3228,16 @@ function addNewItem() {
   // Cleanup legacy key if it exists
   localStorage.removeItem("pending_tmdb_for");
 
-  // ========================================================
-  // iOS KEYBOARD FIX:
-  // On iOS, the keyboard only opens if focus() is called SYNCHRONOUSLY
- // within the user gesture (click/tap). Full render() rebuilds the DOM
-  // and breaks this synchronicity. So for iOS we:
-  // 1) Inject a minimal editable element into the DOM immediately
-  // 2) Focus it (keyboard opens)
-  // 3) Then do full render() which will replace it, but we restore focus
-  // ========================================================
+  // Reset scroll to bottom area and render
+  render();
 
-  const apple = isAppleDevice();
-
-  if (apple) {
-    // Create a temporary input to capture focus synchronously
-    const viewMode = $("viewMode");
-    const tempInput = document.createElement("input");
-    tempInput.type = "text";
-    tempInput.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;";
-    tempInput.setAttribute("autocomplete", "off");
-    tempInput.setAttribute("autocapitalize", "off");
-    document.body.appendChild(tempInput);
-    tempInput.focus(); // Synchronous focus — iOS keyboard will open
-
-    // Now do the full render
-    render();
-
-    // Find the new line and transfer focus to the actual contenteditable
+  requestAnimationFrame(() => {
     const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
     if (line) {
+      line.scrollIntoView({ block: "center", behavior: "smooth" });
       beginInlineEdit(line);
-      try { line.scrollIntoView({ block: "center" }); } catch {}
     }
-
-    // Remove temporary input
-    setTimeout(() => {
-      try { tempInput.remove(); } catch {}
-    }, 100);
-
-  } else {
-    // Non-Apple: standard flow
-    render();
-
-    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
-    if (line) {
-      // IMPORTANT: beginInlineEdit FIRST (focus), then scroll
-      // Otherwise scrollIntoView can interfere with keyboard opening on Android
-      beginInlineEdit(line);
-      try { line.scrollIntoView({ block: "center" }); } catch {}
-    }
-  }
-
-  // Save after starting the edit (safe for all, friendlier for iOS keyboard focus)
-  saveData();
+  });
 }
 
 // ===== Utils =====
