@@ -70,13 +70,9 @@ function scheduleRender() {
 // We ignore committing for exactly the same click event.
 function markIgnoreOutsideCommitOnce() {
   ignoreOutsideCommitOnce = true;
-  // Reset after current event propagation finishes.
-  try {
-    queueMicrotask(() => { ignoreOutsideCommitOnce = false; });
-  } catch {
-    setTimeout(() => { ignoreOutsideCommitOnce = false; }, 0);
-  }
-  // Safety fallback
+  // IMPORTANT: do NOT use microtasks here.
+  // Some browsers can run a microtask checkpoint between event listeners of the same click,
+  // which would reset this flag too early and immediately commit/close the editor.
   setTimeout(() => { ignoreOutsideCommitOnce = false; }, 0);
 }
 
