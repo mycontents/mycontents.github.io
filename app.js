@@ -2481,6 +2481,41 @@ function buildItems() {
 }
 
 function render() {
+  // If an inline edit is active, preserve it across a full re-render.
+  // This prevents background updates (e.g. TMDB fetch completion) from destroying
+  // the editable DOM node and effectively "ending" the user's current editing session.
+  let restoreInline = null;
+  if (inlineEdit?.active && inlineEdit?.el) {
+    const el = inlineEdit.el;
+    let caretOffset = null;
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        if (el.contains(r.startContainer)) {
+          const off = charOffsetFromRange(el, r);
+          if (typeof off === "number") caretOffset = off;
+        }
+      }
+    } catch {}
+
+    restoreInline = {
+      key: inlineEdit.key,
+      draftText: String(el.textContent || ""),
+      caretOffset,
+      orig: inlineEdit.orig
+    };
+
+    // Remove handlers to avoid accidental commit on blur when DOM is replaced
+    try {
+      el.onkeydown = null;
+      el.onblur = null;
+      el.setAttribute("contenteditable", "false");
+    } catch {}
+
+    inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
+  }
+
   const view = $("viewMode"), items = buildItems();
   updateTagFilterBtnUI();
   if (!items.length) { view.innerHTML = ""; updateCounter(0); return; }
@@ -2604,6 +2639,21 @@ function render() {
       </div>`;
   }).join("");
   updateCounter(items.length);
+
+  // Restore inline edit session (if any) after DOM update
+  if (restoreInline && restoreInline.key) {
+    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(restoreInline.key)}"]`);
+    if (line) {
+      beginInlineEdit(line, (typeof restoreInline.caretOffset === "number") ? { caretOffset: restoreInline.caretOffset } : {});
+      // Re-apply user's uncommitted text draft
+      if (inlineEdit?.el) {
+        inlineEdit.el.textContent = restoreInline.draftText;
+        if (typeof restoreInline.caretOffset === "number") {
+          setCaretByCharOffset(inlineEdit.el, restoreInline.caretOffset);
+        }
+      }
+    }
+  }
 }
 
 function updateCounter(n) {
