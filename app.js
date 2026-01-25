@@ -2824,13 +2824,27 @@ $("viewMode").addEventListener("click", e => {
     disarmItemDelete();
   }
 
+  // Single-tap behavior for empty items:
+  // If title is empty, a single tap anywhere on the item (except buttons/actions)
+  // should immediately start renaming.
+  const clickedAction = !!e.target.closest('[data-action]');
+  const clickedButton = !!e.target.closest('button');
+  const textEl = e.target.closest('[data-role="text"]');
+
+  if (!clickedAction && !clickedButton) {
+    const sec0 = line.dataset.sec, idx0 = +line.dataset.idx;
+    const item0 = data.sections?.[sec0]?.items?.[idx0];
+    if (item0 && !String(item0.text || '').trim()) {
+      // Start inline edit immediately for empty titles.
+      // Focus is synchronous (important for iOS keyboard).
+      beginInlineEdit(line);
+      return;
+    }
+  }
+
   // Double tap behavior:
   // - on title text: start inline edit (only)
   // - elsewhere on the item (excluding buttons/actions): toggle description (if any)
-  const textEl = e.target.closest('[data-role="text"]');
-  const clickedAction = !!e.target.closest('[data-action]');
-  const clickedButton = !!e.target.closest('button');
-
   if (!clickedAction && !clickedButton) {
     const now = Date.now();
     const sameKey = lastItemTap.key === key;
@@ -3188,9 +3202,6 @@ function addNewItem() {
   sec.items.push(newItem);
   sec.modified = new Date().toISOString();
 
-  // Save immediately so undo/refresh won't lose it
-  saveData();
-
   // Ensure it is visible by clearing filters (otherwise inline edit element won't exist)
   if (filterQuery) {
     filterQuery = "";
@@ -3228,16 +3239,27 @@ function addNewItem() {
   // Cleanup legacy key if it exists
   localStorage.removeItem("pending_tmdb_for");
 
-  // Reset scroll to bottom area and render
+  // Render and immediately start inline edit.
+  // IMPORTANT for iOS: focus must happen synchronously within the user gesture.
+  // Also, avoid starting network requests BEFORE focus (Safari may block the keyboard).
   render();
 
-  requestAnimationFrame(() => {
-    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
-    if (line) {
-      line.scrollIntoView({ block: "center", behavior: "smooth" });
-      beginInlineEdit(line);
+  const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+  if (line) {
+    const apple = isAppleDevice();
+    // On non-Apple browsers: scroll into view first.
+    // On iOS: scrolling before focus can prevent keyboard from opening, so focus first.
+    if (!apple) {
+      try { line.scrollIntoView({ block: "center" }); } catch {}
     }
-  });
+    beginInlineEdit(line);
+    if (apple) {
+      try { line.scrollIntoView({ block: "center" }); } catch {}
+    }
+  }
+
+  // Save after starting the edit (safe for all, friendlier for iOS keyboard focus)
+  saveData();
 }
 
 // ===== Utils =====
