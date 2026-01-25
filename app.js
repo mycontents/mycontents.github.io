@@ -3239,21 +3239,53 @@ function addNewItem() {
   // Cleanup legacy key if it exists
   localStorage.removeItem("pending_tmdb_for");
 
-  // Render and immediately start inline edit.
-  // IMPORTANT for iOS: focus must happen synchronously within the user gesture.
-  // Also, avoid starting network requests BEFORE focus (Safari may block the keyboard).
-  render();
+  // ========================================================
+  // iOS KEYBOARD FIX:
+  // On iOS, the keyboard only opens if focus() is called SYNCHRONOUSLY
+ // within the user gesture (click/tap). Full render() rebuilds the DOM
+  // and breaks this synchronicity. So for iOS we:
+  // 1) Inject a minimal editable element into the DOM immediately
+  // 2) Focus it (keyboard opens)
+  // 3) Then do full render() which will replace it, but we restore focus
+  // ========================================================
 
-  const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
-  if (line) {
-    const apple = isAppleDevice();
-    // On non-Apple browsers: scroll into view first.
-    // On iOS: scrolling before focus can prevent keyboard from opening, so focus first.
-    if (!apple) {
+  const apple = isAppleDevice();
+
+  if (apple) {
+    // Create a temporary input to capture focus synchronously
+    const viewMode = $("viewMode");
+    const tempInput = document.createElement("input");
+    tempInput.type = "text";
+    tempInput.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;";
+    tempInput.setAttribute("autocomplete", "off");
+    tempInput.setAttribute("autocapitalize", "off");
+    document.body.appendChild(tempInput);
+    tempInput.focus(); // Synchronous focus — iOS keyboard will open
+
+    // Now do the full render
+    render();
+
+    // Find the new line and transfer focus to the actual contenteditable
+    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+    if (line) {
+      beginInlineEdit(line);
       try { line.scrollIntoView({ block: "center" }); } catch {}
     }
-    beginInlineEdit(line);
-    if (apple) {
+
+    // Remove temporary input
+    setTimeout(() => {
+      try { tempInput.remove(); } catch {}
+    }, 100);
+
+  } else {
+    // Non-Apple: standard flow
+    render();
+
+    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+    if (line) {
+      // IMPORTANT: beginInlineEdit FIRST (focus), then scroll
+      // Otherwise scrollIntoView can interfere with keyboard opening on Android
+      beginInlineEdit(line);
       try { line.scrollIntoView({ block: "center" }); } catch {}
     }
   }
