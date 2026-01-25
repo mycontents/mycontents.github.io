@@ -1427,3 +1427,31 @@ body.editing .scroll-slack{ display:none; }
   opacity:.45;
   pointer-events:none;
 }
+
+/* ===== Add item footer (bottom +) ===== */
+.add-item-footer{
+  display:flex;
+  justify-content:center;
+  padding:10px 0 6px;
+}
+.add-item-btn{
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--panel2);
+  color:var(--text);
+  font-size:28px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  -webkit-tap-highlight-color:var(--tap);
+  transition:color .12s, background .12s, border-color .12s, transform .05s;
+}
+.add-item-btn:hover{ border-color:var(--blue); color:var(--blue); background:rgba(216,178,106,.06); }
+.add-item-btn:active{ transform:translateY(.5px); }
+
+/* Hide add button in edit mode */
+body.editing .add-item-footer{ display:none; }

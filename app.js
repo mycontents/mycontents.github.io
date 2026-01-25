@@ -221,7 +221,7 @@ function cancelInlineEdit() {
 
 function commitInlineEdit() {
   if (!inlineEdit.active) return;
-  const { secKey, idx, el, orig } = inlineEdit;
+  const { secKey, idx, el, orig, key } = inlineEdit;
   const item = data.sections?.[secKey]?.items?.[idx];
   const next = sanitizeInlineText(el?.textContent);
 
@@ -238,7 +238,30 @@ function commitInlineEdit() {
 
   item.text = finalText;
   data.sections[secKey].modified = new Date().toISOString();
-  saveData();
+
+  // One-shot TMDB auto-load ONLY for items created via "+" and only once
+  // Use stable identifier (created) to avoid index shifts (move/delete) triggering TMDB for a wrong item.
+  const pendingCreated = localStorage.getItem("pending_tmdb_created") || "";
+  const isPending = pendingCreated && item?.created && pendingCreated === String(item.created);
+
+  if (isPending) {
+    localStorage.removeItem("pending_tmdb_created");
+    // Cleanup legacy key if it exists
+    localStorage.removeItem("pending_tmdb_for");
+
+    // Save first, then load TMDB in background
+    (async () => {
+      try {
+        await saveData();
+        await fetchTmdbForSingleItem(secKey, idx);
+      } catch {
+        // ignore
+      }
+    })();
+  } else {
+    saveData();
+  }
+
   scheduleRender();
 }
 
@@ -251,6 +274,7 @@ async function init() {
   updateSearchBtnUI();
   updateShareButton();
   updateTmdbBtnVisibility();
+  updateSectionButton(); // also updates bottom + visibility
 
   if (!GIST_ID || !TOKEN) {
     $("viewMode").innerHTML = `<div class="setup-prompt">Откройте меню → Подключение</div>`;
@@ -1811,6 +1835,10 @@ function updateSectionButton() {
   el.textContent = currentSection === "__all__" ? "Все" : currentSection;
   // Ensure we are showing the start of the text in ellipsis mode
   try { el.scrollLeft = 0; } catch {}
+
+  // Bottom add button is not available in "Все"
+  const footer = $("addItemFooter");
+  if (footer) footer.style.display = (currentSection === "__all__" || isEditing) ? "none" : "flex";
 }
 
 function showNewSectionInput() { const inp = $("newSectionInput"); inp.classList.remove("hidden"); inp.value = ""; inp.focus(); disarmSectionDelete(); }
@@ -2129,6 +2157,7 @@ function cancelEdit() {
   document.body.classList.remove("editing");
   $("viewMode").classList.remove("hidden"); $("editMode").classList.add("hidden"); $("editHint").classList.add("hidden");
   $("editUse").setAttribute("href", `${ICONS}#i-pencil`);
+  updateSectionButton();
 }
 
 function mergeByMask(orig, mask, texts) {
@@ -2170,6 +2199,7 @@ async function saveEdit() {
   document.body.classList.remove("editing");
   $("viewMode").classList.remove("hidden"); $("editMode").classList.add("hidden"); $("editHint").classList.add("hidden");
   $("editUse").setAttribute("href", `${ICONS}#i-pencil`);
+  updateSectionButton();
   
   // Начинаем фоновое сохранение
   savingInProgress = true;
@@ -3015,11 +3045,156 @@ function cancelLongPress() {
   longPressTarget = null;
 }
 
+// ===== Add new item (bottom +) =====
+async function fetchTmdbForSingleItem(secKey, idx) {
+  if (!TMDB_KEY) return;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  if (!item) return;
+
+  // Only load if there is some title text
+  const title = String(item.text || "").trim();
+  if (!title) return;
+
+  showProgress("Загрузка данных...", 60);
+
+  try {
+    const { genres, overview, poster, originalTitle, year, rating, votes, tmdbType, seasons, episodes, firstAirDate, lastAirDate, inProduction } = await fetchTmdbDataForItem(title);
+    let updated = false;
+
+    // Normalize/additions to title
+    const nextTitle = buildTitleUpdate(item.text, originalTitle, year);
+    if (nextTitle) { item.text = nextTitle; updated = true; }
+
+    if (genres.length) {
+      const existing = new Set((item.tags || []).map(normTag));
+      const newTags = genres.filter(g => !existing.has(normTag(g)) && normTag(g) !== VIEWED_TAG);
+      if (newTags.length) {
+        item.tags = uniqueTags([...(item.tags || []), ...newTags]);
+        item.tags = normalizeAnimeTags(item.tags);
+        updated = true;
+      } else {
+        const before = JSON.stringify(uniqueTags(item.tags || []));
+        const afterArr = normalizeAnimeTags(item.tags || []);
+        const after = JSON.stringify(afterArr);
+        if (before !== after) {
+          item.tags = afterArr;
+          updated = true;
+        }
+      }
+    }
+
+    // Serial tag + TV meta
+    if (tmdbType === "tv") {
+      const hasSerialTag = (item.tags || []).some(t => normTag(t) === "сериал");
+      if (!hasSerialTag) {
+        const viewedIdx = (item.tags || []).indexOf(VIEWED_TAG);
+        if (viewedIdx >= 0) item.tags.splice(viewedIdx + 1, 0, "сериал");
+        else item.tags = ["сериал", ...(item.tags || [])];
+        item.tags = uniqueTags(item.tags);
+        updated = true;
+      }
+
+      if (seasons != null && item.seasons == null) { item.seasons = seasons; updated = true; }
+      if (episodes != null && item.episodes == null) { item.episodes = episodes; updated = true; }
+      if (firstAirDate && !item.firstAirDate) { item.firstAirDate = firstAirDate; updated = true; }
+      if (lastAirDate && !item.lastAirDate) { item.lastAirDate = lastAirDate; updated = true; }
+      if (inProduction != null && item.inProduction == null) { item.inProduction = inProduction; updated = true; }
+      if (!item.year && firstAirDate) { item.year = String(firstAirDate).slice(0, 4); updated = true; }
+    }
+
+    if (overview && !item.desc) { item.desc = overview; updated = true; }
+    if (poster && !item.poster) { item.poster = poster; updated = true; }
+    if (rating != null && item.rating == null) { item.rating = rating; updated = true; }
+    if (votes != null && item.votes == null) { item.votes = votes; updated = true; }
+    if (tmdbType && !item.tmdbType) { item.tmdbType = tmdbType; updated = true; }
+    if (year && !item.year) { item.year = String(year); updated = true; }
+
+    if (updated) {
+      data.sections[secKey].modified = new Date().toISOString();
+      showProgress("Сохранение данных...", 90);
+      await saveData();
+    }
+
+    showProgress("Готово", 100);
+    setTimeout(hideProgress, 500);
+    render();
+
+  } catch {
+    showProgress("Ошибка", 100);
+    setTimeout(hideProgress, 1200);
+  }
+}
+
+function addNewItem() {
+  if (isEditing || savingInProgress) return;
+  if (currentSection === "__all__") return;
+  if (!data.sections[currentSection]) data.sections[currentSection] = { items: [], modified: new Date().toISOString() };
+
+  normalizeDataModel();
+
+  const sec = data.sections[currentSection];
+  const newItem = { text: "", tags: [], created: new Date().toISOString() };
+  const idx = sec.items.length;
+  sec.items.push(newItem);
+  sec.modified = new Date().toISOString();
+
+  // Save immediately so undo/refresh won't lose it
+  saveData();
+
+  // Ensure it is visible by clearing filters (otherwise inline edit element won't exist)
+  if (filterQuery) {
+    filterQuery = "";
+    localStorage.setItem("filter_query", "");
+    $("filterInput").value = $("mobileFilterInput").value = "";
+    $("filterClear").classList.add("hidden");
+    $("mobileFilterClear").classList.add("hidden");
+    updateSearchBtnUI();
+  }
+
+  // For tag filters: clear them so the empty item is not hidden
+  if (tagFilter.size || tagFilterExcluded.size || ratingFilter != null) {
+    tagFilter = new Set();
+    tagFilterExcluded = new Set();
+    ratingFilter = null;
+    saveTagFilter();
+    saveRatingFilter();
+    updateTagFilterBtnUI();
+  }
+
+  // Ensure viewed filter is not "only" (new item has no viewed tag)
+  if (viewedFilter === "only") {
+    viewedFilter = "show";
+    localStorage.setItem("viewed_filter", viewedFilter);
+    updateViewedToggleUI();
+  }
+
+  const key = `${currentSection}|${idx}`;
+  selectedKey = key;
+  localStorage.setItem("selected_key", selectedKey);
+
+  // Mark this item as pending one-shot TMDB load after first commit
+  // Use stable identifier (created) to avoid index shifts.
+  localStorage.setItem("pending_tmdb_created", String(newItem.created));
+  // Cleanup legacy key if it exists
+  localStorage.removeItem("pending_tmdb_for");
+
+  // Reset scroll to bottom area and render
+  render();
+
+  requestAnimationFrame(() => {
+    const line = document.querySelector(`#viewMode .item-line[data-key="${CSS.escape(key)}"]`);
+    if (line) {
+      line.scrollIntoView({ block: "center", behavior: "smooth" });
+      beginInlineEdit(line);
+    }
+  });
+}
+
 // ===== Utils =====
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
 function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
 // Expose
-Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename, confirmMoveToNewSection, closeMoveMenu });
+Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename, confirmMoveToNewSection, closeMoveMenu, addNewItem });
 
 init();
