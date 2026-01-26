@@ -332,13 +332,19 @@ function commitInlineEdit() {
   item.text = finalText;
   data.sections[secKey].modified = new Date().toISOString();
 
-  // Auto TMDB pick (new items added via "+"): show candidate list under the item after naming.
+  // TMDB choice after rename:
+  // - for brand-new items ("+") AND for renamed existing items, we show the pick list.
+  // - we NEVER auto-apply; user either picks a candidate or chooses "Не загружать данные".
   const created = String(item?.created || "");
-  if (created && TMDB_KEY && isPendingPickCreated(created)) {
+  if (created && TMDB_KEY) {
+    // Mark as pending (so user can return later and it still behaves as "new" until resolved)
+    if (!isPendingPickCreated(created)) addPendingPickCreated(created);
+
+    // Save text first, then search + show choices
     saveData();
     startTmdbAutoPick(created);
   } else {
-    // If there is no TMDB key (or it is not a pending-new item) — just save and exit.
+    // No TMDB key: just save and make sure pending is cleared.
     if (created) removePendingPickCreated(created);
     saveData();
   }
@@ -3092,8 +3098,8 @@ function render() {
           <div class="tmdb-pick">
             <div class="tmdb-pick-title">TMDB: выбрать (${candidates.length})</div>
             <div class="tmdb-pick-list">
-              <button class="tmdb-pick-item" type="button" data-action="tmdb-keep">
-                <div class="tmdb-pick-label">Оставить как введено</div>
+              <button class="tmdb-pick-item tmdb-no-load" type="button" data-action="tmdb-keep">
+                <div class="tmdb-pick-label">Не загружать данные</div>
               </button>
               ${candidates.map((c, i) => {
                 const label = formatTmdbCandidateLabel(c);
