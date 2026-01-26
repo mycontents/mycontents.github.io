@@ -2958,9 +2958,8 @@ function render() {
   const view = $("viewMode"), items = buildItems();
   updateTagFilterBtnUI();
   if (!items.length) {
-    // If the list became empty (filters/section), just hide the pick UI.
-    // IMPORTANT: do NOT resolve the item (do not remove pending) — same behavior as description.
-    tmdbAutoPick = null;
+    // If the list became empty (filters/section), keep the pick state (like description).
+    // IMPORTANT: do NOT resolve the item (do not remove pending).
     view.innerHTML = "";
     updateCounter(0);
     return;
@@ -2968,6 +2967,17 @@ function render() {
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
+
+  // Validate TMDB pick key by DATA (not by current visibility), like description.
+  // Keep it even if temporarily hidden by filters/section.
+  if (tmdbAutoPick?.key) {
+    const p = parseItemKey(tmdbAutoPick.key);
+    const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
+    // If item no longer exists OR it is no longer pending => close pick.
+    if (!it || !isPendingPickCreated(String(it?.created || ""))) {
+      tmdbAutoPick = null;
+    }
+  }
 
   // Keep expanded description even if the item is temporarily hidden by filters/section.
   // Only reset when the item no longer exists in DATA or has no description anymore.
@@ -3016,10 +3026,11 @@ function render() {
       viewedBtn = `<button class="viewed-action not-viewed" data-action="toggle-viewed"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg></button>`;
     }
 
-    // Inline TMDB auto-pick block (for newly added items)
-    // Show only for the currently selected item to avoid clutter.
+    // Inline TMDB auto-pick block (for pending items)
+    // Behavior must match description: it stays open even if item becomes unselected,
+    // and it should not disappear due to filters/section switches (unless item is gone or resolved).
     let autoPickBlock = "";
-    if (tmdbAutoPick && tmdbAutoPick.key === key && selectedKey === key) {
+    if (tmdbAutoPick && tmdbAutoPick.key === key) {
       if (tmdbAutoPick.loading) {
         autoPickBlock = `
           <div class="tmdb-pick">
@@ -3340,6 +3351,8 @@ $("viewMode").addEventListener("click", e => {
 
   // If this item is still pending TMDB pick, ensure pick list is (re)shown for it.
   // This allows returning to the choice later, and also works after renaming.
+  // NOTE: pick panel must behave like description (not tied to selection),
+  // but tapping the pending item can re-trigger search if query changed.
   try {
     const sec = line.dataset.sec, idx = +line.dataset.idx;
     const it = data.sections?.[sec]?.items?.[idx];
@@ -3349,11 +3362,6 @@ $("viewMode").addEventListener("click", e => {
       const needsReload = !tmdbAutoPick || tmdbAutoPick.created !== created || String(tmdbAutoPick.query || "") !== title;
       if (needsReload) {
         startTmdbAutoPick(created);
-      } else {
-        // Ensure the UI is present if we already have candidates cached in memory.
-        // (e.g. previous render removed the block while item was not selected)
-        const hasPickEl = !!line.querySelector(".tmdb-pick");
-        if (!hasPickEl) scheduleRender();
       }
     }
   } catch {}
