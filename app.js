@@ -33,6 +33,58 @@ let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 let tmdbGenres = null;
 let tmdbPickState = null; // { candidates: [], secKey, idx }
 
+// Auto TMDB choice for newly added items (via "+")
+const PENDING_TMDB_PICK_CREATED_KEY = "pending_tmdb_pick_created";
+let tmdbAutoPick = null; // { created, key, secKey, idx, query, candidates: [], loading: bool }
+let tmdbAutoReqId = 0;
+
+// Pending auto-pick set helpers (support multiple "new" items at once)
+function loadPendingPickCreatedSet() {
+  const raw = localStorage.getItem(PENDING_TMDB_PICK_CREATED_KEY);
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed.map(x => String(x)).filter(Boolean));
+  } catch {
+    // If it was stored as plain string in older builds
+    return new Set([String(raw)]);
+  }
+  return new Set();
+}
+function savePendingPickCreatedSet(set) {
+  const arr = [...(set || new Set())].map(String).filter(Boolean);
+  if (!arr.length) localStorage.removeItem(PENDING_TMDB_PICK_CREATED_KEY);
+  else localStorage.setItem(PENDING_TMDB_PICK_CREATED_KEY, JSON.stringify(arr));
+}
+function addPendingPickCreated(created) {
+  const set = loadPendingPickCreatedSet();
+  set.add(String(created));
+  savePendingPickCreatedSet(set);
+}
+function removePendingPickCreated(created) {
+  const set = loadPendingPickCreatedSet();
+  set.delete(String(created));
+  savePendingPickCreatedSet(set);
+}
+function isPendingPickCreated(created) {
+  const set = loadPendingPickCreatedSet();
+  return set.has(String(created));
+}
+
+function findItemByCreated(created) {
+  const c = String(created || "");
+  if (!c) return null;
+  for (const secKey of Object.keys(data.sections || {})) {
+    const items = data.sections?.[secKey]?.items || [];
+    for (let idx = 0; idx < items.length; idx++) {
+      if (String(items[idx]?.created || "") === c) {
+        return { secKey, idx, key: `${secKey}|${idx}` };
+      }
+    }
+  }
+  return null;
+}
+
 // Inline rename in view mode
 let inlineEdit = { active: false, key: null, secKey: null, idx: null, el: null, orig: "" };
 let ignoreOutsideCommitOnce = false; // prevent immediate commit on the same click that started inline edit
@@ -280,26 +332,14 @@ function commitInlineEdit() {
   item.text = finalText;
   data.sections[secKey].modified = new Date().toISOString();
 
-  // One-shot TMDB auto-load ONLY for items created via "+" and only once
-  // Use stable identifier (created) to avoid index shifts (move/delete) triggering TMDB for a wrong item.
-  const pendingCreated = localStorage.getItem("pending_tmdb_created") || "";
-  const isPending = pendingCreated && item?.created && pendingCreated === String(item.created);
-
-  if (isPending) {
-    localStorage.removeItem("pending_tmdb_created");
-    // Cleanup legacy key if it exists
-    localStorage.removeItem("pending_tmdb_for");
-
-    // Save first, then load TMDB in background
-    (async () => {
-      try {
-        await saveData();
-        await fetchTmdbForSingleItem(secKey, idx);
-      } catch {
-        // ignore
-      }
-    })();
+  // Auto TMDB pick (new items added via "+"): show candidate list under the item after naming.
+  const created = String(item?.created || "");
+  if (created && TMDB_KEY && isPendingPickCreated(created)) {
+    saveData();
+    startTmdbAutoPick(created);
   } else {
+    // If there is no TMDB key (or it is not a pending-new item) — just save and exit.
+    if (created) removePendingPickCreated(created);
     saveData();
   }
 
@@ -958,6 +998,264 @@ function showTmdbPick(candidates) {
       await applyTmdbCandidateToCurrentItem(c);
     };
   });
+}
+
+// ===== TMDB auto-pick for newly created items (via "+") =====
+// Per requirements: ALWAYS show choice list (even if only 1 match). Never auto-apply.
+async function startTmdbAutoPick(created) {
+  const c = String(created || "");
+  if (!c) return;
+  if (!TMDB_KEY) { removePendingPickCreated(c); tmdbAutoPick = null; scheduleRender(); return; }
+
+  const found = findItemByCreated(c);
+  if (!found) { removePendingPickCreated(c); tmdbAutoPick = null; scheduleRender(); return; }
+
+  const { secKey, idx, key } = found;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  const title = String(item?.text || "").trim();
+
+  if (!title) {
+    // Empty title => no search; keep pending but no UI
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
+
+  const reqId = ++tmdbAutoReqId;
+
+  // Close expanded description (we use the same space under item)
+  if (expandedDescKey === key) closeDescMenu();
+
+  // Show loading state
+  tmdbAutoPick = { created: c, key, secKey, idx, query: title, candidates: [], loading: true };
+  scheduleRender();
+
+  try {
+    const genresMap = await loadTmdbGenres();
+    const { names, year } = parseTitleForSearch(title);
+
+    const gather = async (name, y) => {
+      const out = [];
+      const movies = await searchTmdbMany(name, y, "movie", 8);
+      for (const r of movies) {
+        const y2 = r.release_date ? r.release_date.slice(0, 4) : null;
+        out.push({
+          id: r.id,
+          mediaType: "movie",
+          genre_ids: r.genre_ids,
+          genreNames: (Array.isArray(r.genre_ids) && genresMap)
+            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
+            : [],
+          overview: r.overview || null,
+          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
+          titleRu: r.title || "",
+          titleOrig: r.original_title || "",
+          titleEn: null,
+          year: y2,
+          origin_country: r.origin_country || [],
+          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
+          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null,
+          countryCode: null
+        });
+      }
+      const tvs = await searchTmdbMany(name, y, "tv", 8);
+      for (const r of tvs) {
+        const y2 = r.first_air_date ? r.first_air_date.slice(0, 4) : null;
+        out.push({
+          id: r.id,
+          mediaType: "tv",
+          genre_ids: r.genre_ids,
+          genreNames: (Array.isArray(r.genre_ids) && genresMap)
+            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
+            : [],
+          overview: r.overview || null,
+          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
+          titleRu: r.name || "",
+          titleOrig: r.original_name || "",
+          titleEn: null,
+          year: y2,
+          origin_country: r.origin_country || [],
+          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
+          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null,
+          countryCode: (Array.isArray(r.origin_country) && r.origin_country.length) ? String(r.origin_country[0]).toLowerCase() : null
+        });
+      }
+      return out;
+    };
+
+    let candidates = [];
+    for (const n of names) candidates.push(...await gather(n, year));
+    if (!candidates.length && year) {
+      for (const n of names) candidates.push(...await gather(n, null));
+    }
+
+    // Dedupe preserving order
+    const uniq = new Map();
+    for (const cand of candidates) {
+      const k = `${cand.mediaType}:${cand.id}`;
+      if (!uniq.has(k)) uniq.set(k, cand);
+    }
+    candidates = [...uniq.values()];
+
+    // Outdated request or state changed
+    if (reqId !== tmdbAutoReqId) return;
+    if (!tmdbAutoPick || tmdbAutoPick.created !== c) return;
+
+    if (!candidates.length) {
+      // Nothing to choose => keep user's text and stop pending
+      removePendingPickCreated(c);
+      tmdbAutoPick = null;
+      scheduleRender();
+      return;
+    }
+
+    tmdbAutoPick = { ...tmdbAutoPick, candidates, loading: false };
+    scheduleRender();
+
+    // Hydrate countries + English titles in background, then re-render
+    (async () => {
+      try {
+        await Promise.all(candidates.map(x => hydrateTmdbCandidateCountry(x)));
+        if (reqId !== tmdbAutoReqId) return;
+        if (!tmdbAutoPick || tmdbAutoPick.created !== c) return;
+        tmdbAutoPick = { ...tmdbAutoPick, candidates: [...candidates], loading: false };
+        scheduleRender();
+      } catch {}
+    })();
+
+  } catch {
+    // On error: keep user's text and stop pending
+    removePendingPickCreated(c);
+    tmdbAutoPick = null;
+    scheduleRender();
+  }
+}
+
+async function applyTmdbCandidateToItemFromAutoPick(created, c) {
+  const createdKey = String(created || "");
+  if (!createdKey || !c || !TMDB_KEY) {
+    if (createdKey) removePendingPickCreated(createdKey);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
+
+  const found = findItemByCreated(createdKey);
+  if (!found) {
+    removePendingPickCreated(createdKey);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
+
+  const { secKey, idx, key } = found;
+  const item = data.sections?.[secKey]?.items?.[idx];
+  if (!item) {
+    removePendingPickCreated(createdKey);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
+
+  // Apply selected candidate to THIS item, overwriting previous data fully (keep viewed tag only)
+  const genresMap = await loadTmdbGenres();
+  if (!genresMap) return;
+
+  // Fetch details: country code + (for TV) seasons/episodes + air dates
+  let countryCode = c.countryCode ? String(c.countryCode).toLowerCase() : null;
+  let tvMeta = { seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null };
+
+  try {
+    const detailsRes = await fetch(`${TMDB_BASE}/${c.mediaType}/${c.id}?api_key=${TMDB_KEY}&language=ru`);
+    const details = await detailsRes.json();
+
+    if (c.mediaType === "tv") {
+      if (Array.isArray(details.origin_country) && details.origin_country.length) countryCode = String(details.origin_country[0]).toLowerCase();
+      else if (Array.isArray(c.origin_country) && c.origin_country.length) countryCode = String(c.origin_country[0]).toLowerCase();
+
+      tvMeta = {
+        seasons: Number.isFinite(Number(details.number_of_seasons)) ? Number(details.number_of_seasons) : null,
+        episodes: Number.isFinite(Number(details.number_of_episodes)) ? Number(details.number_of_episodes) : null,
+        firstAirDate: details.first_air_date || null,
+        lastAirDate: details.last_air_date || null,
+        inProduction: (typeof details.in_production === "boolean") ? details.in_production : null
+      };
+
+    } else {
+      // movie
+      if (Array.isArray(details.production_countries) && details.production_countries.length) {
+        countryCode = String(details.production_countries[0].iso_3166_1).toLowerCase();
+      }
+    }
+  } catch {}
+
+  // Clear ALL previous API fields and tags (keep __viewed__ only)
+  const wasViewed = isViewed(item);
+  item.tags = wasViewed ? [VIEWED_TAG] : [];
+  clearApiDataForItem(item, { keepTags: true });
+
+  // Title: set exactly as in pick list (RU / EN-or-Orig (YYYY))
+  item.text = formatTmdbTitleForItem(c) || (item.text || "");
+
+  // Genres
+  const genreTagsRaw = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
+    .map(id => genresMap.get(id))
+    .filter(Boolean);
+
+  const pool = [...genreTagsRaw];
+  if (countryCode) pool.push(String(countryCode).toLowerCase());
+  const normalizedTags = normalizeAnimeTags(pool);
+
+  // Store tags (fresh)
+  const fresh = normalizedTags.map(normTag).filter(t => t && t !== VIEWED_TAG);
+  item.tags = uniqueTags([...(item.tags || []), ...fresh]);
+
+  // Desc + poster
+  item.desc = c.overview || null;
+  item.poster = c.poster || null;
+
+  // Rating
+  item.rating = (typeof c.voteAverage === "number") ? c.voteAverage : null;
+  item.votes = (typeof c.voteCount === "number") ? c.voteCount : null;
+
+  // Type + year
+  item.tmdbType = c.mediaType || null;
+  item.year = c.year ? String(c.year) : null;
+
+  // TV meta + serial tag
+  if (c.mediaType === "tv") {
+    item.seasons = tvMeta.seasons;
+    item.episodes = tvMeta.episodes;
+    item.firstAirDate = tvMeta.firstAirDate;
+    item.lastAirDate = tvMeta.lastAirDate;
+    item.inProduction = tvMeta.inProduction;
+
+    if (!item.year && tvMeta.firstAirDate) item.year = String(tvMeta.firstAirDate).slice(0, 4);
+
+    const hasSerialTag = (item.tags || []).some(t => normTag(t) === "сериал");
+    if (!hasSerialTag) {
+      const viewedIdx = (item.tags || []).indexOf(VIEWED_TAG);
+      if (viewedIdx >= 0) item.tags.splice(viewedIdx + 1, 0, "сериал");
+      else item.tags = ["сериал", ...(item.tags || [])];
+      item.tags = uniqueTags(item.tags);
+    }
+  }
+
+  data.sections[secKey].modified = new Date().toISOString();
+
+  // Done: this item is no longer "new"
+  removePendingPickCreated(createdKey);
+
+  // Close pick UI
+  if (tmdbAutoPick && tmdbAutoPick.created === createdKey) tmdbAutoPick = null;
+
+  await saveData();
+
+  // Keep selection on this item
+  selectedKey = key;
+  localStorage.setItem("selected_key", selectedKey);
+
+  render();
 }
 
 async function searchTmdb(query, year, type) {
@@ -2321,6 +2619,8 @@ function adjustEditHeight() {
 function startEdit() {
   isEditing = true; selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); setFilterLock(true);
   document.body.classList.add("editing");
+  // Ensure bottom "+" button is hidden in edit mode even if it had inline display:flex.
+  updateSectionButton();
   adjustEditHeight();
   updateTmdbModeBtn();
   if (window.visualViewport) {
@@ -2777,6 +3077,38 @@ function render() {
       viewedBtn = `<button class="viewed-action not-viewed" data-action="toggle-viewed"><svg class="icon" viewBox="0 0 16 16"><use href="${ICONS}#i-eye"></use></svg></button>`;
     }
 
+    // Inline TMDB auto-pick block (for newly added items)
+    // Show only for the currently selected item to avoid clutter.
+    let autoPickBlock = "";
+    if (tmdbAutoPick && tmdbAutoPick.key === key && selectedKey === key) {
+      if (tmdbAutoPick.loading) {
+        autoPickBlock = `
+          <div class="tmdb-pick">
+            <div class="tmdb-pick-title">TMDB: поиск...</div>
+          </div>`;
+      } else {
+        const candidates = Array.isArray(tmdbAutoPick.candidates) ? tmdbAutoPick.candidates : [];
+        autoPickBlock = `
+          <div class="tmdb-pick">
+            <div class="tmdb-pick-title">TMDB: выбрать (${candidates.length})</div>
+            <div class="tmdb-pick-list">
+              <button class="tmdb-pick-item" type="button" data-action="tmdb-keep">
+                <div class="tmdb-pick-label">Оставить как введено</div>
+              </button>
+              ${candidates.map((c, i) => {
+                const label = formatTmdbCandidateLabel(c);
+                const chips = tmdbCandidateChipsHtml(c);
+                return `
+                  <button class="tmdb-pick-item" type="button" data-action="tmdb-auto" data-pick="${i}">
+                    <div class="tmdb-pick-label">${esc(label)}</div>
+                    ${chips ? `<div class="tmdb-pick-tags">${chips}</div>` : ""}
+                  </button>`;
+              }).join("")}
+            </div>
+          </div>`;
+      }
+    }
+
     // Inline description block (expanded)
     let descBlock = "";
     if (isExpanded && hasDesc) {
@@ -2842,6 +3174,7 @@ function render() {
             ${viewedBtn}
           </div>
         </div>
+        ${autoPickBlock}
         ${descBlock}
       </div>`;
   }).join("");
@@ -2968,6 +3301,25 @@ $("viewMode").addEventListener("click", e => {
 
     if (a === "toggle-viewed") { toggleItemViewed(sec, idx); return; }
 
+    if (a === "tmdb-auto") {
+      const pickIdx = Number(act.dataset.pick);
+      if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
+      const cand = tmdbAutoPick.candidates?.[pickIdx];
+      if (!cand) return;
+      applyTmdbCandidateToItemFromAutoPick(tmdbAutoPick.created, cand);
+      return;
+    }
+
+    if (a === "tmdb-keep") {
+      if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
+      const created = String(tmdbAutoPick.created || "");
+      if (created) removePendingPickCreated(created);
+      tmdbAutoPick = null;
+      saveData();
+      render();
+      return;
+    }
+
     if (a === "desc") {
       if (selectedKey !== key) {
         selectedKey = key;
@@ -3033,6 +3385,19 @@ $("viewMode").addEventListener("click", e => {
     // Keep selection, just disarm delete if it was armed
     disarmItemDelete();
   }
+
+  // If this item is still pending TMDB pick, ensure pick list is (re)shown for it.
+  // This allows returning to the choice later, and also works after renaming.
+  try {
+    const sec = line.dataset.sec, idx = +line.dataset.idx;
+    const it = data.sections?.[sec]?.items?.[idx];
+    const created = String(it?.created || "");
+    const title = String(it?.text || "").trim();
+    if (created && title && TMDB_KEY && isPendingPickCreated(created)) {
+      const needsReload = !tmdbAutoPick || tmdbAutoPick.created !== created || String(tmdbAutoPick.query || "") !== title;
+      if (needsReload) startTmdbAutoPick(created);
+    }
+  } catch {}
 
   const clickedAction = !!e.target.closest('[data-action]');
   const clickedButton = !!e.target.closest('button');
@@ -3446,10 +3811,12 @@ function addNewItem() {
   selectedKey = key;
   localStorage.setItem("selected_key", selectedKey);
 
-  // Mark this item as pending one-shot TMDB load after first commit
+  // Mark this item as pending TMDB pick (choice list will be shown after first commit)
   // Use stable identifier (created) to avoid index shifts.
-  localStorage.setItem("pending_tmdb_created", String(newItem.created));
-  // Cleanup legacy key if it exists
+  addPendingPickCreated(newItem.created);
+
+  // Cleanup legacy keys (older builds)
+  localStorage.removeItem("pending_tmdb_created");
   localStorage.removeItem("pending_tmdb_for");
 
   // Render immediately so the new DOM node exists
