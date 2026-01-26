@@ -3189,7 +3189,9 @@ $("viewMode").addEventListener("pointerdown", e => {
         const sec = line.dataset.sec;
         const idx = Number(line.dataset.idx);
         if (sec && Number.isInteger(idx)) {
-          openMoveMenu(sec, idx, line);
+          // Anchor move menu to the top row so it won't be pushed down by expanded desc/TMDB pick
+          const row = line.querySelector(".item-row") || line;
+          openMoveMenu(sec, idx, row);
         }
       }
       cancelLongPress();
@@ -3614,6 +3616,14 @@ function moveItemToSection(fromSec, idx, toSec) {
 
   const item = fromArr[idx];
   const itemCopy = JSON.parse(JSON.stringify(item));
+  const created = String(item?.created || "");
+
+  // If TMDB pick panel is open for this item — close it like description does.
+  // Also resolve "new" state: moving to another section is a deliberate action.
+  if (created) {
+    if (tmdbAutoPick && tmdbAutoPick.created === created) tmdbAutoPick = null;
+    removePendingPickCreated(created);
+  }
 
   // Remove from source
   fromArr.splice(idx, 1);
