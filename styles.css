@@ -975,12 +975,6 @@ dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
   background:rgba(216,178,106,.08);
 }
 
-/* Make the "no load" option visually larger */
-.tmdb-pick-item.tmdb-no-load{
-  padding-top:16px;
-  padding-bottom:16px;
-}
-
 /* New pick item layout: label + chips */
 .tmdb-pick-label{
   font-size:13px;

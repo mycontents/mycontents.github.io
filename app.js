@@ -3099,7 +3099,8 @@ function render() {
             <div class="tmdb-pick-title">TMDB: выбрать (${candidates.length})</div>
             <div class="tmdb-pick-list">
               <button class="tmdb-pick-item tmdb-no-load" type="button" data-action="tmdb-keep">
-                <div class="tmdb-pick-label">Не загружать данные</div>
+                <div class="tmdb-pick-label">${esc(x.text)}</div>
+                <div style="margin-top:4px;font-size:10px;line-height:1.2;color:var(--muted);">не загружать данные</div>
               </button>
               ${candidates.map((c, i) => {
                 const label = formatTmdbCandidateLabel(c);
