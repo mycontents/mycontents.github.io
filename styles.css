@@ -974,10 +974,21 @@ body.editing .scroll-slack{ display:none; }
   border-color:rgba(216,178,106,.6);
   background:rgba(216,178,106,.08);
 }
-.tmdb-pick-meta{
-  font-size:11px;
-  color:var(--muted2);
-  margin-top:2px;
+
+/* New pick item layout: label + chips */
+.tmdb-pick-label{
+  font-size:13px;
+  line-height:1.25;
+  color:var(--text);
+}
+.tmdb-pick-tags{
+  margin-top:6px;
+}
+/* Ensure chips inside pick look exactly like in item list */
+.tmdb-pick-tags .item-tags{
+  display:inline-flex;
+  flex-wrap:wrap;
+  gap:6px;
 }
 
 .tag-menu-list{

@@ -760,12 +760,35 @@ function hideTmdbPick() {
   el.innerHTML = "";
 }
 
+function tmdbAltTitleForDisplay(c) {
+  const ru = String(c?.titleRu || "").trim();
+  const en = String(c?.titleEn || "").trim();
+  const orig = String(c?.titleOrig || "").trim();
+
+  const ruL = ru.toLowerCase();
+  const enL = en.toLowerCase();
+  const origL = orig.toLowerCase();
+
+  // Prefer English title (if present and differs from RU), otherwise fallback to original title.
+  if (en && enL !== ruL) return en;
+  if (orig && origL !== ruL) return orig;
+  return "";
+}
+
+// This is the exact title format we apply to the item on manual TMDB load.
+function formatTmdbTitleForItem(c) {
+  const ru = String(c?.titleRu || "").trim();
+  const alt = tmdbAltTitleForDisplay(c);
+  const y = c?.year ? String(c.year).trim() : "";
+
+  let out = ru || alt || "";
+  if (ru && alt) out = `${ru} / ${alt}`;
+  if (y) out = `${out} (${y})`;
+  return out.trim();
+}
+
 function formatTmdbCandidateLabel(c) {
-  const ru = (c.titleRu || "").trim();
-  const orig = (c.titleOrig || "").trim();
-  const y = c.year ? ` (${c.year})` : "";
-  if (!orig || orig.toLowerCase() === ru.toLowerCase()) return `${ru}${y}`;
-  return `${ru} / ${orig}${y}`;
+  return formatTmdbTitleForItem(c);
 }
 
 function tmdbCandidateMetaText(c) {
@@ -782,17 +805,6 @@ function tmdbCandidateMetaText(c) {
   if (Number.isFinite(r) && r > 0) {
     const votes = formatVotes(c.voteCount);
     parts.push(votes ? `${r.toFixed(1)} (${votes})` : r.toFixed(1));
-  }
-
-  // English title (if available and differs)
-  const ru = String(c.titleRu || "").trim();
-  const orig = String(c.titleOrig || "").trim();
-  const en = String(c.titleEn || "").trim();
-  if (en) {
-    const e = en.toLowerCase();
-    const r2 = ru.toLowerCase();
-    const o2 = orig.toLowerCase();
-    if (e !== r2 && e !== o2) parts.push(`EN: ${en}`);
   }
 
   return parts.join(" · ");
@@ -836,6 +848,40 @@ async function hydrateTmdbCandidateCountry(c) {
   return c;
 }
 
+function tmdbCandidateChipsHtml(c) {
+  if (!c) return "";
+
+  const chips = [];
+
+  // TV marker (same style as in items)
+  if (c.mediaType === "tv") {
+    chips.push(`<span class="tag-chip serial">сериал</span>`);
+  }
+
+  // Year
+  if (c.year) {
+    chips.push(`<span class="tag-chip">${esc(String(c.year))}</span>`);
+  }
+
+  // Country
+  if (c.countryCode) {
+    chips.push(`<span class="tag-chip country">${esc(countryDisplayName(String(c.countryCode)))}</span>`);
+  }
+
+  // Rating
+  const r = Number(c.voteAverage);
+  if (Number.isFinite(r) && r > 0) {
+    const votesMeta = formatVotes(c.voteCount);
+    const rColor = ratingColor(r);
+    chips.push(
+      `<span class="tag-chip rating" style="--rating-color:${esc(rColor)}"><span class="rating-val">${esc(r.toFixed(1))}</span>${votesMeta ? `<span class="rating-votes"> (${esc(votesMeta)})</span>` : ""}</span>`
+    );
+  }
+
+  if (!chips.length) return "";
+  return `<span class="item-tags">${chips.join("")}</span>`;
+}
+
 function showTmdbPick(candidates) {
   const wrap = $("tmdbPick");
   if (!wrap) return;
@@ -847,11 +893,11 @@ function showTmdbPick(candidates) {
   const list = $("tmdbPickList");
   list.innerHTML = candidates.map((c, i) => {
     const label = formatTmdbCandidateLabel(c);
-    const meta = tmdbCandidateMetaText(c);
+    const chips = tmdbCandidateChipsHtml(c);
     return `
       <button class="tmdb-pick-item" type="button" data-pick="${i}">
-        ${esc(label)}
-        <div class="tmdb-pick-meta">${esc(meta)}</div>
+        <div class="tmdb-pick-label">${esc(label)}</div>
+        ${chips ? `<div class="tmdb-pick-tags">${chips}</div>` : ""}
       </button>`;
   }).join("");
 
