@@ -880,29 +880,43 @@ function tmdbCandidateChipsHtml(c) {
 
   const chips = [];
 
-  // TV marker (same style as in items)
+  // Keep ordering identical to the main item list:
+  // сериал → жанры (A-Я) → страны → рейтинг
+
+  // Country code (stored lowercase)
+  const cc = c.countryCode ? String(c.countryCode).toLowerCase() : "";
+
+  // (1) TV marker first
   if (c.mediaType === "tv") {
     chips.push(`<span class="tag-chip serial">сериал</span>`);
   }
 
-  // Genres (RU names from genre list)
-  // Show them like in item list (as normal chips). Do NOT show country/year as generic chips.
-  const genreNames = Array.isArray(c.genreNames) ? c.genreNames : [];
-  for (const g of genreNames) {
+  // (2) Genre tags: normalize (incl. anime rules) and sort like in the item list
+  const rawGenreNames = Array.isArray(c.genreNames) ? c.genreNames.map(x => String(x)) : [];
+  const pool = [];
+  for (const g of rawGenreNames) {
     const t = normTag(g);
-    if (!t) continue;
-    // Avoid duplicating "сериал" marker
-    if (t === "сериал") continue;
-    // Avoid showing anime source tags as-is; TMDB normalization happens on apply.
-    chips.push(`<span class="tag-chip">${esc(String(g))}</span>`);
+    if (!t || t === "сериал") continue;
+    pool.push(t);
+  }
+  if (cc) pool.push(cc);
+
+  const normalized = normalizeAnimeTags(pool);
+
+  const genreTags = normalized
+    .filter(t => t && t !== "сериал" && !isCountryTag(t))
+    .sort((a, b) => a.localeCompare(b, "ru"));
+
+  for (const t of genreTags) {
+    chips.push(`<span class="tag-chip">${esc(t)}</span>`);
   }
 
-  // Country
-  if (c.countryCode) {
-    chips.push(`<span class="tag-chip country">${esc(countryDisplayName(String(c.countryCode)))}</span>`);
+  // (3) Country last (before rating)
+  if (cc) {
+    chips.push(`<span class="tag-chip country">${esc(countryDisplayName(cc))}</span>`);
   }
 
-  // Rating
+  // (4) Rating at the end
   const r = Number(c.voteAverage);
   if (Number.isFinite(r) && r > 0) {
     const votesMeta = formatVotes(c.voteCount);
