@@ -1163,39 +1163,10 @@ async function applyTmdbCandidateToItemFromAutoPick(created, c) {
     return;
   }
 
-  // Apply selected candidate to THIS item, overwriting previous data fully (keep viewed tag only)
-  const genresMap = await loadTmdbGenres();
-  if (!genresMap) return;
+  // ===== Apply FAST (immediate UX) =====
+  // Close pick UI immediately and apply everything we already have from search response.
+  // Then hydrate missing details in background (genres/country + TV meta) and save again.
 
-  // Fetch details: country code + (for TV) seasons/episodes + air dates
-  let countryCode = c.countryCode ? String(c.countryCode).toLowerCase() : null;
-  let tvMeta = { seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null };
-
-  try {
-    const detailsRes = await fetch(`${TMDB_BASE}/${c.mediaType}/${c.id}?api_key=${TMDB_KEY}&language=ru`);
-    const details = await detailsRes.json();
-
-    if (c.mediaType === "tv") {
-      if (Array.isArray(details.origin_country) && details.origin_country.length) countryCode = String(details.origin_country[0]).toLowerCase();
-      else if (Array.isArray(c.origin_country) && c.origin_country.length) countryCode = String(c.origin_country[0]).toLowerCase();
-
-      tvMeta = {
-        seasons: Number.isFinite(Number(details.number_of_seasons)) ? Number(details.number_of_seasons) : null,
-        episodes: Number.isFinite(Number(details.number_of_episodes)) ? Number(details.number_of_episodes) : null,
-        firstAirDate: details.first_air_date || null,
-        lastAirDate: details.last_air_date || null,
-        inProduction: (typeof details.in_production === "boolean") ? details.in_production : null
-      };
-
-    } else {
-      // movie
-      if (Array.isArray(details.production_countries) && details.production_countries.length) {
-        countryCode = String(details.production_countries[0].iso_3166_1).toLowerCase();
-      }
-    }
-  } catch {}
-
-  // Clear ALL previous API fields and tags (keep __viewed__ only)
   const wasViewed = isViewed(item);
   item.tags = wasViewed ? [VIEWED_TAG] : [];
   clearApiDataForItem(item, { keepTags: true });
@@ -1203,41 +1174,31 @@ async function applyTmdbCandidateToItemFromAutoPick(created, c) {
   // Title: set exactly as in pick list (RU / EN-or-Orig (YYYY))
   item.text = formatTmdbTitleForItem(c) || (item.text || "");
 
-  // Genres
-  const genreTagsRaw = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
-    .map(id => genresMap.get(id))
-    .filter(Boolean);
-
-  const pool = [...genreTagsRaw];
-  if (countryCode) pool.push(String(countryCode).toLowerCase());
-  const normalizedTags = normalizeAnimeTags(pool);
-
-  // Store tags (fresh)
-  const fresh = normalizedTags.map(normTag).filter(t => t && t !== VIEWED_TAG);
-  item.tags = uniqueTags([...(item.tags || []), ...fresh]);
-
-  // Desc + poster
+  // Desc + poster (available from search)
   item.desc = c.overview || null;
   item.poster = c.poster || null;
 
-  // Rating
+  // Rating (available from search)
   item.rating = (typeof c.voteAverage === "number") ? c.voteAverage : null;
   item.votes = (typeof c.voteCount === "number") ? c.voteCount : null;
 
-  // Type + year
+  // Type + year (available from search)
   item.tmdbType = c.mediaType || null;
   item.year = c.year ? String(c.year) : null;
 
-  // TV meta + serial tag
+  // Tags from search payload if present (no awaits)
+  // (We still re-hydrate & normalize in background for correctness)
+  try {
+    const pool = [];
+    if (Array.isArray(c.genreNames) && c.genreNames.length) pool.push(...c.genreNames.map(normTag));
+    if (c.countryCode) pool.push(String(c.countryCode).toLowerCase());
+    const normalized = normalizeAnimeTags(pool);
+    const fresh = normalized.map(normTag).filter(t => t && t !== VIEWED_TAG);
+    if (fresh.length) item.tags = uniqueTags([...(item.tags || []), ...fresh]);
+  } catch {}
+
+  // TV marker tag (based on mediaType)
   if (c.mediaType === "tv") {
-    item.seasons = tvMeta.seasons;
-    item.episodes = tvMeta.episodes;
-    item.firstAirDate = tvMeta.firstAirDate;
-    item.lastAirDate = tvMeta.lastAirDate;
-    item.inProduction = tvMeta.inProduction;
-
-    if (!item.year && tvMeta.firstAirDate) item.year = String(tvMeta.firstAirDate).slice(0, 4);
-
     const hasSerialTag = (item.tags || []).some(t => normTag(t) === "сериал");
     if (!hasSerialTag) {
       const viewedIdx = (item.tags || []).indexOf(VIEWED_TAG);
@@ -1252,16 +1213,78 @@ async function applyTmdbCandidateToItemFromAutoPick(created, c) {
   // Done: this item is no longer "new"
   removePendingPickCreated(createdKey);
 
-  // Close pick UI
+  // Close pick UI NOW
   if (tmdbAutoPick && tmdbAutoPick.created === createdKey) tmdbAutoPick = null;
 
-  await saveData();
-
-  // Keep selection on this item
+  // Immediate UI update + save with current data
   selectedKey = key;
   localStorage.setItem("selected_key", selectedKey);
-
   render();
+  saveData();
+
+  // ===== Hydrate in background (details) =====
+  (async () => {
+    try {
+      // Fetch RU details: country + TV meta
+      let countryCode = c.countryCode ? String(c.countryCode).toLowerCase() : null;
+      let tvMeta = { seasons: null, episodes: null, firstAirDate: null, lastAirDate: null, inProduction: null };
+
+      const detailsRes = await fetch(`${TMDB_BASE}/${c.mediaType}/${c.id}?api_key=${TMDB_KEY}&language=ru`);
+      const details = await detailsRes.json();
+
+      if (c.mediaType === "tv") {
+        if (Array.isArray(details.origin_country) && details.origin_country.length) countryCode = String(details.origin_country[0]).toLowerCase();
+        else if (Array.isArray(c.origin_country) && c.origin_country.length) countryCode = String(c.origin_country[0]).toLowerCase();
+
+        tvMeta = {
+          seasons: Number.isFinite(Number(details.number_of_seasons)) ? Number(details.number_of_seasons) : null,
+          episodes: Number.isFinite(Number(details.number_of_episodes)) ? Number(details.number_of_episodes) : null,
+          firstAirDate: details.first_air_date || null,
+          lastAirDate: details.last_air_date || null,
+          inProduction: (typeof details.in_production === "boolean") ? details.in_production : null
+        };
+
+        item.seasons = tvMeta.seasons;
+        item.episodes = tvMeta.episodes;
+        item.firstAirDate = tvMeta.firstAirDate;
+        item.lastAirDate = tvMeta.lastAirDate;
+        item.inProduction = tvMeta.inProduction;
+
+        if (!item.year && tvMeta.firstAirDate) item.year = String(tvMeta.firstAirDate).slice(0, 4);
+      } else {
+        if (Array.isArray(details.production_countries) && details.production_countries.length) {
+          countryCode = String(details.production_countries[0].iso_3166_1).toLowerCase();
+        }
+      }
+
+      // Rebuild tags from ids + country (authoritative)
+      const genresMap2 = await loadTmdbGenres();
+      const genreTagsRaw2 = (Array.isArray(c.genre_ids) ? c.genre_ids : [])
+        .map(id => genresMap2?.get(id))
+        .filter(Boolean);
+
+      const pool2 = [...genreTagsRaw2];
+      if (countryCode) pool2.push(countryCode);
+
+      const normalized2 = normalizeAnimeTags(pool2);
+      const fresh2 = normalized2.map(normTag).filter(t => t && t !== VIEWED_TAG);
+
+      // Keep viewed + serial tag positions stable-ish
+      const wasViewed2 = isViewed(item);
+      const hasSerial = (item.tags || []).some(t => normTag(t) === "сериал");
+      const prefix = [];
+      if (wasViewed2) prefix.push(VIEWED_TAG);
+      if (hasSerial) prefix.push("сериал");
+
+      item.tags = uniqueTags([ ...prefix, ...fresh2 ]);
+
+      data.sections[secKey].modified = new Date().toISOString();
+      await saveData();
+      scheduleRender();
+    } catch {
+      // ignore
+    }
+  })();
 }
 
 async function searchTmdb(query, year, type) {
@@ -1523,121 +1546,24 @@ async function fetchTmdbTags() {
   if (!item || !tagEditorCtx) return;
   if (!TMDB_KEY) { alert("TMDB API Key не задан. Добавьте его в настройках подключения."); return; }
 
-  // If pick list is already shown for this item — second press applies auto-choice (first candidate)
-  if (tmdbPickState && tmdbPickState.secKey === tagEditorCtx.secKey && tmdbPickState.idx === tagEditorCtx.idx) {
-    const first = tmdbPickState.candidates?.[0];
-    if (first) {
-      await applyTmdbCandidateToCurrentItem(first);
-      const btn = $("tmdbBtn");
-      btn?.classList.add("success");
-      setTimeout(() => btn?.classList.remove("success"), 1200);
-      return;
-    }
-  }
+  // Requirement: remove pick-preview inside tag editor.
+  // Instead, close tag editor and open the same "TMDB выбрать" flow under the item in the main list.
+  const { secKey, idx } = tagEditorCtx;
+  const created = String(item?.created || "");
 
-  const btn = $("tmdbBtn");
-  btn.classList.add("loading");
-  btn.classList.remove("success", "error");
+  closeTagEditor();
 
-  try {
-    const { names, year } = parseTitleForSearch(item.text);
+  if (!created) return;
 
-    // Build candidates: try each name with year, then without year
-    const gather = async (name, y) => {
-      const out = [];
-      const genresMap = await loadTmdbGenres();
+  // Mark pending so it behaves as "new" until user chooses or "не загружать данные"
+  addPendingPickCreated(created);
 
-      const movies = await searchTmdbMany(name, y, "movie", 6);
-      for (const r of movies) {
-        const y2 = r.release_date ? r.release_date.slice(0, 4) : null;
-        out.push({
-          id: r.id,
-          mediaType: "movie",
-          genre_ids: r.genre_ids,
-          genreNames: (Array.isArray(r.genre_ids) && genresMap)
-            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
-            : [],
-          overview: r.overview || null,
-          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
-          titleRu: r.title || "",
-          titleOrig: r.original_title || "",
-          year: y2,
-          origin_country: r.origin_country || [],
-          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
-          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null
-        });
-      }
-      const tvs = await searchTmdbMany(name, y, "tv", 6);
-      for (const r of tvs) {
-        const y2 = r.first_air_date ? r.first_air_date.slice(0, 4) : null;
-        out.push({
-          id: r.id,
-          mediaType: "tv",
-          genre_ids: r.genre_ids,
-          genreNames: (Array.isArray(r.genre_ids) && genresMap)
-            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
-            : [],
-          overview: r.overview || null,
-          poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
-          titleRu: r.name || "",
-          titleOrig: r.original_name || "",
-          year: y2,
-          origin_country: r.origin_country || [],
-          voteAverage: (typeof r.vote_average === "number") ? r.vote_average : null,
-          voteCount: (typeof r.vote_count === "number") ? r.vote_count : null
-        });
-      }
-      return out;
-    };
+  // Ensure the item is selected in the main list
+  selectedKey = `${secKey}|${idx}`;
+  localStorage.setItem("selected_key", selectedKey);
 
-    let candidates = [];
-    for (const n of names) candidates.push(...await gather(n, year));
-    if (!candidates.length && year) {
-      for (const n of names) candidates.push(...await gather(n, null));
-    }
-
-    // Deduplicate by mediaType+id
-    const uniq = new Map();
-    for (const c of candidates) uniq.set(`${c.mediaType}:${c.id}`, c);
-    candidates = [...uniq.values()];
-
-    // If none
-    if (!candidates.length) {
-      hideTmdbPick();
-      btn.classList.add("error");
-      return;
-    }
-
-    // If single match — apply immediately
-    if (candidates.length === 1) {
-      hideTmdbPick();
-      await applyTmdbCandidateToCurrentItem(candidates[0]);
-      btn.classList.add("success");
-      return;
-    }
-
-    // Multiple matches — show pick list
-    tmdbPickState = { candidates, secKey: tagEditorCtx.secKey, idx: tagEditorCtx.idx };
-    showTmdbPick(candidates);
-    btn.classList.add("success");
-
-    // Hydrate extra meta (country) in background, then update list
-    (async () => {
-      try {
-        await Promise.all(candidates.map(c => hydrateTmdbCandidateCountry(c)));
-        // Still the same item? then re-render
-        if (tmdbPickState && tmdbPickState.secKey === tagEditorCtx.secKey && tmdbPickState.idx === tagEditorCtx.idx) {
-          showTmdbPick(candidates);
-        }
-      } catch {}
-    })();
-
-  } catch {
-    btn.classList.add("error");
-  } finally {
-    btn.classList.remove("loading");
-    setTimeout(() => btn.classList.remove("success", "error"), 2000);
-  }
+  // Start (or restart) the pick flow
+  startTmdbAutoPick(created);
 }
 
 // Нормализует название: приводит год к виду (YYYY) и при необходимости добавляет / Original Title
@@ -3100,7 +3026,9 @@ function render() {
             <div class="tmdb-pick-list">
               <button class="tmdb-pick-item tmdb-no-load" type="button" data-action="tmdb-keep">
                 <div class="tmdb-pick-label">${esc(x.text)}</div>
-                <div style="margin-top:4px;font-size:10px;line-height:1.2;color:var(--muted);">не загружать данные</div>
+                <div style="margin-top:6px;">
+                  <span class="tag-chip" style="border-color:transparent;background:transparent;">не загружать данные</span>
+                </div>
               </button>
               ${candidates.map((c, i) => {
                 const label = formatTmdbCandidateLabel(c);
@@ -3313,7 +3241,14 @@ $("viewMode").addEventListener("click", e => {
       if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
       const cand = tmdbAutoPick.candidates?.[pickIdx];
       if (!cand) return;
-      applyTmdbCandidateToItemFromAutoPick(tmdbAutoPick.created, cand);
+
+      // Close pick UI immediately (fast UX)
+      const created = String(tmdbAutoPick.created || "");
+      tmdbAutoPick = null;
+
+      // Apply immediately (without waiting for extra TMDB details);
+      // any missing meta (country/TV numbers) is hydrated in background.
+      applyTmdbCandidateToItemFromAutoPick(created, cand);
       return;
     }
 
@@ -3322,8 +3257,8 @@ $("viewMode").addEventListener("click", e => {
       const created = String(tmdbAutoPick.created || "");
       if (created) removePendingPickCreated(created);
       tmdbAutoPick = null;
-      saveData();
       render();
+      saveData();
       return;
     }
 
@@ -3449,7 +3384,17 @@ $("viewMode").addEventListener("click", e => {
         return;
       }
 
-      // Double tap elsewhere toggles description (if any)
+      // Double tap elsewhere:
+      // - if TMDB pick is currently open for this item, close it
+      // - else toggle description (if any)
+      const created = String(item?.created || "");
+      const isPickOpen = !!(tmdbAutoPick && tmdbAutoPick.key === key && created && isPendingPickCreated(created));
+      if (isPickOpen) {
+        tmdbAutoPick = null;
+        render();
+        return;
+      }
+
       if (item?.desc) {
         closeTagEditor();
         toggleDescExpand(sec, idx);
@@ -3852,5 +3797,18 @@ function escQ(s) { return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
 // Expose
 Object.assign(window, { toggleSectionMenu, cycleViewedFilter, clearFilter, toggleSort, setSortKey, toggleEdit, cancelEdit, saveEdit, toggleSettingsPanel, saveSettings, copyShareLink, selectSection, showNewSectionInput, handleNewSection, handleSectionDelete, toggleTagFilterMenu, clearTagFilter, closeTagEditor, handleTagAdd, addTagFromInput, clearTagsForCurrentItem, toggleMobileSearch, fetchTmdbTags, cycleTmdbMode, beginSectionRename, confirmMoveToNewSection, closeMoveMenu, addNewItem });
+
+// Ensure "+" click runs in a real user gesture (iOS keyboard reliability)
+try {
+  const btn = $("addItemBtn");
+  if (btn && !btn.__wired) {
+    btn.__wired = true;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      addNewItem();
+    });
+  }
+} catch {}
 
 init();
