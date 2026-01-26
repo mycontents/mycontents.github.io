@@ -2957,7 +2957,14 @@ function render() {
 
   const view = $("viewMode"), items = buildItems();
   updateTagFilterBtnUI();
-  if (!items.length) { view.innerHTML = ""; updateCounter(0); return; }
+  if (!items.length) {
+    // If the list became empty (filters/section), just hide the pick UI.
+    // IMPORTANT: do NOT resolve the item (do not remove pending) — same behavior as description.
+    tmdbAutoPick = null;
+    view.innerHTML = "";
+    updateCounter(0);
+    return;
+  }
 
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
@@ -3225,6 +3232,7 @@ $("viewMode").addEventListener("click", e => {
   if (!line) return;
 
   const key = line.dataset.key;
+  const prevSelectedKey = selectedKey;
   const wasSelected = selectedKey === key;
 
   const act = e.target.closest("[data-action]");
@@ -3317,6 +3325,8 @@ $("viewMode").addEventListener("click", e => {
 
   // Selection: clicking the already selected item does NOT clear selection.
   if (!wasSelected) {
+    // IMPORTANT: switching selection should NOT resolve pending TMDB pick.
+    // The pick UI will be hidden automatically because the previous item loses `.selected`.
     selectedKey = key;
     localStorage.setItem("selected_key", selectedKey);
     disarmItemDelete();
@@ -3337,7 +3347,14 @@ $("viewMode").addEventListener("click", e => {
     const title = String(it?.text || "").trim();
     if (created && title && TMDB_KEY && isPendingPickCreated(created)) {
       const needsReload = !tmdbAutoPick || tmdbAutoPick.created !== created || String(tmdbAutoPick.query || "") !== title;
-      if (needsReload) startTmdbAutoPick(created);
+      if (needsReload) {
+        startTmdbAutoPick(created);
+      } else {
+        // Ensure the UI is present if we already have candidates cached in memory.
+        // (e.g. previous render removed the block while item was not selected)
+        const hasPickEl = !!line.querySelector(".tmdb-pick");
+        if (!hasPickEl) scheduleRender();
+      }
     }
   } catch {}
 
@@ -3390,6 +3407,8 @@ $("viewMode").addEventListener("click", e => {
       const created = String(item?.created || "");
       const isPickOpen = !!(tmdbAutoPick && tmdbAutoPick.key === key && created && isPendingPickCreated(created));
       if (isPickOpen) {
+        // Closing the pick panel resolves the item: it is no longer treated as "new".
+        if (created) removePendingPickCreated(created);
         tmdbAutoPick = null;
         render();
         return;
