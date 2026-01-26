@@ -633,8 +633,35 @@ function normalizeAnimeTags(tags) {
   return uniqueTags(arr);
 }
 
-function isCountryTag(tag) { return COUNTRY_CODES_SET.has(normTag(tag)); }
-function countryDisplayName(code) { return COUNTRY_CODES[code.toUpperCase()] || code.toUpperCase(); }
+let regionDisplayNames = null;
+function isCountryTag(tag) {
+  const t = normTag(tag);
+  if (COUNTRY_CODES_SET.has(t)) return true;
+  // Fallback: TMDB country tags are ISO 3166-1 alpha-2 codes stored in lowercase.
+  return /^[a-z]{2}$/.test(t);
+}
+function countryDisplayName(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return "";
+
+  // Normalize common alias
+  let iso = raw.toUpperCase();
+  if (iso === "UK") iso = "GB";
+
+  // Prefer our manual map
+  if (COUNTRY_CODES[iso]) return COUNTRY_CODES[iso];
+
+  // Fallback to Intl (gives localized names in most modern browsers)
+  try {
+    if (!regionDisplayNames && typeof Intl !== "undefined" && Intl.DisplayNames) {
+      regionDisplayNames = new Intl.DisplayNames(["ru"], { type: "region" });
+    }
+    const name = regionDisplayNames?.of(iso);
+    if (name && name !== iso) return name;
+  } catch {}
+
+  return iso;
+}
 function setViewed(item, v) {
   item.tags = uniqueTags(item.tags);
   const has = item.tags.includes(VIEWED_TAG);
@@ -858,9 +885,16 @@ function tmdbCandidateChipsHtml(c) {
     chips.push(`<span class="tag-chip serial">сериал</span>`);
   }
 
-  // Year
-  if (c.year) {
-    chips.push(`<span class="tag-chip">${esc(String(c.year))}</span>`);
+  // Genres (RU names from genre list)
+  // Show them like in item list (as normal chips). Do NOT show country/year as generic chips.
+  const genreNames = Array.isArray(c.genreNames) ? c.genreNames : [];
+  for (const g of genreNames) {
+    const t = normTag(g);
+    if (!t) continue;
+    // Avoid duplicating "сериал" marker
+    if (t === "сериал") continue;
+    // Avoid showing anime source tags as-is; TMDB normalization happens on apply.
+    chips.push(`<span class="tag-chip">${esc(String(g))}</span>`);
   }
 
   // Country
@@ -1193,6 +1227,8 @@ async function fetchTmdbTags() {
     // Build candidates: try each name with year, then without year
     const gather = async (name, y) => {
       const out = [];
+      const genresMap = await loadTmdbGenres();
+
       const movies = await searchTmdbMany(name, y, "movie", 6);
       for (const r of movies) {
         const y2 = r.release_date ? r.release_date.slice(0, 4) : null;
@@ -1200,6 +1236,9 @@ async function fetchTmdbTags() {
           id: r.id,
           mediaType: "movie",
           genre_ids: r.genre_ids,
+          genreNames: (Array.isArray(r.genre_ids) && genresMap)
+            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
+            : [],
           overview: r.overview || null,
           poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
           titleRu: r.title || "",
@@ -1217,6 +1256,9 @@ async function fetchTmdbTags() {
           id: r.id,
           mediaType: "tv",
           genre_ids: r.genre_ids,
+          genreNames: (Array.isArray(r.genre_ids) && genresMap)
+            ? r.genre_ids.map(id => genresMap.get(id)).filter(Boolean)
+            : [],
           overview: r.overview || null,
           poster: r.poster_path ? TMDB_IMG + r.poster_path : null,
           titleRu: r.name || "",
