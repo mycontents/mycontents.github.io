@@ -33,6 +33,17 @@ let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 let tmdbGenres = null;
 let tmdbPickState = null; // { candidates: [], secKey, idx }
 
+// If we generate missing stable ids during normalizeDataModel(), we should persist them.
+let modelSaveQueued = false;
+function queueModelSave() {
+  if (modelSaveQueued) return;
+  modelSaveQueued = true;
+  setTimeout(() => {
+    modelSaveQueued = false;
+    try { saveData(); } catch {}
+  }, 0);
+}
+
 // Auto TMDB choice for newly added items (via "+")
 const PENDING_TMDB_PICK_CREATED_KEY = "pending_tmdb_pick_created";
 let tmdbAutoPick = null; // { pickKey, key, secKey, idx, query, candidates: [], loading: bool }
@@ -659,6 +670,7 @@ function normalizeDataModel() {
   // Migrate legacy pending keys (stored as `created`) to stable item ids.
   const pending = loadPendingPickCreatedSet();
   let pendingChanged = false;
+  let idsGenerated = false;
 
   for (const key of Object.keys(data.sections)) {
     let sec = data.sections[key];
@@ -667,7 +679,7 @@ function normalizeDataModel() {
     if (!sec.modified) sec.modified = new Date().toISOString();
     sec.items = sec.items.map(it => {
       if (it && typeof it === "object" && typeof it.text === "string") {
-        if (!it.id) it.id = genItemId();
+        if (!it.id) { it.id = genItemId(); idsGenerated = true; }
         it.tags = uniqueTags(it.tags);
         if (!it.created) it.created = sec.modified;
 
@@ -682,6 +694,7 @@ function normalizeDataModel() {
 
         return it;
       }
+      idsGenerated = true;
       const obj = { id: genItemId(), text: String(it ?? ""), tags: [], created: sec.modified };
       return obj;
     });
@@ -689,6 +702,8 @@ function normalizeDataModel() {
   }
 
   if (pendingChanged) savePendingPickCreatedSet(pending);
+  // Persist newly generated ids so they stay stable across reloads/devices.
+  if (idsGenerated && TOKEN && GIST_ID) queueModelSave();
 }
 
 function uniqueTags(tags) {
@@ -1067,6 +1082,9 @@ async function startTmdbAutoPick(pickKey) {
   const k = String(pickKey || "");
   if (!k) return;
   if (!TMDB_KEY) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
+
+  // Ensure it is actually pending; if not, don't open UI
+  if (!isPendingPickCreated(k)) { tmdbAutoPick = null; scheduleRender(); return; }
 
   const found = findItemByPickKey(k);
   if (!found) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
@@ -3023,14 +3041,24 @@ function render() {
   const keySet = new Set(items.map(x => `${x.secKey}|${x.idx}`));
   if (selectedKey && !keySet.has(selectedKey)) { selectedKey = null; disarmItemDelete(); closeTagEditor(); }
 
-  // Validate TMDB pick key by DATA (not by current visibility), like description.
-  // Keep it even if temporarily hidden by filters/section.
-  if (tmdbAutoPick?.key) {
-    const p = parseItemKey(tmdbAutoPick.key);
-    const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
+  // Validate TMDB pick by DATA (not by current visibility), like description.
+  // IMPORTANT: use stable item.id (pickKey), NOT `created` and NOT sec|idx.
+  // This prevents the pick panel from attaching to a wrong item after deletes/moves/sorts.
+  if (tmdbAutoPick?.pickKey) {
+    const pickKey = String(tmdbAutoPick.pickKey || "");
+    const found = findItemByPickKey(pickKey);
+    const it = found ? data.sections?.[found.secKey]?.items?.[found.idx] : null;
+
     // If item no longer exists OR it is no longer pending => close pick.
-    if (!it || !isPendingPickCreated(String(it?.created || ""))) {
+    if (!it || !isPendingPickCreated(pickKey)) {
       tmdbAutoPick = null;
+    } else {
+      // If the item is currently being edited inline, do not re-render/move the pick panel.
+      // This avoids a nasty UX where DOM changes can steal focus.
+      // If the item moved (sec/idx changed), update the rendered key so the panel stays with the same item.
+      if (tmdbAutoPick.key !== found.key) {
+        tmdbAutoPick = { ...tmdbAutoPick, key: found.key, secKey: found.secKey, idx: found.idx };
+      }
     }
   }
 
@@ -3413,13 +3441,14 @@ $("viewMode").addEventListener("click", e => {
   try {
     const sec = line.dataset.sec, idx = +line.dataset.idx;
     const it = data.sections?.[sec]?.items?.[idx];
-    const created = String(it?.created || "");
+    const pickKey = ensureItemHasId(it) || "";
     const title = String(it?.text || "").trim();
-    if (created && title && TMDB_KEY && isPendingPickCreated(created)) {
-      const needsReload = !tmdbAutoPick || tmdbAutoPick.created !== created || String(tmdbAutoPick.query || "") !== title;
-      if (needsReload) {
-        startTmdbAutoPick(created);
-      }
+
+    // If this item is still pending TMDB pick, ensure pick list is (re)shown for it.
+    // IMPORTANT: use stable item.id (pickKey), NOT `created`.
+    if (pickKey && title && TMDB_KEY && isPendingPickCreated(pickKey)) {
+      const needsReload = !tmdbAutoPick || String(tmdbAutoPick.pickKey || "") !== pickKey || String(tmdbAutoPick.query || "") !== title;
+      if (needsReload) startTmdbAutoPick(pickKey);
     }
   } catch {}
 
@@ -3469,11 +3498,11 @@ $("viewMode").addEventListener("click", e => {
       // Double tap elsewhere:
       // - if TMDB pick is currently open for this item, close it
       // - else toggle description (if any)
-      const created = String(item?.created || "");
-      const isPickOpen = !!(tmdbAutoPick && tmdbAutoPick.key === key && created && isPendingPickCreated(created));
+      const pickKey = ensureItemHasId(item) || "";
+      const isPickOpen = !!(tmdbAutoPick && tmdbAutoPick.key === key && pickKey && isPendingPickCreated(pickKey));
       if (isPickOpen) {
         // Closing the pick panel resolves the item: it is no longer treated as "new".
-        if (created) removePendingPickCreated(created);
+        if (pickKey) removePendingPickCreated(pickKey);
         tmdbAutoPick = null;
         render();
         return;
@@ -3671,13 +3700,13 @@ function moveItemToSection(fromSec, idx, toSec) {
 
   const item = fromArr[idx];
   const itemCopy = JSON.parse(JSON.stringify(item));
-  const created = String(item?.created || "");
+  const pickKey = ensureItemHasId(item) || "";
 
   // If TMDB pick panel is open for this item — close it like description does.
   // Also resolve "new" state: moving to another section is a deliberate action.
-  if (created) {
-    if (tmdbAutoPick && tmdbAutoPick.created === created) tmdbAutoPick = null;
-    removePendingPickCreated(created);
+  if (pickKey) {
+    if (tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === pickKey) tmdbAutoPick = null;
+    removePendingPickCreated(pickKey);
   }
 
   // Remove from source
