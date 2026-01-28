@@ -35,10 +35,11 @@ let tmdbPickState = null; // { candidates: [], secKey, idx }
 
 // Auto TMDB choice for newly added items (via "+")
 const PENDING_TMDB_PICK_CREATED_KEY = "pending_tmdb_pick_created";
-let tmdbAutoPick = null; // { created, key, secKey, idx, query, candidates: [], loading: bool }
+let tmdbAutoPick = null; // { pickKey, key, secKey, idx, query, candidates: [], loading: bool }
 let tmdbAutoReqId = 0;
 
 // Pending auto-pick set helpers (support multiple "new" items at once)
+// NOTE: despite the historical key name, we store stable item identifiers (item.id).
 function loadPendingPickCreatedSet() {
   const raw = localStorage.getItem(PENDING_TMDB_PICK_CREATED_KEY);
   if (!raw) return new Set();
@@ -56,22 +57,29 @@ function savePendingPickCreatedSet(set) {
   if (!arr.length) localStorage.removeItem(PENDING_TMDB_PICK_CREATED_KEY);
   else localStorage.setItem(PENDING_TMDB_PICK_CREATED_KEY, JSON.stringify(arr));
 }
-function addPendingPickCreated(created) {
+function addPendingPickCreated(pickKey) {
   const set = loadPendingPickCreatedSet();
-  set.add(String(created));
+  set.add(String(pickKey));
   savePendingPickCreatedSet(set);
 }
-function removePendingPickCreated(created) {
+function removePendingPickCreated(pickKey) {
   const set = loadPendingPickCreatedSet();
-  set.delete(String(created));
+  set.delete(String(pickKey));
   savePendingPickCreatedSet(set);
 }
-function isPendingPickCreated(created) {
+function isPendingPickCreated(pickKey) {
   const set = loadPendingPickCreatedSet();
-  return set.has(String(created));
+  return set.has(String(pickKey));
+}
+
+function ensureItemHasId(item) {
+  if (!item || typeof item !== "object") return null;
+  if (!item.id) item.id = genItemId();
+  return String(item.id);
 }
 
 function findItemByCreated(created) {
+  // Legacy helper (older builds used `created` as a pseudo-identifier)
   const c = String(created || "");
   if (!c) return null;
   for (const secKey of Object.keys(data.sections || {})) {
@@ -83,6 +91,34 @@ function findItemByCreated(created) {
     }
   }
   return null;
+}
+
+function genItemId() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function findItemById(id) {
+  const s = String(id || "");
+  if (!s) return null;
+  for (const secKey of Object.keys(data.sections || {})) {
+    const items = data.sections?.[secKey]?.items || [];
+    for (let idx = 0; idx < items.length; idx++) {
+      if (String(items[idx]?.id || "") === s) {
+        return { secKey, idx, key: `${secKey}|${idx}` };
+      }
+    }
+  }
+  return null;
+}
+
+function findItemByPickKey(pickKey) {
+  // New builds use stable item.id, but we keep a fallback for legacy stored values.
+  const k = String(pickKey || "");
+  if (!k) return null;
+  return findItemById(k) || findItemByCreated(k);
 }
 
 // Inline rename in view mode
@@ -314,7 +350,7 @@ function cancelInlineEdit() {
 
 function commitInlineEdit() {
   if (!inlineEdit.active) return;
-  const { secKey, idx, el, orig, key } = inlineEdit;
+  const { secKey, idx, el, orig } = inlineEdit;
   const item = data.sections?.[secKey]?.items?.[idx];
   const next = sanitizeInlineText(el?.textContent);
 
@@ -332,20 +368,20 @@ function commitInlineEdit() {
   item.text = finalText;
   data.sections[secKey].modified = new Date().toISOString();
 
+  // Stable per-item key for TMDB pick logic
+  const pickKey = ensureItemHasId(item) || String(item?.created || "");
+
   // TMDB choice after rename:
   // - for brand-new items ("+") AND for renamed existing items, we show the pick list.
   // - we NEVER auto-apply; user either picks a candidate or chooses "Не загружать данные".
-  const created = String(item?.created || "");
-  if (created && TMDB_KEY) {
-    // Mark as pending (so user can return later and it still behaves as "new" until resolved)
-    if (!isPendingPickCreated(created)) addPendingPickCreated(created);
-
+  if (pickKey && TMDB_KEY) {
+    if (!isPendingPickCreated(pickKey)) addPendingPickCreated(pickKey);
     // Save text first, then search + show choices
     saveData();
-    startTmdbAutoPick(created);
+    startTmdbAutoPick(pickKey);
   } else {
     // No TMDB key: just save and make sure pending is cleared.
-    if (created) removePendingPickCreated(created);
+    if (pickKey) removePendingPickCreated(pickKey);
     saveData();
   }
 
@@ -619,6 +655,11 @@ function beginSectionRename() {
 // ===== Data model =====
 function normalizeDataModel() {
   if (!data?.sections) data = { sections: {} };
+
+  // Migrate legacy pending keys (stored as `created`) to stable item ids.
+  const pending = loadPendingPickCreatedSet();
+  let pendingChanged = false;
+
   for (const key of Object.keys(data.sections)) {
     let sec = data.sections[key];
     if (!sec || typeof sec !== "object") sec = { items: [], modified: new Date().toISOString() };
@@ -626,14 +667,28 @@ function normalizeDataModel() {
     if (!sec.modified) sec.modified = new Date().toISOString();
     sec.items = sec.items.map(it => {
       if (it && typeof it === "object" && typeof it.text === "string") {
+        if (!it.id) it.id = genItemId();
         it.tags = uniqueTags(it.tags);
         if (!it.created) it.created = sec.modified;
+
+        // Migrate pending marker: if pending contains this legacy `created`, replace with stable `id`.
+        const createdKey = String(it.created || "");
+        const idKey = String(it.id || "");
+        if (createdKey && idKey && pending.has(createdKey) && !pending.has(idKey)) {
+          pending.delete(createdKey);
+          pending.add(idKey);
+          pendingChanged = true;
+        }
+
         return it;
       }
-      return { text: String(it ?? ""), tags: [], created: sec.modified };
+      const obj = { id: genItemId(), text: String(it ?? ""), tags: [], created: sec.modified };
+      return obj;
     });
     data.sections[key] = sec;
   }
+
+  if (pendingChanged) savePendingPickCreatedSet(pending);
 }
 
 function uniqueTags(tags) {
@@ -1008,13 +1063,13 @@ function showTmdbPick(candidates) {
 
 // ===== TMDB auto-pick for newly created items (via "+") =====
 // Per requirements: ALWAYS show choice list (even if only 1 match). Never auto-apply.
-async function startTmdbAutoPick(created) {
-  const c = String(created || "");
-  if (!c) return;
-  if (!TMDB_KEY) { removePendingPickCreated(c); tmdbAutoPick = null; scheduleRender(); return; }
+async function startTmdbAutoPick(pickKey) {
+  const k = String(pickKey || "");
+  if (!k) return;
+  if (!TMDB_KEY) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
 
-  const found = findItemByCreated(c);
-  if (!found) { removePendingPickCreated(c); tmdbAutoPick = null; scheduleRender(); return; }
+  const found = findItemByPickKey(k);
+  if (!found) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
 
   const { secKey, idx, key } = found;
   const item = data.sections?.[secKey]?.items?.[idx];
@@ -1033,7 +1088,7 @@ async function startTmdbAutoPick(created) {
   if (expandedDescKey === key) closeDescMenu();
 
   // Show loading state
-  tmdbAutoPick = { created: c, key, secKey, idx, query: title, candidates: [], loading: true };
+  tmdbAutoPick = { pickKey: k, key, secKey, idx, query: title, candidates: [], loading: true };
   scheduleRender();
 
   try {
@@ -1105,11 +1160,11 @@ async function startTmdbAutoPick(created) {
 
     // Outdated request or state changed
     if (reqId !== tmdbAutoReqId) return;
-    if (!tmdbAutoPick || tmdbAutoPick.created !== c) return;
+    if (!tmdbAutoPick || tmdbAutoPick.pickKey !== k) return;
 
     if (!candidates.length) {
       // Nothing to choose => keep user's text and stop pending
-      removePendingPickCreated(c);
+      removePendingPickCreated(k);
       tmdbAutoPick = null;
       scheduleRender();
       return;
@@ -1123,7 +1178,7 @@ async function startTmdbAutoPick(created) {
       try {
         await Promise.all(candidates.map(x => hydrateTmdbCandidateCountry(x)));
         if (reqId !== tmdbAutoReqId) return;
-        if (!tmdbAutoPick || tmdbAutoPick.created !== c) return;
+        if (!tmdbAutoPick || tmdbAutoPick.pickKey !== k) return;
         tmdbAutoPick = { ...tmdbAutoPick, candidates: [...candidates], loading: false };
         scheduleRender();
       } catch {}
@@ -1131,24 +1186,24 @@ async function startTmdbAutoPick(created) {
 
   } catch {
     // On error: keep user's text and stop pending
-    removePendingPickCreated(c);
+    removePendingPickCreated(k);
     tmdbAutoPick = null;
     scheduleRender();
   }
 }
 
-async function applyTmdbCandidateToItemFromAutoPick(created, c) {
-  const createdKey = String(created || "");
-  if (!createdKey || !c || !TMDB_KEY) {
-    if (createdKey) removePendingPickCreated(createdKey);
+async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
+  const k = String(pickKey || "");
+  if (!k || !c || !TMDB_KEY) {
+    if (k) removePendingPickCreated(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
   }
 
-  const found = findItemByCreated(createdKey);
+  const found = findItemByPickKey(k);
   if (!found) {
-    removePendingPickCreated(createdKey);
+    removePendingPickCreated(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1157,7 +1212,7 @@ async function applyTmdbCandidateToItemFromAutoPick(created, c) {
   const { secKey, idx, key } = found;
   const item = data.sections?.[secKey]?.items?.[idx];
   if (!item) {
-    removePendingPickCreated(createdKey);
+    removePendingPickCreated(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1211,10 +1266,10 @@ async function applyTmdbCandidateToItemFromAutoPick(created, c) {
   data.sections[secKey].modified = new Date().toISOString();
 
   // Done: this item is no longer "new"
-  removePendingPickCreated(createdKey);
+  removePendingPickCreated(k);
 
   // Close pick UI NOW
-  if (tmdbAutoPick && tmdbAutoPick.created === createdKey) tmdbAutoPick = null;
+  if (tmdbAutoPick && tmdbAutoPick.pickKey === k) tmdbAutoPick = null;
 
   // Immediate UI update + save with current data
   selectedKey = key;
@@ -1549,21 +1604,21 @@ async function fetchTmdbTags() {
   // Requirement: remove pick-preview inside tag editor.
   // Instead, close tag editor and open the same "TMDB выбрать" flow under the item in the main list.
   const { secKey, idx } = tagEditorCtx;
-  const created = String(item?.created || "");
+  const pickKey = ensureItemHasId(item) || "";
 
   closeTagEditor();
 
-  if (!created) return;
+  if (!pickKey) return;
 
   // Mark pending so it behaves as "new" until user chooses or "не загружать данные"
-  addPendingPickCreated(created);
+  addPendingPickCreated(pickKey);
 
   // Ensure the item is selected in the main list
   selectedKey = `${secKey}|${idx}`;
   localStorage.setItem("selected_key", selectedKey);
 
   // Start (or restart) the pick flow
-  startTmdbAutoPick(created);
+  startTmdbAutoPick(pickKey);
 }
 
 // Нормализует название: приводит год к виду (YYYY) и при необходимости добавляет / Original Title
@@ -3264,19 +3319,19 @@ $("viewMode").addEventListener("click", e => {
       if (!cand) return;
 
       // Close pick UI immediately (fast UX)
-      const created = String(tmdbAutoPick.created || "");
+      const pickKey = String(tmdbAutoPick.pickKey || "");
       tmdbAutoPick = null;
 
       // Apply immediately (without waiting for extra TMDB details);
       // any missing meta (country/TV numbers) is hydrated in background.
-      applyTmdbCandidateToItemFromAutoPick(created, cand);
+      applyTmdbCandidateToItemFromAutoPick(pickKey, cand);
       return;
     }
 
     if (a === "tmdb-keep") {
       if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
-      const created = String(tmdbAutoPick.created || "");
-      if (created) removePendingPickCreated(created);
+      const pickKey = String(tmdbAutoPick.pickKey || "");
+      if (pickKey) removePendingPickCreated(pickKey);
       tmdbAutoPick = null;
       render();
       saveData();
@@ -3761,7 +3816,7 @@ function addNewItem() {
   normalizeDataModel();
 
   const sec = data.sections[currentSection];
-  const newItem = { text: "", tags: [], created: new Date().toISOString() };
+  const newItem = { id: genItemId(), text: "", tags: [], created: new Date().toISOString() };
   const idx = sec.items.length;
   sec.items.push(newItem);
   sec.modified = new Date().toISOString();
@@ -3801,8 +3856,8 @@ function addNewItem() {
   localStorage.setItem("selected_key", selectedKey);
 
   // Mark this item as pending TMDB pick (choice list will be shown after first commit)
-  // Use stable identifier (created) to avoid index shifts.
-  addPendingPickCreated(newItem.created);
+  // Use stable identifier (item.id) to avoid any index/sort/filter issues.
+  addPendingPickCreated(String(newItem.id));
 
   // Cleanup legacy keys (older builds)
   localStorage.removeItem("pending_tmdb_created");
