@@ -2567,12 +2567,17 @@ function disarmItemDelete() {
 function deleteItemNow(secKey, idx) {
   const arr = data.sections[secKey]?.items;
   if (!arr?.[idx]) return;
-  const item = JSON.parse(JSON.stringify(arr[idx]));
+
+  // Ensure stable id for undo/restore
+  const itRef = arr[idx];
+  const itemId = ensureItemHasId(itRef) || "";
+
+  const item = JSON.parse(JSON.stringify(itRef));
   arr.splice(idx, 1);
   data.sections[secKey].modified = new Date().toISOString();
   disarmItemDelete(); closeTagEditor(); closeDescMenu(); selectedKey = null;
   saveData(); render();
-  startUndo({ type: "item", secKey, idx, item }, "Запись удалена");
+  startUndo({ type: "item", itemId, secKey, idx, item }, "Запись удалена");
 }
 
 // ===== Edit =====
