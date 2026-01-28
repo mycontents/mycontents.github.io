@@ -46,6 +46,7 @@ function queueModelSave() {
 
 // Auto TMDB choice for newly added items (via "+")
 const PENDING_TMDB_PICK_CREATED_KEY = "pending_tmdb_pick_created";
+const TMDB_OPEN_PICK_KEY = "tmdb_open_pick_key"; // which item's TMDB pick panel is currently open
 let tmdbAutoPick = null; // { pickKey, key, secKey, idx, query, candidates: [], loading: bool }
 let tmdbAutoReqId = 0;
 
@@ -84,6 +85,20 @@ function removePendingPickCreated(pickKey) {
 function isPendingPickCreated(pickKey) {
   const set = loadPendingPickCreatedSet();
   return set.has(String(pickKey));
+}
+
+function getOpenTmdbPickKey() {
+  return localStorage.getItem(TMDB_OPEN_PICK_KEY) || "";
+}
+function setOpenTmdbPickKey(pickKey) {
+  const k = String(pickKey || "");
+  if (!k) localStorage.removeItem(TMDB_OPEN_PICK_KEY);
+  else localStorage.setItem(TMDB_OPEN_PICK_KEY, k);
+}
+function clearOpenTmdbPickKeyIfMatches(pickKey) {
+  const k = String(pickKey || "");
+  if (!k) return;
+  if (getOpenTmdbPickKey() === k) localStorage.removeItem(TMDB_OPEN_PICK_KEY);
 }
 
 function ensureItemHasId(item) {
@@ -429,6 +444,31 @@ async function init() {
   renderSectionList();
   updateSectionButton();
   render();
+
+  // Restore open TMDB pick panel after reload (like description).
+  // We store a stable pickKey (item.id) in localStorage.
+  try {
+    const openStored = getOpenTmdbPickKey();
+    if (openStored) {
+      if (!TMDB_KEY) {
+        // Can't restore without TMDB key
+        setOpenTmdbPickKey("");
+      } else {
+        const found = findItemByPickKey(openStored);
+        const it = found ? data.sections?.[found.secKey]?.items?.[found.idx] : null;
+        const realPickKey = it ? (ensureItemHasId(it) || "") : "";
+        if (realPickKey && isPendingPickCreated(realPickKey)) {
+          // Show panel again (never auto-apply)
+          startTmdbAutoPick(realPickKey);
+        } else {
+          // Nothing to restore
+          setOpenTmdbPickKey("");
+        }
+      }
+    }
+  } catch {
+    setOpenTmdbPickKey("");
+  }
 
   // Restore UI state (expanded description, selection, scroll, open menus)
   // IMPORTANT: description is rendered by render(), so we must set/validate keys BEFORE restoring scroll.
@@ -1086,13 +1126,35 @@ function showTmdbPick(candidates) {
 async function startTmdbAutoPick(pickKey) {
   const k = String(pickKey || "");
   if (!k) return;
-  if (!TMDB_KEY) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
+
+  // Remember which item's pick panel is open (so it can be restored after reload)
+  setOpenTmdbPickKey(k);
+
+  if (!TMDB_KEY) {
+    // No TMDB key — cannot show panel
+    removePendingPickCreated(k);
+    clearOpenTmdbPickKeyIfMatches(k);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
 
   // Ensure it is actually pending; if not, don't open UI
-  if (!isPendingPickCreated(k)) { tmdbAutoPick = null; scheduleRender(); return; }
+  if (!isPendingPickCreated(k)) {
+    clearOpenTmdbPickKeyIfMatches(k);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
 
   const found = findItemByPickKey(k);
-  if (!found) { removePendingPickCreated(k); tmdbAutoPick = null; scheduleRender(); return; }
+  if (!found) {
+    removePendingPickCreated(k);
+    clearOpenTmdbPickKeyIfMatches(k);
+    tmdbAutoPick = null;
+    scheduleRender();
+    return;
+  }
 
   const { secKey, idx, key } = found;
   const item = data.sections?.[secKey]?.items?.[idx];
@@ -1100,6 +1162,7 @@ async function startTmdbAutoPick(pickKey) {
 
   if (!title) {
     // Empty title => no search; keep pending but no UI
+    clearOpenTmdbPickKeyIfMatches(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1188,6 +1251,7 @@ async function startTmdbAutoPick(pickKey) {
     if (!candidates.length) {
       // Nothing to choose => keep user's text and stop pending
       removePendingPickCreated(k);
+      clearOpenTmdbPickKeyIfMatches(k);
       tmdbAutoPick = null;
       scheduleRender();
       return;
@@ -1210,6 +1274,7 @@ async function startTmdbAutoPick(pickKey) {
   } catch {
     // On error: keep user's text and stop pending
     removePendingPickCreated(k);
+    clearOpenTmdbPickKeyIfMatches(k);
     tmdbAutoPick = null;
     scheduleRender();
   }
@@ -1219,6 +1284,7 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
   const k = String(pickKey || "");
   if (!k || !c || !TMDB_KEY) {
     if (k) removePendingPickCreated(k);
+    if (k) clearOpenTmdbPickKeyIfMatches(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1227,6 +1293,7 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
   const found = findItemByPickKey(k);
   if (!found) {
     removePendingPickCreated(k);
+    clearOpenTmdbPickKeyIfMatches(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1236,6 +1303,7 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
   const item = data.sections?.[secKey]?.items?.[idx];
   if (!item) {
     removePendingPickCreated(k);
+    clearOpenTmdbPickKeyIfMatches(k);
     tmdbAutoPick = null;
     scheduleRender();
     return;
@@ -1290,6 +1358,7 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
 
   // Done: this item is no longer "new"
   removePendingPickCreated(k);
+  clearOpenTmdbPickKeyIfMatches(k);
 
   // Close pick UI NOW
   if (tmdbAutoPick && tmdbAutoPick.pickKey === k) tmdbAutoPick = null;
@@ -2127,6 +2196,7 @@ function removeTagWithUndo(tag) {
 
   // Per requirement: removing tags from tag editor should also clear API-loaded fields
   const oldItem = JSON.parse(JSON.stringify(item));
+  const itemId = ensureItemHasId(item) || String(oldItem?.id || "");
 
   item.tags = uniqueTags(item.tags.filter(x => normTag(x) !== t));
   clearApiDataForItem(item, { keepTags: true });
@@ -2139,7 +2209,7 @@ function removeTagWithUndo(tag) {
   if (expandedDescKey === key) closeDescMenu();
 
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
-  startUndo({ type: "itemRestore", secKey, idx, oldItem }, `Тег удалён: ${t}`);
+  startUndo({ type: "itemRestore", itemId, secKey, idx, oldItem }, `Тег удалён: ${t}`);
 }
 
 function clearTagsForCurrentItem() {
@@ -2148,6 +2218,7 @@ function clearTagsForCurrentItem() {
 
   // Per requirement: clearing tags should also clear API-loaded fields
   const oldItem = JSON.parse(JSON.stringify(item));
+  const itemId = ensureItemHasId(item) || String(oldItem?.id || "");
 
   const wasViewed = isViewed(item);
   item.tags = wasViewed ? [VIEWED_TAG] : [];
@@ -2160,11 +2231,20 @@ function clearTagsForCurrentItem() {
   if (expandedDescKey === key) closeDescMenu();
 
   saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
-  startUndo({ type: "itemRestore", secKey, idx, oldItem }, "Теги очищены");
+  startUndo({ type: "itemRestore", itemId, secKey, idx, oldItem }, "Теги очищены");
 }
 
 // ===== Description inline expand =====
 function toggleDescExpand(secKey, idx) {
+  // Description and TMDB pick share the same "expanded" UX area.
+  // If user toggles description (open OR close), we close the TMDB pick panel (and resolve it).
+  if (tmdbAutoPick?.pickKey) {
+    const pk = String(tmdbAutoPick.pickKey || "");
+    if (pk) removePendingPickCreated(pk);
+    if (pk) clearOpenTmdbPickKeyIfMatches(pk);
+    tmdbAutoPick = null;
+  }
+
   const key = `${secKey}|${idx}`;
   expandedDescKey = (expandedDescKey === key) ? null : key;
   if (expandedDescKey) localStorage.setItem("expanded_desc_key", expandedDescKey);
@@ -2180,20 +2260,22 @@ function closeDescMenu() {
 function clearDescForItem(secKey, idx) {
   const item = data.sections?.[secKey]?.items?.[idx];
   if (!item) return;
-  
+
   const oldDesc = item.desc;
   const oldPoster = item.poster;
   if (!oldDesc && !oldPoster) return;
-  
+
+  const itemId = ensureItemHasId(item) || "";
+
   item.desc = null;
   item.poster = null;
   data.sections[secKey].modified = new Date().toISOString();
-  
+
   expandedDescKey = null;
   saveData();
   render();
-  
-  startUndo({ type: "desc", secKey, idx, oldDesc, oldPoster }, "Описание удалено");
+
+  startUndo({ type: "desc", itemId, secKey, idx, oldDesc, oldPoster }, "Описание удалено");
 }
 
 // ===== Viewed toggle =====
@@ -2465,52 +2547,97 @@ $("undoBtn").onclick = () => {
   } else if (p.type === "item") {
     if (!data.sections[p.secKey]) data.sections[p.secKey] = { items: [], modified: new Date().toISOString() };
     const arr = data.sections[p.secKey].items;
-    arr.splice(Math.min(p.idx, arr.length), 0, p.item);
-    data.sections[p.secKey].modified = new Date().toISOString();
-    saveData(); render();
+
+    // Restore by stable id when possible (prevents duplicates / wrong restores after moves/sorts)
+    const id = String(p.itemId || p.item?.id || "");
+    const exists = id ? findItemById(id) : null;
+
+    if (!exists) {
+      if (id && p.item && typeof p.item === "object" && !p.item.id) p.item.id = id;
+      arr.splice(Math.min(p.idx, arr.length), 0, p.item);
+      data.sections[p.secKey].modified = new Date().toISOString();
+    }
+
+    saveData();
+    render();
   } else if (p.type === "viewed") {
     const item = data.sections?.[p.secKey]?.items?.[p.idx];
     if (item) { setViewed(item, p.was); data.sections[p.secKey].modified = new Date().toISOString(); saveData(); render(); }
   } else if (p.type === "tag" || p.type === "tagClear") {
-    const item = data.sections?.[p.secKey]?.items?.[p.idx];
-    if (item) { item.tags = uniqueTags(p.oldTags); data.sections[p.secKey].modified = new Date().toISOString(); saveData(); render(); renderTagEditorList(); renderTagFilterMenu(); }
-  } else if (p.type === "itemRestore") {
-    const item = data.sections?.[p.secKey]?.items?.[p.idx];
+    // Legacy branch (not used by current UI), but make it stable by id as well.
+    const found = p.itemId ? findItemById(p.itemId) : null;
+    const item = found ? data.sections?.[found.secKey]?.items?.[found.idx] : data.sections?.[p.secKey]?.items?.[p.idx];
     if (item) {
+      const secKey = found ? found.secKey : p.secKey;
+      item.tags = uniqueTags(p.oldTags);
+      data.sections[secKey].modified = new Date().toISOString();
+      saveData();
+      render();
+      renderTagEditorList();
+      renderTagFilterMenu();
+    }
+  } else if (p.type === "itemRestore") {
+    // Restore by stable id (works even if item moved)
+    const found = p.itemId ? findItemById(p.itemId) : null;
+    const item = found ? data.sections?.[found.secKey]?.items?.[found.idx] : data.sections?.[p.secKey]?.items?.[p.idx];
+
+    if (item) {
+      const secKey = found ? found.secKey : p.secKey;
       // Restore the entire item snapshot (including tags and API-loaded fields)
       const wasViewed = isViewed(item);
       Object.assign(item, p.oldItem);
+      // Ensure id stays stable
+      if (p.itemId && !item.id) item.id = p.itemId;
       // Ensure viewed tag stays consistent if it was toggled elsewhere
       if (wasViewed) setViewed(item, true);
-      data.sections[p.secKey].modified = new Date().toISOString();
-      saveData(); render(); renderTagEditorList(); renderTagFilterMenu();
+      data.sections[secKey].modified = new Date().toISOString();
+      saveData();
+      render();
+      renderTagEditorList();
+      renderTagFilterMenu();
     }
   } else if (p.type === "desc") {
-    const item = data.sections?.[p.secKey]?.items?.[p.idx];
-    if (item) { 
-      item.desc = p.oldDesc; 
-      item.poster = p.oldPoster; 
-      data.sections[p.secKey].modified = new Date().toISOString(); 
-      saveData(); render(); 
+    // Restore by stable id (works even if item moved)
+    const found = p.itemId ? findItemById(p.itemId) : null;
+    const item = found ? data.sections?.[found.secKey]?.items?.[found.idx] : data.sections?.[p.secKey]?.items?.[p.idx];
+
+    if (item) {
+      const secKey = found ? found.secKey : p.secKey;
+      item.desc = p.oldDesc;
+      item.poster = p.oldPoster;
+      data.sections[secKey].modified = new Date().toISOString();
+      saveData();
+      render();
     }
   } else if (p.type === "moveItem") {
-    // Undo move: remove from toSec, insert back to fromSec at original position
-    const toArr = data.sections?.[p.toSec]?.items;
-    const fromArr = data.sections?.[p.fromSec]?.items;
-    if (toArr && fromArr) {
-      // Find and remove from target
-      const idxInTarget = toArr.findIndex(it => 
-        it.text === p.item.text && it.created === p.item.created
-      );
-      if (idxInTarget >= 0) {
-        toArr.splice(idxInTarget, 1);
-        data.sections[p.toSec].modified = new Date().toISOString();
+    // Undo move by stable id: remove from wherever it currently is, then insert back.
+    const id = String(p.itemId || p.item?.id || "");
+
+    // If it exists anywhere right now — remove it first.
+    if (id) {
+      const cur = findItemById(id);
+      if (cur) {
+        const curArr = data.sections?.[cur.secKey]?.items;
+        if (curArr?.[cur.idx]) {
+          curArr.splice(cur.idx, 1);
+          data.sections[cur.secKey].modified = new Date().toISOString();
+        }
       }
-      // Insert back at original position
+    }
+
+    // Insert back (only if it doesn't already exist)
+    const exists = id ? findItemById(id) : null;
+    if (!exists) {
+      if (!data.sections[p.fromSec]) data.sections[p.fromSec] = { items: [], modified: new Date().toISOString() };
+      const fromArr = data.sections[p.fromSec].items;
+      if (id && p.item && typeof p.item === "object" && !p.item.id) p.item.id = id;
       fromArr.splice(Math.min(p.fromIdx, fromArr.length), 0, p.item);
       data.sections[p.fromSec].modified = new Date().toISOString();
-      saveData(); renderSectionList(); render();
     }
+
+    saveData();
+    renderSectionList();
+    render();
   }
   if (undoTimer) clearTimeout(undoTimer);
   undoTimer = null; undoPayload = null; hideUndo();
@@ -2573,10 +2700,29 @@ function deleteItemNow(secKey, idx) {
   const itemId = ensureItemHasId(itRef) || "";
 
   const item = JSON.parse(JSON.stringify(itRef));
+
+  // Key BEFORE removal (so we don't accidentally close another item's description)
+  const deletedKey = `${secKey}|${idx}`;
+
   arr.splice(idx, 1);
   data.sections[secKey].modified = new Date().toISOString();
-  disarmItemDelete(); closeTagEditor(); closeDescMenu(); selectedKey = null;
-  saveData(); render();
+
+  // Close TMDB pick only if it belongs to this item
+  if (itemId && tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === String(itemId)) {
+    tmdbAutoPick = null;
+  }
+  if (itemId) {
+    removePendingPickCreated(itemId);
+    clearOpenTmdbPickKeyIfMatches(itemId);
+  }
+
+  disarmItemDelete();
+  closeTagEditor();
+  if (expandedDescKey === deletedKey) closeDescMenu();
+  selectedKey = null;
+
+  saveData();
+  render();
   startUndo({ type: "item", itemId, secKey, idx, item }, "Запись удалена");
 }
 
@@ -3402,6 +3548,7 @@ $("viewMode").addEventListener("click", e => {
 
       const pickKey = String(tmdbAutoPick.pickKey || "");
       if (pickKey) removePendingPickCreated(pickKey);
+      if (pickKey) clearOpenTmdbPickKeyIfMatches(pickKey);
       tmdbAutoPick = null;
       render();
       saveData();
@@ -3414,6 +3561,9 @@ $("viewMode").addEventListener("click", e => {
         localStorage.setItem("selected_key", selectedKey);
         disarmItemDelete();
       }
+
+      // NOTE: do not close TMDB pick here.
+      // toggleDescExpand() handles closing/resolving the pick panel (open OR close), keeping behavior consistent.
       closeTagEditor();
       toggleDescExpand(sec, idx);
       return;
@@ -3445,7 +3595,7 @@ $("viewMode").addEventListener("click", e => {
         localStorage.setItem("selected_key", selectedKey);
         disarmItemDelete();
         closeTagEditor();
-        closeDescMenu();
+        // Do NOT close expanded description/pick of another item just because user armed delete on this one.
         render();
         armItemDelete(key);
         return;
@@ -3545,6 +3695,7 @@ $("viewMode").addEventListener("click", e => {
       if (isPickOpen) {
         // Closing the pick panel resolves the item: it is no longer treated as "new".
         if (pickKey) removePendingPickCreated(pickKey);
+        if (pickKey) clearOpenTmdbPickKeyIfMatches(pickKey);
         tmdbAutoPick = null;
         render();
         return;
@@ -3749,6 +3900,7 @@ function moveItemToSection(fromSec, idx, toSec) {
   if (pickKey) {
     if (tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === pickKey) tmdbAutoPick = null;
     removePendingPickCreated(pickKey);
+    clearOpenTmdbPickKeyIfMatches(pickKey);
   }
 
   // Remove from source
@@ -3783,6 +3935,7 @@ function moveItemToSection(fromSec, idx, toSec) {
   // Undo
   startUndo({
     type: "moveItem",
+    itemId: ensureItemHasId(itemCopy) || String(itemCopy?.id || ""),
     fromSec,
     fromIdx: idx,
     toSec,
