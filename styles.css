@@ -497,11 +497,13 @@ body.editing .scroll-slack{ display:none; }
 }
 
 .item-text{
-  min-width:0;
-  /* Make empty titles tappable (e.g. for paste) */
-  display:inline-block;
-  min-width:50px;
+  /* Expand the editable title hit-area to all free space inside the row
+     (does not overlap action buttons, because actions are in a separate flex column) */
+  flex:1 1 100px;
+  min-width:100px;
   min-height:1em;
+  max-width:100%;
+  display:block;
 
   white-space:pre-wrap;
   word-break:break-word;
