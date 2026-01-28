@@ -3462,8 +3462,11 @@ $("viewMode").addEventListener("pointerdown", e => {
   }
 });
 
-// Prevent browser context menu on long press (mobile Chrome shows "Download/Share/Print")
+// Prevent browser context menu on long press on NON-text areas (mobile Chrome shows "Download/Share/Print").
+// IMPORTANT: do NOT block the native selection/copy/paste menu on text/inputs/contenteditable.
 $("viewMode").addEventListener("contextmenu", e => {
+  const allowNative = !!e.target.closest('[data-role="text"], .item-desc-text, input, textarea, [contenteditable="true"]');
+  if (allowNative) return;
   e.preventDefault();
   return false;
 });
