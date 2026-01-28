@@ -498,6 +498,11 @@ body.editing .scroll-slack{ display:none; }
 
 .item-text{
   min-width:0;
+  /* Make empty titles tappable (e.g. for paste) */
+  display:inline-block;
+  min-width:50px;
+  min-height:1em;
+
   white-space:pre-wrap;
   word-break:break-word;
   cursor:text;
