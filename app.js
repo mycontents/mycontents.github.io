@@ -49,6 +49,9 @@ const PENDING_TMDB_PICK_CREATED_KEY = "pending_tmdb_pick_created";
 let tmdbAutoPick = null; // { pickKey, key, secKey, idx, query, candidates: [], loading: bool }
 let tmdbAutoReqId = 0;
 
+// After a rename/commit, item can move in the sorted list. We scroll to it once.
+let scrollToPickKeyOnce = null;
+
 // Pending auto-pick set helpers (support multiple "new" items at once)
 // NOTE: despite the historical key name, we store stable item identifiers (item.id).
 function loadPendingPickCreatedSet() {
@@ -390,6 +393,8 @@ function commitInlineEdit() {
     // Save text first, then search + show choices
     saveData();
     startTmdbAutoPick(pickKey);
+    // Item may move due to sorting after rename; scroll to it once after render.
+    scrollToPickKeyOnce = pickKey;
   } else {
     // No TMDB key: just save and make sure pending is cleared.
     if (pickKey) removePendingPickCreated(pickKey);
@@ -3113,7 +3118,8 @@ function render() {
     // Behavior must match description: it stays open even if item becomes unselected,
     // and it should not disappear due to filters/section switches (unless item is gone or resolved).
     let autoPickBlock = "";
-    if (tmdbAutoPick && tmdbAutoPick.key === key) {
+    const thisPickKey = ensureItemHasId(x.item) || "";
+    if (tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === thisPickKey) {
       if (tmdbAutoPick.loading) {
         autoPickBlock = `
           <div class="tmdb-pick">
@@ -3230,6 +3236,25 @@ function render() {
       }
     }
   }
+
+  // One-shot scroll to the item after rename/commit if it moved due to sorting.
+  if (scrollToPickKeyOnce) {
+    const targetPickKey = String(scrollToPickKeyOnce);
+    scrollToPickKeyOnce = null;
+    requestAnimationFrame(() => {
+      try {
+        // Find by stable id via dataset sec/idx → resolve item.id from DATA
+        const lines = Array.from(document.querySelectorAll('#viewMode .item-line'));
+        const target = lines.find(node => {
+          const sec = node.dataset.sec;
+          const idx = Number(node.dataset.idx);
+          const it = data.sections?.[sec]?.items?.[idx];
+          return String(it?.id || '') === targetPickKey;
+        });
+        if (target) target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {}
+    });
+  }
 }
 
 function updateCounter(n) {
@@ -3342,7 +3367,11 @@ $("viewMode").addEventListener("click", e => {
 
     if (a === "tmdb-auto") {
       const pickIdx = Number(act.dataset.pick);
-      if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
+      if (!tmdbAutoPick) return;
+      const item = data.sections?.[sec]?.items?.[idx];
+      const thisPickKey = ensureItemHasId(item) || "";
+      if (!thisPickKey || String(tmdbAutoPick.pickKey || "") !== thisPickKey) return;
+
       const cand = tmdbAutoPick.candidates?.[pickIdx];
       if (!cand) return;
 
@@ -3357,7 +3386,11 @@ $("viewMode").addEventListener("click", e => {
     }
 
     if (a === "tmdb-keep") {
-      if (!tmdbAutoPick || tmdbAutoPick.key !== key) return;
+      if (!tmdbAutoPick) return;
+      const item = data.sections?.[sec]?.items?.[idx];
+      const thisPickKey = ensureItemHasId(item) || "";
+      if (!thisPickKey || String(tmdbAutoPick.pickKey || "") !== thisPickKey) return;
+
       const pickKey = String(tmdbAutoPick.pickKey || "");
       if (pickKey) removePendingPickCreated(pickKey);
       tmdbAutoPick = null;
@@ -3499,7 +3532,7 @@ $("viewMode").addEventListener("click", e => {
       // - if TMDB pick is currently open for this item, close it
       // - else toggle description (if any)
       const pickKey = ensureItemHasId(item) || "";
-      const isPickOpen = !!(tmdbAutoPick && tmdbAutoPick.key === key && pickKey && isPendingPickCreated(pickKey));
+      const isPickOpen = !!(tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === pickKey && pickKey && isPendingPickCreated(pickKey));
       if (isPickOpen) {
         // Closing the pick panel resolves the item: it is no longer treated as "new".
         if (pickKey) removePendingPickCreated(pickKey);
