@@ -1297,6 +1297,10 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
   // Immediate UI update + save with current data
   selectedKey = key;
   localStorage.setItem("selected_key", selectedKey);
+
+  // Item may move due to sorting after TMDB apply; scroll to it once after render.
+  scrollToPickKeyOnce = k;
+
   render();
   saveData();
 
