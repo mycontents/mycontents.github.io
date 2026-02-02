@@ -742,7 +742,7 @@ body.editing .scroll-slack{ display:none; }
 
 .dropdown-menu.section-menu{ padding:8px 0; min-width:260px; max-width:min(92vw, 360px); }
 .dropdown-menu.sort-menu{ padding:6px 0; width:170px; min-width:170px; }
-dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
+.dropdown-menu.tag-filter-menu{ padding:10px; width:240px; min-width:240px; }
 .dropdown-menu.tag-editor-menu{ padding:10px; width:280px; min-width:280px; position:absolute; }
 
 .menu-option{
