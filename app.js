@@ -546,7 +546,7 @@ function applyUrlSetup() {
       // For Apple devices: keep URL with ?s= parameter (localStorage is unreliable)
       // For other browsers: shorten URL
       //if (!isAppleDevice()) {
-        history.replaceState({}, "", location.pathname);
+      //  history.replaceState({}, "", location.pathname);
       //}
     }
   } catch {}
