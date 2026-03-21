@@ -3711,6 +3711,63 @@ $("viewMode").addEventListener("click", e => {
   }
 });
 
+// ===== Double-click for desktop inline editing =====
+// On touch devices, double-tap is handled by the click handler via lastItemTap timing.
+// On desktop, browser's native double-click selects a word, causing the click handler
+// to bail out early (selection is not collapsed). This dedicated handler fixes that.
+$("viewMode").addEventListener("dblclick", e => {
+  if (isEditing || savingInProgress) return;
+  if (inlineEdit.active) return; // Already editing (touch double-tap handled it first)
+
+  if (e.target.closest("[data-action]") || e.target.closest("button")) return;
+
+  const line = e.target.closest(".item-line");
+  if (!line) return;
+
+  const key = line.dataset.key;
+  const sec = line.dataset.sec;
+  const idx = +line.dataset.idx;
+  const item = data.sections?.[sec]?.items?.[idx];
+  if (!item) return;
+
+  // Ensure selected
+  if (selectedKey !== key) {
+    selectedKey = key;
+    localStorage.setItem("selected_key", selectedKey);
+    disarmItemDelete();
+    closeTagEditor();
+    document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
+    line.classList.add("selected");
+  }
+
+  const textEl = e.target.closest('[data-role="text"]');
+
+  if (textEl) {
+    // Clear browser's automatic word selection caused by dblclick
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+    const caretOffset = caretOffsetFromEvent(textEl, e);
+    beginInlineEdit(line, (typeof caretOffset === "number") ? { caretOffset } : {});
+    return;
+  }
+
+  // Double-click elsewhere on the item (not on text, not on buttons):
+  // same logic as touch double-tap — toggle TMDB pick or description
+  const pickKey = ensureItemHasId(item) || "";
+  const isPickOpen = !!(tmdbAutoPick && String(tmdbAutoPick.pickKey || "") === pickKey && pickKey && isPendingPickCreated(pickKey));
+  if (isPickOpen) {
+    if (pickKey) removePendingPickCreated(pickKey);
+    if (pickKey) clearOpenTmdbPickKeyIfMatches(pickKey);
+    tmdbAutoPick = null;
+    render();
+    return;
+  }
+
+  if (item?.desc) {
+    closeTagEditor();
+    toggleDescExpand(sec, idx);
+  }
+});
+
 // Persist scroll position (normal mode only)
 window.addEventListener("scroll", () => {
   if (document.body.classList.contains("editing")) return;
@@ -3737,11 +3794,13 @@ document.addEventListener("click", e => {
 
   // Commit section rename if user clicked outside the section name
   if (sectionRename.active) {
-    const nameEl = $("currentSectionName");
-    const insideName = (e.target === nameEl) || e.target.closest('#currentSectionName') === nameEl;
-    if (!insideName) {
-      // Trigger blur -> commit
-      nameEl?.blur();
+    if (!ignoreOutsideCommitOnce) {
+      const nameEl = $("currentSectionName");
+      const insideName = (e.target === nameEl) || e.target.closest('#currentSectionName') === nameEl;
+      if (!insideName) {
+        // Trigger blur -> commit
+        nameEl?.blur();
+      }
     }
   }
 
@@ -4123,6 +4182,23 @@ try {
       e.preventDefault();
       e.stopPropagation();
       addNewItem();
+    });
+  }
+} catch {}
+
+// Desktop double-click to rename section (backup for timing-based detection in toggleSectionMenu)
+try {
+  const sectionBtn = $("sectionBtn");
+  if (sectionBtn) {
+    sectionBtn.addEventListener("dblclick", e => {
+      if (isEditing || savingInProgress) return;
+      if (currentSection === "__all__") return;
+      if (sectionRename.active) return; // Already started by click handler's fast-tap detection
+      e.preventDefault();
+      e.stopPropagation();
+      // Close section menu if it was opened by the first click of the double-click
+      $("sectionMenu")?.classList.add("hidden");
+      beginSectionRename();
     });
   }
 } catch {}
