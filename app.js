@@ -524,16 +524,13 @@ async function init() {
 }
 
 // Detect Apple devices (iOS, iPadOS, macOS Safari)
-function isAppleDevice() {
-  const ua = navigator.userAgent;
-  // iOS/iPadOS
-  if (/iPad|iPhone|iPod/.test(ua)) return true;
-  // iPadOS 13+ reports as Macintosh but has touch
-  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
-  // macOS Safari (Safari UA without Chrome/Chromium)
-  if (/Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua)) return true;
-  return false;
-}
+//function isAppleDevice() {
+//  const ua = navigator.userAgent;
+//  if (/iPad|iPhone|iPod/.test(ua)) return true;
+//  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+//  if (/Macintosh/.test(ua) && /Safari/.test(ua) && !/Chrome|Chromium|Edg/.test(ua)) return true;
+//  return false;
+//}
 
 function applyUrlSetup() {
   const setup = new URLSearchParams(location.search).get("s");
@@ -548,9 +545,9 @@ function applyUrlSetup() {
       if (tmdb) { localStorage.setItem("tmdb_key", tmdb); TMDB_KEY = tmdb; }
       // For Apple devices: keep URL with ?s= parameter (localStorage is unreliable)
       // For other browsers: shorten URL
-      if (!isAppleDevice()) {
+      //if (!isAppleDevice()) {
         history.replaceState({}, "", location.pathname);
-      }
+      //}
     }
   } catch {}
 }
