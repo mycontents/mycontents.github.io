@@ -2385,6 +2385,19 @@ function saveSettings() {
   localStorage.setItem("github_token", t);
   localStorage.setItem("tmdb_key", tmdb);
   GIST_ID = g; TOKEN = t; TMDB_KEY = tmdb;
+
+  // Reinitialize UI state variables for the new account
+  currentSection = getAccountItem("current_section") || "__all__";
+  sortState = parseSortState(getAccountItem("sort_state")) || { key: "manual", dir: "desc" };
+  filterQuery = getAccountItem("filter_query") || "";
+  viewedFilter = getAccountItem("viewed_filter") || "hide";
+  tagFilter = loadTagFilter();
+  tagFilterExcluded = loadTagFilterExcluded();
+  ratingFilter = loadRatingFilter();
+  selectedKey = getAccountItem("selected_key") || null;
+  sortMenuOpen = (getAccountItem("sort_menu_open") || "0") === "1";
+  expandedDescKey = getAccountItem("expanded_desc_key") || null;
+
   tmdbGenres = null;
   $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
   updateShareButton(); updateTmdbBtnVisibility(); init();
