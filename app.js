@@ -2552,6 +2552,11 @@ function sortItems(items) {
     return Number(yA) - Number(yB);
   });
   else if (sortState.key === "date") sorted.sort((a, b) => (Date.parse(a.item?.created) || 0) - (Date.parse(b.item?.created) || 0));
+  else if (sortState.key === "rating") sorted.sort((a, b) => {
+    const rA = itemRating(a.item) ?? -1;
+    const rB = itemRating(b.item) ?? -1;
+    return rA - rB;
+  });
   if (sortState.dir === "desc") sorted.reverse();
   return sorted;
 }
