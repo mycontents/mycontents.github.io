@@ -5,13 +5,20 @@ const UNDO_MS = 10000;
 
 // Apply URL setup FIRST before reading from localStorage
 (function applyUrlSetup() {
+  // Prevent browser auto scroll restoration as early as possible
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+  // Force scroll to top immediately to prevent browser restoration
+  window.scrollTo(0, 0);
+
   const setup = new URLSearchParams(location.search).get("s");
   if (!setup) return;
   try {
     const parts = atob(setup).split(":");
     const [gist, token, tmdb] = parts;
+    // Only save token and tmdb_key to localStorage, NOT gist_id
+    // Each tab will read gist_id from its own URL in getAccountKey()
     if (gist && token) {
-      localStorage.setItem("gist_id", gist);
       localStorage.setItem("github_token", token);
       if (tmdb) localStorage.setItem("tmdb_key", tmdb);
     }
@@ -22,7 +29,21 @@ const UNDO_MS = 10000;
 
 // Helper functions for account-specific localStorage
 function getAccountKey(key) {
-  const gistId = localStorage.getItem("gist_id") || "";
+  // Always read gist_id from URL first, fallback to localStorage
+  let gistId = "";
+  try {
+    const setup = new URLSearchParams(location.search).get("s");
+    if (setup) {
+      const parts = atob(setup).split(":");
+      gistId = parts[0] || "";
+    }
+  } catch {}
+
+  // Fallback to localStorage if no URL param
+  if (!gistId) {
+    gistId = localStorage.getItem("gist_id") || "";
+  }
+
   return gistId ? `${gistId}:${key}` : key;
 }
 function getAccountItem(key) {
@@ -223,9 +244,6 @@ let longPressTimer = null;
 let longPressTarget = null;
 const LONG_PRESS_MS = 1200;
 let suppressNextClick = false;
-
-// Prevent browser auto scroll restoration fighting with our saved scroll
-if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
 // Do not overwrite saved UI state during initial load
 let restoringUI = true;
