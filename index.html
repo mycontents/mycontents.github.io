@@ -5,6 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=resizes-content" />
   <title>Контент</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <script>
+    // Apply theme as early as possible to prevent flash
+    (function() {
+      try {
+        let gistId = "";
+        const setup = new URLSearchParams(location.search).get("s");
+        if (setup) {
+          const parts = atob(setup).split(":");
+          gistId = parts[0] || "";
+        }
+        if (!gistId) gistId = localStorage.getItem("gist_id") || "";
+        const key = gistId ? gistId + ":theme" : "theme";
+        const theme = localStorage.getItem(key) || "dark";
+        // Wait for body to exist
+        if (document.body) {
+          document.body.dataset.theme = theme;
+        } else {
+          document.addEventListener("DOMContentLoaded", function() {
+            document.body.dataset.theme = theme;
+          });
+        }
+      } catch(e) {}
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <link rel="stylesheet" href="styles.css?v=2026-01-28-2" />
   <script src="app.js?v=2026-01-28-7" defer></script>
@@ -88,6 +112,15 @@
       </div>
       <input type="text" class="new-section-input hidden" id="newSectionInput" placeholder="Название..." onkeydown="handleNewSection(event)" />
       <div id="sectionList"></div>
+      <div class="menu-divider"></div>
+      <div class="theme-selector">
+        <div class="theme-label">Тема</div>
+        <div class="theme-buttons">
+          <button class="theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Темная"></button>
+          <button class="theme-btn" data-theme="medium" onclick="setTheme('medium')" title="Средняя"></button>
+          <button class="theme-btn" data-theme="light" onclick="setTheme('light')" title="Светлая"></button>
+        </div>
+      </div>
       <div class="menu-divider"></div>
       <div class="menu-option" onclick="toggleSettingsPanel()">
         <svg class="icon small" viewBox="0 0 16 16"><use href="icons.svg#i-gear"></use></svg>

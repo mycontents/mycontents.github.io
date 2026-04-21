@@ -110,6 +110,14 @@ let tagFilter = loadTagFilter();
 let tagFilterExcluded = loadTagFilterExcluded();
 let ratingFilter = loadRatingFilter(); // number|null : минимальный рейтинг (>=)
 
+// Theme (account-specific)
+// Read from body.dataset.theme which was set by inline script in HTML
+let currentTheme = document.body.dataset.theme || "dark";
+// Ensure it's saved to account-specific storage
+if (!getAccountItem("theme")) {
+  setAccountItem("theme", currentTheme);
+}
+
 let data = { sections: {} };
 let isEditing = false;
 let selectedKey = getAccountItem("selected_key") || null;
@@ -2410,6 +2418,21 @@ function toggleSettingsPanel() {
   }
 }
 
+function setTheme(theme) {
+  currentTheme = theme;
+  setAccountItem("theme", theme);
+  document.body.dataset.theme = theme;
+  updateThemeButtons();
+  render(); // Re-render to update rating colors
+  $("sectionMenu").classList.add("hidden");
+}
+
+function updateThemeButtons() {
+  document.querySelectorAll(".theme-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.theme === currentTheme);
+  });
+}
+
 function saveSettings() {
   const g = $("inputGistId").value.trim(), t = $("inputToken").value.trim();
   const tmdb = $("inputTmdbKey").value.trim();
@@ -2472,6 +2495,7 @@ function toggleSectionMenu() {
     return;
   }
   renderSectionList(); $("newSectionInput").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
+  updateThemeButtons();
   openMenu("sectionMenu", $("sectionBtn"), "left");
 }
 
@@ -2860,11 +2884,48 @@ function ratingColor(r) {
   const v = Number(r);
   if (!Number.isFinite(v)) return null;
 
-  // Map 0..10 to red..green (hue 0..120)
+  // Normalize 0..10 to 0..1
   const t = Math.max(0, Math.min(1, v / 10));
-  const hue = 120 * t;
-  // Slightly bright but not neon
-  return `hsl(${hue} 70% 55%)`;
+
+  // Hue mapping: 0-2.5 pure red, then gradient to green
+  let hue;
+  if (t <= 0.25) {
+    // 0-2.5: pure red (hue 0)
+    hue = 0;
+  } else if (t < 0.45) {
+    // 2.5-4.5: red to orange (hue 0->35)
+    hue = (t - 0.25) * 175;
+  } else if (t < 0.65) {
+    // 4.5-6.5: orange to yellow (hue 35->55)
+    hue = 35 + (t - 0.45) * 100;
+  } else {
+    // 6.5-10: yellow to green (hue 55->110)
+    hue = 55 + (t - 0.65) * 157.14;
+  }
+
+  const theme = document.body.dataset.theme || "dark";
+
+  if (theme === "light") {
+    // Light theme: darker colors for better contrast on light background
+    if (hue === 0) {
+      return `hsl(0 85% 40%)`;  // Dark red
+    } else if (hue < 35) {
+      return `hsl(${hue} 80% 42%)`;  // Dark orange
+    } else if (hue < 55) {
+      return `hsl(${hue} 75% 45%)`;  // Dark yellow
+    } else {
+      return `hsl(${hue} 70% 35%)`;  // Dark green
+    }
+  } else {
+    // Dark theme: bright colors
+    if (hue === 0) {
+      return `hsl(0 100% 50%)`;  // Pure red for ratings 0-2.5
+    } else if (hue < 35) {
+      return `hsl(${hue} 90% 58%)`;
+    } else {
+      return `hsl(${hue} 78% 58%)`;
+    }
+  }
 }
 
 function matchFilters(item) {
