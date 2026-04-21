@@ -4332,8 +4332,8 @@ function addNewItem() {
   if (footer && viewMode) {
     const footerRect = footer.getBoundingClientRect();
     const viewModeRect = viewMode.getBoundingClientRect();
-    // If button is above the list bottom, it's at top
-    addToTop = footerRect.top < viewModeRect.bottom - 10;
+    // If button is above the list container, add to top
+    addToTop = footerRect.top < viewModeRect.top;
   }
 
   const newItem = {
