@@ -2470,9 +2470,13 @@ function updateSectionButton() {
   // Ensure we are showing the start of the text in ellipsis mode
   try { el.scrollLeft = 0; } catch {}
 
-  // Bottom add button is not available in "Все"
+  // Bottom add button visibility
   const footer = $("addItemFooter");
-  if (footer) footer.style.display = (currentSection === "__all__" || isEditing) ? "none" : "flex";
+  if (!footer) return;
+
+  // Show external button only when NOT in manual+desc mode (inline button is used instead)
+  const shouldShow = currentSection !== "__all__" && !isEditing && !(sortState.key === "manual" && sortState.dir === "desc");
+  footer.style.display = shouldShow ? "flex" : "none";
 }
 
 function showNewSectionInput() { const inp = $("newSectionInput"); inp.classList.remove("hidden"); inp.value = ""; inp.focus(); disarmSectionDelete(); }
@@ -2521,9 +2525,13 @@ function toggleSort() {
 }
 
 function setSortKey(key) {
-  if (key === "manual") sortState = { key: "manual", dir: "desc" };
-  else if (sortState.key === key) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
-  else sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
+  if (sortState.key === key) {
+    // Toggle direction for the same key (including manual)
+    sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+  } else {
+    // New key selected - set default direction
+    sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
+  }
   setAccountItem("sort_state", `${sortState.key}:${sortState.dir}`);
   selectedKey = null; removeAccountItem("selected_key");
   disarmItemDelete(); closeTagEditor();
@@ -2532,6 +2540,7 @@ function setSortKey(key) {
   $("sortMenu").classList.add("hidden");
   sortMenuOpen = false; setAccountItem("sort_menu_open", "0");
   render();
+  updateSectionButton(); // Update button position based on sort direction
 }
 
 function updateSortMenuUI() {
@@ -2539,24 +2548,32 @@ function updateSortMenuUI() {
     const k = el.dataset.key, active = k === sortState.key;
     el.classList.toggle("active", active);
     const dir = el.querySelector(".sort-dir");
-    if (dir) dir.textContent = !active || k === "manual" ? "" : sortState.dir === "asc" ? "↑" : "↓";
+    if (dir) dir.textContent = !active ? "" : sortState.dir === "asc" ? "↑" : "↓";
   });
 }
 
 function sortItems(items) {
-  if (sortState.key === "manual") return items;
-  const sorted = [...items], text = x => x.text || "";
-  if (sortState.key === "alpha") sorted.sort((a, b) => text(a).localeCompare(text(b), "ru"));
-  else if (sortState.key === "year") sorted.sort((a, b) => {
-    const yA = (text(a).match(/\((\d{4})\)/) || [, 0])[1], yB = (text(b).match(/\((\d{4})\)/) || [, 0])[1];
-    return Number(yA) - Number(yB);
-  });
-  else if (sortState.key === "date") sorted.sort((a, b) => (Date.parse(a.item?.created) || 0) - (Date.parse(b.item?.created) || 0));
-  else if (sortState.key === "rating") sorted.sort((a, b) => {
-    const rA = itemRating(a.item) ?? -1;
-    const rB = itemRating(b.item) ?? -1;
-    return rA - rB;
-  });
+  const sorted = [...items];
+  const text = x => x.text || "";
+
+  if (sortState.key === "alpha") {
+    sorted.sort((a, b) => text(a).localeCompare(text(b), "ru"));
+  } else if (sortState.key === "year") {
+    sorted.sort((a, b) => {
+      const yA = (text(a).match(/\((\d{4})\)/) || [, 0])[1], yB = (text(b).match(/\((\d{4})\)/) || [, 0])[1];
+      return Number(yA) - Number(yB);
+    });
+  } else if (sortState.key === "date") {
+    sorted.sort((a, b) => (Date.parse(a.item?.created) || 0) - (Date.parse(b.item?.created) || 0));
+  } else if (sortState.key === "rating") {
+    sorted.sort((a, b) => {
+      const rA = itemRating(a.item) ?? -1;
+      const rB = itemRating(b.item) ?? -1;
+      return rA - rB;
+    });
+  }
+  // For manual: items are already in manual order, just apply direction
+
   if (sortState.dir === "desc") sorted.reverse();
   return sorted;
 }
@@ -3411,6 +3428,12 @@ function render() {
         ${descBlock}
       </div>`;
   }).join("");
+
+  // Add "+" button inline when manual + desc (reversed order - button on top)
+  if (currentSection !== "__all__" && !isEditing && sortState.key === "manual" && sortState.dir === "desc") {
+    view.innerHTML = `<div class="add-item-footer" style="position: static; margin-bottom: 12px;"><button class="add-item-btn" onclick="addNewItem()" type="button" title="Добавить">+</button></div>` + view.innerHTML;
+  }
+
   updateCounter(items.length);
 
   // Restore inline edit session (if any) after DOM update
@@ -3446,6 +3469,9 @@ function render() {
       } catch {}
     });
   }
+
+  // Update button position after render
+  updateSectionButton();
 }
 
 function updateCounter(n) {
@@ -4147,8 +4173,14 @@ function addNewItem() {
 
   const sec = data.sections[currentSection];
   const newItem = { id: genItemId(), text: "", tags: [], created: new Date().toISOString() };
+
+  // Manual order in DATA: newest items are always at the END of the array
+  // Display order depends on sortState.dir:
+  // - asc: no reverse, so END of array = bottom of display
+  // - desc: reverse applied, so END of array = top of display
   const idx = sec.items.length;
   sec.items.push(newItem);
+
   sec.modified = new Date().toISOString();
 
   // Save immediately so undo/refresh won't lose it
