@@ -2457,10 +2457,32 @@ function selectSection(key) {
   currentSection = key; setAccountItem("current_section", key);
   selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
   updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
-  // сбрасываем scroll, чтобы не сохранялось старое положение другого раздела
+
+  // Reset scroll position based on sort direction
   setAccountItem("scroll_y", "0");
-  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+  // Render first to populate the list
   render();
+
+  // Scroll to top or bottom based on manual sort direction
+  if (sortState.key === "manual" && sortState.dir === "asc") {
+    // asc = normal order = scroll to bottom, but keep "+" button visible with proper spacing
+    requestAnimationFrame(() => {
+      const footer = $("addItemFooter");
+      if (footer) {
+        // Scroll so the button is visible at the bottom with natural spacing
+        footer.scrollIntoView({ block: "end", behavior: "instant" });
+        // Add a bit more scroll down to balance spacing
+        window.scrollBy({ top: 40, left: 0, behavior: "instant" });
+      } else {
+        // Fallback if button not found
+        window.scrollTo({ top: document.documentElement.scrollHeight, left: 0, behavior: "instant" });
+      }
+    });
+  } else {
+    // desc or other sorts = scroll to top
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }
 }
 
 function updateSectionButton() {
