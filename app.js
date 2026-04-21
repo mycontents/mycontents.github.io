@@ -497,6 +497,13 @@ function commitInlineEdit() {
   }
 
   item.text = finalText;
+
+  // Remove temporary flags after first edit
+  if (item._justCreated) {
+    delete item._justCreated;
+    delete item._addToTop;
+  }
+
   data.sections[secKey].modified = new Date().toISOString();
 
   // Stable per-item key for TMDB pick logic
@@ -2521,25 +2528,31 @@ function selectSection(key) {
   // Render first to populate the list
   render();
 
-  // Scroll to top or bottom based on manual sort direction
-  if (sortState.key === "manual" && sortState.dir === "asc") {
-    // asc = normal order = scroll to bottom, but keep "+" button visible with proper spacing
-    requestAnimationFrame(() => {
-      const footer = $("addItemFooter");
-      if (footer) {
-        // Scroll so the button is visible at the bottom with natural spacing
+  // Scroll to top or bottom based on where "+" button ends up
+  requestAnimationFrame(() => {
+    const footer = $("addItemFooter");
+    const container = $("container");
+
+    if (footer && container) {
+      const footerRect = footer.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      // Check if button is in bottom half of viewport (below fold)
+      const isAtBottom = footerRect.top > window.innerHeight / 2;
+
+      if (isAtBottom) {
+        // Button is at bottom - scroll to show it
         footer.scrollIntoView({ block: "end", behavior: "instant" });
-        // Add a bit more scroll down to balance spacing
         window.scrollBy({ top: 40, left: 0, behavior: "instant" });
       } else {
-        // Fallback if button not found
-        window.scrollTo({ top: document.documentElement.scrollHeight, left: 0, behavior: "instant" });
+        // Button is at top - scroll to top
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
       }
-    });
-  } else {
-    // desc or other sorts = scroll to top
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }
+    } else {
+      // Fallback: scroll to top
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  });
 }
 
 function updateSectionButton() {
@@ -2639,7 +2652,11 @@ function updateSortMenuUI() {
 }
 
 function sortItems(items) {
-  const sorted = [...items];
+  // Separate just-created items from regular items
+  const justCreated = items.filter(x => x.item?._justCreated);
+  const regular = items.filter(x => !x.item?._justCreated);
+
+  const sorted = [...regular];
   const text = x => x.text || "";
 
   if (sortState.key === "alpha") {
@@ -2661,6 +2678,17 @@ function sortItems(items) {
   // For manual: items are already in manual order, just apply direction
 
   if (sortState.dir === "desc") sorted.reverse();
+
+  // Add just-created items based on their _addToTop flag
+  if (justCreated.length > 0) {
+    const addToTop = justCreated.some(x => x.item?._addToTop);
+    if (addToTop) {
+      return [...justCreated, ...sorted];
+    } else {
+      return [...sorted, ...justCreated];
+    }
+  }
+
   return sorted;
 }
 
@@ -4295,12 +4323,29 @@ function addNewItem() {
   normalizeDataModel();
 
   const sec = data.sections[currentSection];
-  const newItem = { id: genItemId(), text: "", tags: [], created: new Date().toISOString() };
 
-  // Manual order in DATA: newest items are always at the END of the array
-  // Display order depends on sortState.dir:
-  // - asc: no reverse, so END of array = bottom of display
-  // - desc: reverse applied, so END of array = top of display
+  // Determine where button is NOW (before adding item)
+  const footer = $("addItemFooter");
+  const viewMode = $("viewMode");
+  let addToTop = false; // default: add to bottom
+
+  if (footer && viewMode) {
+    const footerRect = footer.getBoundingClientRect();
+    const viewModeRect = viewMode.getBoundingClientRect();
+    // If button is above the list bottom, it's at top
+    addToTop = footerRect.top < viewModeRect.bottom - 10;
+  }
+
+  const newItem = {
+    id: genItemId(),
+    text: "",
+    tags: [],
+    created: new Date().toISOString(),
+    _justCreated: true,  // Flag to prevent sorting
+    _addToTop: addToTop  // Remember where to place it
+  };
+
+  // Add to array (position doesn't matter, sortItems will handle it)
   const idx = sec.items.length;
   sec.items.push(newItem);
 
