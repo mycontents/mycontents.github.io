@@ -161,7 +161,8 @@ let sectionRename = { active: false, orig: "", lastTapAt: 0 };
 // Long press for move menu
 let longPressTimer = null;
 let longPressTarget = null;
-const LONG_PRESS_MS = 2000;
+const LONG_PRESS_MS = 1200;
+let suppressNextClick = false;
 
 // Prevent browser auto scroll restoration fighting with our saved scroll
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -3451,6 +3452,7 @@ $("viewMode").addEventListener("pointerdown", e => {
         if (sec && Number.isInteger(idx)) {
           // Anchor move menu to the top row so it won't be pushed down by expanded desc/TMDB pick
           const row = line.querySelector(".item-row") || line;
+          suppressNextClick = true;
           openMoveMenu(sec, idx, row);
         }
       }
@@ -3494,6 +3496,13 @@ $("viewMode").addEventListener("pointercancel", () => {
 
 $("viewMode").addEventListener("click", e => {
   if (isEditing) return;
+
+  // Suppress click that follows long press menu opening
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    e.stopPropagation();
+    return;
+  }
 
   // If inline edit is active and user clicks elsewhere — commit.
   // IMPORTANT: ignore the same click that just started inline edit (iOS Safari keyboard/focus fix).
