@@ -103,7 +103,7 @@ if (!GIST_ID) {
   GIST_ID = localStorage.getItem("gist_id") || "";
 }
 let currentSection = getAccountItem("current_section") || "__all__";
-let sortState = parseSortState(getAccountItem("sort_state")) || { key: "manual", dir: "desc" };
+let sortState = parseSortState(getAccountItem("sort_state")) || { key: "manual", dir: "asc" };
 let filterQuery = getAccountItem("filter_query") || "";
 let viewedFilter = getAccountItem("viewed_filter") || "hide";
 let tagFilter = loadTagFilter();
