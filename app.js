@@ -84,9 +84,24 @@ function loadRatingFilter() {
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
-let GIST_ID = localStorage.getItem("gist_id") || "";
+// Read credentials from URL or localStorage
+let GIST_ID = "";
 let TOKEN = localStorage.getItem("github_token") || "";
 let TMDB_KEY = localStorage.getItem("tmdb_key") || "";
+
+// Initialize GIST_ID from URL
+try {
+  const setup = new URLSearchParams(location.search).get("s");
+  if (setup) {
+    const parts = atob(setup).split(":");
+    if (parts[0]) GIST_ID = parts[0];
+  }
+} catch {}
+
+// Fallback to localStorage only if no URL param (shouldn't happen in normal use)
+if (!GIST_ID) {
+  GIST_ID = localStorage.getItem("gist_id") || "";
+}
 let currentSection = getAccountItem("current_section") || "__all__";
 let sortState = parseSortState(getAccountItem("sort_state")) || { key: "manual", dir: "desc" };
 let filterQuery = getAccountItem("filter_query") || "";
@@ -2399,7 +2414,7 @@ function saveSettings() {
   const g = $("inputGistId").value.trim(), t = $("inputToken").value.trim();
   const tmdb = $("inputTmdbKey").value.trim();
   if (!g || !t) return;
-  localStorage.setItem("gist_id", g);
+  // Don't save gist_id to localStorage - it should only come from URL
   localStorage.setItem("github_token", t);
   localStorage.setItem("tmdb_key", tmdb);
   GIST_ID = g; TOKEN = t; TMDB_KEY = tmdb;
@@ -2588,7 +2603,14 @@ function updateSortMenuUI() {
     const k = el.dataset.key, active = k === sortState.key;
     el.classList.toggle("active", active);
     const dir = el.querySelector(".sort-dir");
-    if (dir) dir.textContent = !active ? "" : sortState.dir === "asc" ? "↑" : "↓";
+    if (!dir) return;
+    if (!active) {
+      dir.textContent = "";
+    } else {
+      // Invert arrows for all sort types: asc=down, desc=up
+      const arrow = sortState.dir === "asc" ? "↓" : "↑";
+      dir.textContent = arrow;
+    }
   });
 }
 
