@@ -3,21 +3,81 @@ const ICONS = "icons.svg";
 const VIEWED_TAG = "__viewed__";
 const UNDO_MS = 10000;
 
+// Apply URL setup FIRST before reading from localStorage
+(function applyUrlSetup() {
+  const setup = new URLSearchParams(location.search).get("s");
+  if (!setup) return;
+  try {
+    const parts = atob(setup).split(":");
+    const [gist, token, tmdb] = parts;
+    if (gist && token) {
+      localStorage.setItem("gist_id", gist);
+      localStorage.setItem("github_token", token);
+      if (tmdb) localStorage.setItem("tmdb_key", tmdb);
+    }
+  } catch (e) {
+    console.error("Failed to parse URL setup:", e);
+  }
+})();
+
+// Helper functions for account-specific localStorage
+function getAccountKey(key) {
+  const gistId = localStorage.getItem("gist_id") || "";
+  return gistId ? `${gistId}:${key}` : key;
+}
+function getAccountItem(key) {
+  return localStorage.getItem(getAccountKey(key));
+}
+function setAccountItem(key, value) {
+  localStorage.setItem(getAccountKey(key), value);
+}
+function removeAccountItem(key) {
+  localStorage.removeItem(getAccountKey(key));
+}
+
+// Helper functions for parsing/loading state (must be defined before use)
+function parseSortState(s) {
+  if (!s) return null;
+  const [k, d] = s.split(":");
+  return k ? { key: k, dir: d === "asc" ? "asc" : "desc" } : null;
+}
+
+function normTag(t) { return String(t || "").trim().replace(/\s+/g, " ").toLowerCase(); }
+
+function loadTagFilter() {
+  try {
+    const arr = JSON.parse(getAccountItem("tag_filter") || "[]");
+    return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
+  } catch { return new Set(); }
+}
+
+function loadTagFilterExcluded() {
+  try {
+    const arr = JSON.parse(getAccountItem("tag_filter_excluded") || "[]");
+    return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
+  } catch { return new Set(); }
+}
+
+function loadRatingFilter() {
+  const v = Number(getAccountItem("rating_filter") || "0");
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
 let GIST_ID = localStorage.getItem("gist_id") || "";
 let TOKEN = localStorage.getItem("github_token") || "";
 let TMDB_KEY = localStorage.getItem("tmdb_key") || "";
-let currentSection = localStorage.getItem("current_section") || "__all__";
-let sortState = parseSortState(localStorage.getItem("sort_state")) || { key: "manual", dir: "desc" };
-let filterQuery = localStorage.getItem("filter_query") || "";
-let viewedFilter = localStorage.getItem("viewed_filter") || "hide";
+let currentSection = getAccountItem("current_section") || "__all__";
+let sortState = parseSortState(getAccountItem("sort_state")) || { key: "manual", dir: "desc" };
+let filterQuery = getAccountItem("filter_query") || "";
+let viewedFilter = getAccountItem("viewed_filter") || "hide";
 let tagFilter = loadTagFilter();
 let tagFilterExcluded = loadTagFilterExcluded();
 let ratingFilter = loadRatingFilter(); // number|null : минимальный рейтинг (>=)
 
 let data = { sections: {} };
 let isEditing = false;
-let selectedKey = localStorage.getItem("selected_key") || null;
-let sortMenuOpen = (localStorage.getItem("sort_menu_open") || "0") === "1";
+let selectedKey = getAccountItem("selected_key") || null;
+let sortMenuOpen = (getAccountItem("sort_menu_open") || "0") === "1";
 let editCtx = null;
 let tagEditorCtx = null;
 let mobileSearchOpen = false;
@@ -27,7 +87,7 @@ let deleteArmSection = null, deleteArmSectionTimer = null;
 let deleteArmItemKey = null, deleteArmItemTimer = null;
 let undoTimer = null, undoPayload = null;
 let savingInProgress = false; // Фоновое сохранение в процессе
-let expandedDescKey = localStorage.getItem("expanded_desc_key") || null; // "secKey|idx" для раскрытого описания
+let expandedDescKey = getAccountItem("expanded_desc_key") || null; // "secKey|idx" для раскрытого описания
 let tmdbMode = localStorage.getItem("tmdb_mode") || "new";
 
 let tmdbGenres = null;
@@ -314,7 +374,7 @@ function beginInlineEdit(line, opts = {}) {
   // Ensure selected
   if (selectedKey !== key) {
     selectedKey = key;
-    localStorage.setItem("selected_key", selectedKey);
+    setAccountItem("selected_key", selectedKey);
     document.querySelectorAll("#viewMode .item-line.selected").forEach(x => x.classList.remove("selected"));
     line.classList.add("selected");
   }
@@ -422,7 +482,6 @@ function commitInlineEdit() {
 
 // ===== Init =====
 async function init() {
-  applyUrlSetup();
   setupFilterUI();
   updateViewedToggleUI();
   updateTagFilterBtnUI();
@@ -486,14 +545,14 @@ async function init() {
         const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
         if (!it || !it.desc) {
           expandedDescKey = null;
-          localStorage.removeItem("expanded_desc_key");
+          removeAccountItem("expanded_desc_key");
         }
       }
 
       // Validate selected key (selection is tied to the current visible list)
       if (selectedKey && !existingKeys.has(selectedKey)) {
         selectedKey = null;
-        localStorage.removeItem("selected_key");
+        removeAccountItem("selected_key");
       }
 
       // Re-render once only if expanded description is currently visible (so the expanded DOM exists)
@@ -508,7 +567,7 @@ async function init() {
 
       // Restore scroll ONLY after final DOM height is settled
       requestAnimationFrame(() => {
-        const y = Number(localStorage.getItem("scroll_y") || "0");
+        const y = Number(getAccountItem("scroll_y") || "0");
         if (Number.isFinite(y) && y > 0) {
           window.scrollTo({ top: y, left: 0, behavior: "instant" });
         }
@@ -533,26 +592,6 @@ async function init() {
 //  return false;
 //}
 
-function applyUrlSetup() {
-  const setup = new URLSearchParams(location.search).get("s");
-  if (!setup) return;
-  try {
-    const parts = atob(setup).split(":");
-    const [gist, token, tmdb] = parts;
-    if (gist && token) {
-      localStorage.setItem("gist_id", gist);
-      localStorage.setItem("github_token", token);
-      GIST_ID = gist; TOKEN = token;
-      if (tmdb) { localStorage.setItem("tmdb_key", tmdb); TMDB_KEY = tmdb; }
-      // For Apple devices: keep URL with ?s= parameter (localStorage is unreliable)
-      // For other browsers: shorten URL
-      //if (!isAppleDevice()) {
-      //  history.replaceState({}, "", location.pathname);
-      //}
-    }
-  } catch {}
-}
-
 function sanitizeSectionName(s) {
   return String(s || "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -569,7 +608,7 @@ function mergeSectionInto(targetKey, sourceKey) {
   // If current section points to source, redirect
   if (currentSection === sourceKey) {
     currentSection = targetKey;
-    localStorage.setItem("current_section", currentSection);
+    setAccountItem("current_section", currentSection);
   }
 
   // Adjust selection/expanded keys if they were in source
@@ -577,14 +616,14 @@ function mergeSectionInto(targetKey, sourceKey) {
     const p = parseItemKey(selectedKey);
     if (p && p.secKey === sourceKey) {
       selectedKey = null;
-      localStorage.removeItem("selected_key");
+      removeAccountItem("selected_key");
     }
   }
   if (expandedDescKey) {
     const p = parseItemKey(expandedDescKey);
     if (p && p.secKey === sourceKey) {
       expandedDescKey = null;
-      localStorage.removeItem("expanded_desc_key");
+      removeAccountItem("expanded_desc_key");
     }
   }
 
@@ -634,7 +673,7 @@ function commitSectionRename() {
 
     if (currentSection === from) {
       currentSection = to;
-      localStorage.setItem("current_section", currentSection);
+      setAccountItem("current_section", currentSection);
     }
   }
 
@@ -758,7 +797,6 @@ function uniqueTags(tags) {
   return out;
 }
 
-function normTag(t) { return String(t || "").trim().replace(/\s+/g, " ").toLowerCase(); }
 function isViewed(item) { return item?.tags?.includes(VIEWED_TAG); }
 
 // Country codes mapping
@@ -1363,7 +1401,7 @@ async function applyTmdbCandidateToItemFromAutoPick(pickKey, c) {
 
   // Immediate UI update + save with current data
   selectedKey = key;
-  localStorage.setItem("selected_key", selectedKey);
+  setAccountItem("selected_key", selectedKey);
 
   // Item may move due to sorting after TMDB apply; scroll to it once after render.
   scrollToPickKeyOnce = k;
@@ -1709,7 +1747,7 @@ async function fetchTmdbTags() {
 
   // Ensure the item is selected in the main list
   selectedKey = `${secKey}|${idx}`;
-  localStorage.setItem("selected_key", selectedKey);
+  setAccountItem("selected_key", selectedKey);
 
   // Start (or restart) the pick flow
   startTmdbAutoPick(pickKey);
@@ -1850,14 +1888,14 @@ function setupFilterUI() {
   const handle = (v) => {
     if (isEditing) return;
     filterQuery = v || "";
-    localStorage.setItem("filter_query", filterQuery);
+    setAccountItem("filter_query", filterQuery);
     input.value = mInput.value = filterQuery;
     clear.classList.toggle("hidden", !filterQuery);
     mClear.classList.toggle("hidden", !filterQuery);
     updateSearchBtnUI();
 
     // On filter change: reset scroll (but do not affect initial load restoration)
-    localStorage.setItem("scroll_y", "0");
+    setAccountItem("scroll_y", "0");
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
     selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
@@ -1870,14 +1908,14 @@ function setupFilterUI() {
 function clearFilter() {
   if (isEditing) return;
   filterQuery = "";
-  localStorage.setItem("filter_query", "");
+  setAccountItem("filter_query", "");
   $("filterInput").value = $("mobileFilterInput").value = "";
   $("filterClear").classList.add("hidden");
   $("mobileFilterClear").classList.add("hidden");
   updateSearchBtnUI();
 
   // reset scroll on filter change
-  localStorage.setItem("scroll_y", "0");
+  setAccountItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
   selectedKey = null; disarmItemDelete(); closeTagEditor(); render();
@@ -1905,30 +1943,14 @@ function toggleMobileSearch() {
 }
 
 // ===== Tag filter =====
-function loadTagFilter() {
-  try {
-    const arr = JSON.parse(localStorage.getItem("tag_filter") || "[]");
-    return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
-  } catch { return new Set(); }
-}
-function loadTagFilterExcluded() {
-  try {
-    const arr = JSON.parse(localStorage.getItem("tag_filter_excluded") || "[]");
-    return new Set(arr.map(normTag).filter(t => t && t !== VIEWED_TAG));
-  } catch { return new Set(); }
-}
 function saveTagFilter() {
-  localStorage.setItem("tag_filter", JSON.stringify([...tagFilter]));
-  localStorage.setItem("tag_filter_excluded", JSON.stringify([...tagFilterExcluded]));
+  setAccountItem("tag_filter", JSON.stringify([...tagFilter]));
+  setAccountItem("tag_filter_excluded", JSON.stringify([...tagFilterExcluded]));
 }
 
-function loadRatingFilter() {
-  const v = Number(localStorage.getItem("rating_filter") || "0");
-  return Number.isFinite(v) && v > 0 ? v : null;
-}
 function saveRatingFilter() {
-  if (ratingFilter == null) localStorage.removeItem("rating_filter");
-  else localStorage.setItem("rating_filter", String(ratingFilter));
+  if (ratingFilter == null) removeAccountItem("rating_filter");
+  else setAccountItem("rating_filter", String(ratingFilter));
 }
 
 function updateTagFilterBtnUI() {
@@ -2012,7 +2034,7 @@ function renderRatingFilterMenu() {
       updateTagFilterBtnUI();
 
       // reset scroll on filter change
-      localStorage.setItem("scroll_y", "0");
+      setAccountItem("scroll_y", "0");
       window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
       selectedKey = null; disarmItemDelete(); closeTagEditor();
@@ -2046,7 +2068,7 @@ function toggleTagFilterItem(tag) {
   saveTagFilter(); updateTagFilterBtnUI();
 
   // reset scroll on filter change
-  localStorage.setItem("scroll_y", "0");
+  setAccountItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
   selectedKey = null; disarmItemDelete(); closeTagEditor();
@@ -2062,7 +2084,7 @@ function clearTagFilter() {
   updateTagFilterBtnUI();
 
   // reset scroll on filter change
-  localStorage.setItem("scroll_y", "0");
+  setAccountItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
   selectedKey = null; disarmItemDelete(); closeTagEditor();
@@ -2245,14 +2267,14 @@ function toggleDescExpand(secKey, idx) {
 
   const key = `${secKey}|${idx}`;
   expandedDescKey = (expandedDescKey === key) ? null : key;
-  if (expandedDescKey) localStorage.setItem("expanded_desc_key", expandedDescKey);
-  else localStorage.removeItem("expanded_desc_key");
+  if (expandedDescKey) setAccountItem("expanded_desc_key", expandedDescKey);
+  else removeAccountItem("expanded_desc_key");
   render();
 }
 
 function closeDescMenu() { 
   expandedDescKey = null;
-  localStorage.removeItem("expanded_desc_key");
+  removeAccountItem("expanded_desc_key");
 }
 
 function clearDescForItem(secKey, idx) {
@@ -2288,7 +2310,7 @@ function updateViewedToggleUI() {
 function cycleViewedFilter() {
   if (isEditing) return;
   viewedFilter = viewedFilter === "hide" ? "show" : viewedFilter === "show" ? "only" : "hide";
-  localStorage.setItem("viewed_filter", viewedFilter);
+  setAccountItem("viewed_filter", viewedFilter);
   selectedKey = null; disarmItemDelete(); closeTagEditor();
   updateViewedToggleUI(); render();
 }
@@ -2419,11 +2441,11 @@ function renderSectionList() {
 }
 
 function selectSection(key) {
-  currentSection = key; localStorage.setItem("current_section", key);
+  currentSection = key; setAccountItem("current_section", key);
   selectedKey = null; disarmItemDelete(); closeTagEditor(); disarmSectionDelete();
   updateSectionButton(); $("sectionMenu").classList.add("hidden"); $("settingsPanel").classList.add("hidden");
   // сбрасываем scroll, чтобы не сохранялось старое положение другого раздела
-  localStorage.setItem("scroll_y", "0");
+  setAccountItem("scroll_y", "0");
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   render();
 }
@@ -2457,7 +2479,7 @@ function handleSectionDelete(key) {
     delete data.sections[key];
     if (currentSection === key) {
       currentSection = "__all__";
-      localStorage.setItem("current_section", "__all__");
+      setAccountItem("current_section", "__all__");
       updateSectionButton();
     }
     selectedKey = null; disarmItemDelete(); closeTagEditor(); closeDescMenu(); disarmSectionDelete();
@@ -2478,9 +2500,9 @@ function toggleSort() {
   if (isEditing) return;
   const menu = $("sortMenu");
   const willOpen = menu.classList.contains("hidden");
-  if (!willOpen) { menu.classList.add("hidden"); sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0"); return; }
+  if (!willOpen) { menu.classList.add("hidden"); sortMenuOpen = false; setAccountItem("sort_menu_open", "0"); return; }
   sortMenuOpen = true;
-  localStorage.setItem("sort_menu_open", "1");
+  setAccountItem("sort_menu_open", "1");
   openMenu("sortMenu", $("sortBtn"), "right");
   updateSortMenuUI();
 }
@@ -2489,17 +2511,15 @@ function setSortKey(key) {
   if (key === "manual") sortState = { key: "manual", dir: "desc" };
   else if (sortState.key === key) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
   else sortState = { key, dir: key === "alpha" ? "asc" : "desc" };
-  localStorage.setItem("sort_state", `${sortState.key}:${sortState.dir}`);
-  selectedKey = null; localStorage.removeItem("selected_key");
+  setAccountItem("sort_state", `${sortState.key}:${sortState.dir}`);
+  selectedKey = null; removeAccountItem("selected_key");
   disarmItemDelete(); closeTagEditor();
   // описание можно оставить раскрытым
   updateSortMenuUI();
   $("sortMenu").classList.add("hidden");
-  sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
+  sortMenuOpen = false; setAccountItem("sort_menu_open", "0");
   render();
 }
-
-function parseSortState(s) { if (!s) return null; const [k, d] = s.split(":"); return k ? { key: k, dir: d === "asc" ? "asc" : "desc" } : null; }
 
 function updateSortMenuUI() {
   document.querySelectorAll("#sortMenu .menu-option").forEach(el => {
@@ -2540,7 +2560,7 @@ $("undoBtn").onclick = () => {
     let k = p.key;
     if (data.sections[k]) { let i = 2; while (data.sections[`${k} (${i})`]) i++; k = `${k} (${i})`; }
     data.sections[k] = p.secData;
-    if (p.prev === p.key) { currentSection = k; localStorage.setItem("current_section", k); updateSectionButton(); }
+    if (p.prev === p.key) { currentSection = k; setAccountItem("current_section", k); updateSectionButton(); }
     saveData(); renderSectionList(); render();
   } else if (p.type === "item") {
     if (!data.sections[p.secKey]) data.sections[p.secKey] = { items: [], modified: new Date().toISOString() };
@@ -2659,11 +2679,11 @@ function toggleItemViewed(secKey, idx) {
   if (!keepFocus) {
     if (selectedKey === key) {
       selectedKey = null;
-      localStorage.removeItem("selected_key");
+      removeAccountItem("selected_key");
     }
     if (expandedDescKey === key) {
       expandedDescKey = null;
-      localStorage.removeItem("expanded_desc_key");
+      removeAccountItem("expanded_desc_key");
     }
   }
 
@@ -3227,7 +3247,7 @@ function render() {
     const it = p ? data.sections?.[p.secKey]?.items?.[p.idx] : null;
     if (!it || !it.desc) {
       expandedDescKey = null;
-      localStorage.removeItem("expanded_desc_key");
+      removeAccountItem("expanded_desc_key");
     }
   }
 
@@ -3567,7 +3587,7 @@ $("viewMode").addEventListener("click", e => {
     if (a === "desc") {
       if (selectedKey !== key) {
         selectedKey = key;
-        localStorage.setItem("selected_key", selectedKey);
+        setAccountItem("selected_key", selectedKey);
         disarmItemDelete();
       }
 
@@ -3588,7 +3608,7 @@ $("viewMode").addEventListener("click", e => {
 
       if (selectedKey !== key) {
         selectedKey = key;
-        localStorage.setItem("selected_key", selectedKey);
+        setAccountItem("selected_key", selectedKey);
         disarmItemDelete();
         document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
         line.classList.add("selected");
@@ -3601,7 +3621,7 @@ $("viewMode").addEventListener("click", e => {
     if (a === "del") {
       if (selectedKey !== key) {
         selectedKey = key;
-        localStorage.setItem("selected_key", selectedKey);
+        setAccountItem("selected_key", selectedKey);
         disarmItemDelete();
         closeTagEditor();
         // Do NOT close expanded description/pick of another item just because user armed delete on this one.
@@ -3625,7 +3645,7 @@ $("viewMode").addEventListener("click", e => {
     // IMPORTANT: switching selection should NOT resolve pending TMDB pick.
     // The pick UI will be hidden automatically because the previous item loses `.selected`.
     selectedKey = key;
-    localStorage.setItem("selected_key", selectedKey);
+    setAccountItem("selected_key", selectedKey);
     disarmItemDelete();
     closeTagEditor();
     document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
@@ -3684,7 +3704,7 @@ $("viewMode").addEventListener("click", e => {
       // Ensure selected
       if (selectedKey !== key) {
         selectedKey = key;
-        localStorage.setItem('selected_key', selectedKey);
+        setAccountItem('selected_key', selectedKey);
         document.querySelectorAll('#viewMode .item-line.selected').forEach(el => el.classList.remove('selected'));
         line.classList.add('selected');
       }
@@ -3742,7 +3762,7 @@ $("viewMode").addEventListener("dblclick", e => {
   // Ensure selected
   if (selectedKey !== key) {
     selectedKey = key;
-    localStorage.setItem("selected_key", selectedKey);
+    setAccountItem("selected_key", selectedKey);
     disarmItemDelete();
     closeTagEditor();
     document.querySelectorAll("#viewMode .item-line.selected").forEach(el => el.classList.remove("selected"));
@@ -3781,13 +3801,13 @@ $("viewMode").addEventListener("dblclick", e => {
 window.addEventListener("scroll", () => {
   if (document.body.classList.contains("editing")) return;
   if (restoringUI) return; // don't overwrite while restoring
-  localStorage.setItem("scroll_y", String(window.scrollY || 0));
+  setAccountItem("scroll_y", String(window.scrollY || 0));
 }, { passive: true });
 
 // Also persist scroll on unload (more reliable on mobile)
 window.addEventListener("beforeunload", () => {
   if (!document.body.classList.contains("editing")) {
-    localStorage.setItem("scroll_y", String(window.scrollY || 0));
+    setAccountItem("scroll_y", String(window.scrollY || 0));
   }
 });
 
@@ -3816,7 +3836,7 @@ document.addEventListener("click", e => {
   if (!e.target.closest(".dropdown-menu") && !e.target.closest(".icon-btn") && !e.target.closest(".section-btn") && !e.target.closest(".view-toggle") && !e.target.closest(".search-toggle-btn")) {
     closeAllMenus();
     closeMoveMenu();
-    sortMenuOpen = false; localStorage.setItem("sort_menu_open", "0");
+    sortMenuOpen = false; setAccountItem("sort_menu_open", "0");
     disarmSectionDelete();
     renderSectionList();
   }
@@ -3988,11 +4008,11 @@ function moveItemToSection(fromSec, idx, toSec) {
   const oldKey = `${fromSec}|${idx}`;
   if (selectedKey === oldKey) {
     selectedKey = null;
-    localStorage.removeItem("selected_key");
+    removeAccountItem("selected_key");
   }
   if (expandedDescKey === oldKey) {
     expandedDescKey = null;
-    localStorage.removeItem("expanded_desc_key");
+    removeAccountItem("expanded_desc_key");
   }
 
   closeMoveMenu();
@@ -4119,7 +4139,7 @@ function addNewItem() {
   // Ensure it is visible by clearing filters (otherwise inline edit element won't exist)
   if (filterQuery) {
     filterQuery = "";
-    localStorage.setItem("filter_query", "");
+    setAccountItem("filter_query", "");
     $("filterInput").value = $("mobileFilterInput").value = "";
     $("filterClear").classList.add("hidden");
     $("mobileFilterClear").classList.add("hidden");
@@ -4139,13 +4159,13 @@ function addNewItem() {
   // Ensure viewed filter is not "only" (new item has no viewed tag)
   if (viewedFilter === "only") {
     viewedFilter = "show";
-    localStorage.setItem("viewed_filter", viewedFilter);
+    setAccountItem("viewed_filter", viewedFilter);
     updateViewedToggleUI();
   }
 
   const key = `${currentSection}|${idx}`;
   selectedKey = key;
-  localStorage.setItem("selected_key", selectedKey);
+  setAccountItem("selected_key", selectedKey);
 
   // Mark this item as pending TMDB pick (choice list will be shown after first commit)
   // Use stable identifier (item.id) to avoid any index/sort/filter issues.
